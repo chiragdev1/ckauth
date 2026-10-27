@@ -14,7 +14,7 @@
 
 	# the client-side routes (src/app.tsx; keep the two lists in sync) get app.html, the empty shell,
 	# because index.html holds the prerendered home page. they're app screens, not content, so keep them out of search
-	@app path /sign-up /sign-in /verify-email /forgot-password /reset-password /dashboard /app.html
+	@app path /sign-up /sign-in /verify-email /forgot-password /reset-password /dashboard /privacy /terms /app.html
 	header @app X-Robots-Tag "noindex"
 	rewrite @app /app.html
 

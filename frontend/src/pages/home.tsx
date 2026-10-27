@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
 import { CONTACT_EMAIL, homeCopy, REPO_URL, type HomeCopy } from './home-copy.ts'
 
-// the landing page, written for small business owners in india (words: home-copy.ts, from content/landing-page.md)
+// the landing page, written for anyone running a website or app (words: home-copy.ts, from content/landing-page.md)
 export function Home() {
   useDocumentTitle()
   const { language } = useLanguage()
@@ -28,7 +28,8 @@ export function Home() {
   )
 }
 
-function Actions({ copy, secondary }: { copy: HomeCopy, secondary: 'developers' | 'contact' }) {
+// the secondary button stays on the page in the hero (how it works), so the only way off it is signing up
+function Actions({ copy, secondary }: { copy: HomeCopy, secondary: 'how' | 'contact' }) {
   const { user } = useAuth()
 
   return (
@@ -37,11 +38,22 @@ function Actions({ copy, secondary }: { copy: HomeCopy, secondary: 'developers' 
         {user ? <Link to="/dashboard">{copy.hero.dashboard}<ArrowRight /></Link> : <Link to="/sign-up">{copy.hero.primary}<ArrowRight /></Link>}
       </Button>
       <Button asChild size="lg" variant="outline">
-        {secondary === 'developers'
-          ? <a href="#developers">{copy.hero.developers}</a>
+        {secondary === 'how'
+          ? <a href="#how-it-works">{copy.hero.secondary}</a>
           : <a href={`mailto:${CONTACT_EMAIL}`}><Mail />{copy.final.contact}</a>}
       </Button>
     </>
+  )
+}
+
+// answers "what's the catch?" right under the button, where people decide whether to click
+function Reassurance({ items, center }: { items: string[], center?: boolean }) {
+  return (
+    <ul className={cn('mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground', center && 'justify-center')}>
+      {items.map(item => (
+        <li key={item} className="flex items-center gap-1.5"><Check className="size-4 text-success" />{item}</li>
+      ))}
+    </ul>
   )
 }
 
@@ -74,8 +86,9 @@ function Hero({ copy }: { copy: HomeCopy }) {
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">{hero.body}</p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Actions copy={copy} secondary="developers" />
+            <Actions copy={copy} secondary="how" />
           </div>
+          <Reassurance items={hero.reassurance} />
           <dl className="mt-12 grid max-w-lg grid-cols-3 divide-x border-t pt-6">
             {hero.stats.map(stat => (
               <div key={stat.label} className="px-4 first:pl-0">
@@ -99,7 +112,7 @@ function SignInPreview({ copy }: { copy: HomeCopy }) {
 
   return (
     <figure className="mx-auto w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div aria-hidden className="dossier rounded-[2.5rem] border-[10px] border-secondary bg-card p-6 pt-8">
+      <div aria-hidden className="dossier rounded-[2.5rem] border-secondary bg-card p-6 pt-8">
         <p className="text-center text-xs font-semibold tracking-wide text-muted-foreground uppercase">{phone.shop}</p>
         <p className="font-display mt-2 text-center text-2xl font-semibold">{phone.heading}</p>
         <div className="mt-6 space-y-3">
@@ -228,7 +241,7 @@ function Business({ copy }: { copy: HomeCopy }) {
   )
 }
 
-// the second way in, for people who build sites for shop owners
+// the second way in, for developers building sites for clients or for themselves
 function Developers({ copy }: { copy: HomeCopy }) {
   const { developers } = copy
 
@@ -323,6 +336,7 @@ function FaqAnswer({ item }: { item: FaqItem }) {
   return (
     <p className="mt-3 rounded-2xl rounded-tl-sm bg-primary/5 px-4 py-3 leading-relaxed">
       <strong className="font-semibold">{item.lead}</strong> <WithEmailLink text={item.a} />
+      {item.link && <> <Link to={item.link.to} className="font-medium text-foreground underline underline-offset-4">{item.link.label}</Link>.</>}
     </p>
   )
 }
@@ -346,6 +360,7 @@ function FinalCall({ copy }: { copy: HomeCopy }) {
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <Actions copy={copy} secondary="contact" />
         </div>
+        <Reassurance items={copy.hero.reassurance} center />
         <p className="mt-6 text-sm text-muted-foreground">
           {final.emailLine} <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-foreground underline underline-offset-4">{CONTACT_EMAIL}</a>
         </p>

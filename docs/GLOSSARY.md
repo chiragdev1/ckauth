@@ -13,6 +13,7 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 - [Logs and monitoring](#logs-and-monitoring)
 - [Email delivery](#email-delivery)
 - [Search, speed and accessibility](#search-speed-and-accessibility)
+- [Growth and legal](#growth-and-legal)
 
 ---
 
@@ -348,3 +349,21 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 **IndexNow.** A protocol for telling Bing and others straight away that a page changed.
 
 **WCAG / contrast ratio.** WCAG is the web accessibility standard. The contrast ratio compares text colour with its background; level AA needs at least 4.5:1 for normal text.
+
+## Growth and legal
+
+**Conversion rate.** The share of visitors who take the action a page is built for. For CKAuth's landing page, that's creating an account: 30 sign-ups from 1,000 visits is a 3% conversion rate.
+
+**CTA (call to action).** The button or link that asks the visitor to act, such as "Create your free account". A page converts best with one main CTA, repeated, rather than several competing ones.
+
+**Friction.** Anything that makes acting harder: extra form fields, a required card, unclear cost. The reassurance line under CKAuth's buttons ("No card required") removes the most common worries before the click.
+
+**Privacy policy.** A public page saying what personal data a service collects, why, who it's shared with, how long it's kept and how people can use their rights. CKAuth's is at `/privacy` and must match what the code does.
+
+**Terms of service.** The rules for using a service and the limits of the provider's responsibility. CKAuth's are at `/terms`.
+
+**Personal data.** Any information about an identifiable person, such as a name, an email address or an IP address.
+
+**Data processor.** A company that handles personal data on another company's behalf, such as Resend sending CKAuth's emails or ImageKit storing its photos.
+
+**DPDP Act.** India's Digital Personal Data Protection Act, 2023: the law on how services handle Indians' personal data. It gives people the right to see, correct and erase their data and to complain to the Data Protection Board of India.

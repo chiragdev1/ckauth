@@ -64,6 +64,13 @@ export function SignUp() {
         <Button type="submit" size="lg" disabled={form.pending} className="w-full">
           {form.pending ? 'Creating your account…' : 'Create account'}
         </Button>
+        {/* a line, not a checkbox: the terms only bind if sign-up says so, and a required tick costs sign-ups.
+            new tabs, so reading the terms doesn't throw away what's been typed */}
+        <p className="text-center text-xs leading-relaxed text-muted-foreground">
+          By creating an account, you agree to our{' '}
+          <Link to="/terms" target="_blank" className="font-medium text-primary hover:underline">Terms of Service</Link> and{' '}
+          <Link to="/privacy" target="_blank" className="font-medium text-primary hover:underline">Privacy Policy</Link>.
+        </p>
       </form>
     </AuthShell>
   )

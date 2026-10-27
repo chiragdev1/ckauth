@@ -198,6 +198,25 @@ New entries go at the bottom, under a dated heading.
 - **Design.** Chosen from three looks in the design lab (Dusk, Guard and Chai): **Guard**, slate and ember, with Inter for headings. Cinzel, the old all-caps heading font, is gone. The app pages lost their soldier wording ("Enlist", "Take the oath", "Garrison HQ") for plain words, since shop owners land on them straight from the new page.
 - **Search copy:** "Secure Website Login for Small Businesses in India · CKAuth" plus a matching description and share image (`og.png`).
 
+## 27 Oct 2026 · A landing page for every website, a Privacy Policy and Terms
+**In short:** the home page now speaks to anyone with users to protect, reads more professionally, is built to turn visits into sign-ups, and the site has a Privacy Policy and Terms of Service.
+
+- **Broader audience, same message.** CKAuth is still "your website's security guard", with the same action-first headings and familiar comparisons (ATM PIN, bank locker, OTP). "Customers" and "shop" became "users" and "your website"; where a concrete picture helps, the copy lists a range (a shop, a clinic, a startup, a community) instead of one kind of business. The demo sign-in screen shows `yourwebsite.com` instead of a made-up store.
+- **More professional tone.** No emoji, no "cup of chai" pricing line, an "early access" banner instead of a "launch offer", and a new FAQ question, "Who is CKAuth for?".
+- **Built to convert** (turn a visit into a sign-up; terms in the [glossary](docs/GLOSSARY.md#growth-and-legal)):
+  - One primary call to action everywhere: "Create your free account" (the header says "Get started free").
+  - The hero's second button now scrolls to "How it works" instead of to the developer section, so the only way off the first screen is signing up.
+  - A reassurance line under the hero and closing buttons answers "what's the catch?": Free during early access · No card required · Ready in under a minute.
+  - A "What do you do with my data?" FAQ answer links to the Privacy Policy.
+- **Privacy Policy (`/privacy`) and Terms of Service (`/terms`)** in `src/pages/legal.tsx`, lazy-loaded so the landing page's JavaScript doesn't grow, linked from the footer, and added to the `@app` route list in `frontend/Caddyfile` (so they're `noindex`, like the other app screens). The policy describes what the code really does: the stored fields in `schema.ts`, the two `httpOnly` cookies, local storage for theme and language, rate-limit counters (at most an hour), 14-day backups, and the three processors (Hostinger, Resend, ImageKit). It covers the rights India's DPDP Act gives. Neither page has been reviewed by a lawyer yet.
+- **Reviewed both pages against the usual checklists** (GDPR, India's DPDP Act and Rules 2025, California's CCPA, standard SaaS terms, and India's IT Rules 2021, which apply because users upload photos) and filled the gaps:
+  - **Privacy:** the legal basis for each use, where data comes from, international transfers, a business-transfer clause, "no profiling" (the only automatic decision is a temporary rate-limit block), EU/UK portability, objection and restriction rights, identity checks on requests, links to other sites, a Grievance Officer, and an "In short" summary at the top.
+  - **Privacy, accuracy fixes found in the code:** the API accepts an optional `age`, unconfirmed sign-ups are never cleaned up, error logs can include an email address, and ImageKit sees a viewer's IP address when it serves a photo.
+  - **Terms:** using CKAuth on behalf of an organisation, an early-access warning, intellectual property and feedback, other services, survival after an account ends, a limited indemnity, a Grievance Officer with the IT Rules' 24-hour and 15-day timelines, 15 days' notice of changes, and a "General" section (notices, whole agreement, severability, no waiver, transfer, force majeure).
+- **Consent at sign-up:** a line under the button, "By creating an account, you agree to our Terms of Service and Privacy Policy", with both links opening in a new tab so the form isn't lost. A line rather than a required checkbox, since every extra click costs sign-ups; terms only bind if sign-up says so.
+- **Search copy:** "Secure Sign-In and User Accounts for Your Website · CKAuth", with a description ending in "Free, no card. Get started now." The headline didn't change, so `og.png` stays.
+- `frontend/content/landing-page.md` was rewritten to match, with a new "Written to convert" section listing the rules above.
+
 ---
 
 ## Lessons
@@ -207,7 +226,12 @@ Mistakes and the rules learned from them are kept topic by topic in [LEARNINGS.m
 Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md).
 
 - **SEO phase 1:**
-  - Deploy the small-business landing page and its search copy (24 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "website login security for small businesses" rather than "authentication" [O03].
+  - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].
+  - Have a lawyer review the Privacy Policy and Terms, and confirm the operator and Grievance Officer name, the ₹1,000 liability cap, and a city for "Governing law" (it says only "the courts of India").
+  - Make the policy's retention promises concrete: delete unconfirmed sign-ups after a fixed period (e.g. 30 days), and rotate logs with a stated period.
+  - Check that open and click tracking is off for the sending domain in Resend; then the policy can say emails aren't tracked.
+  - Let users delete their own account (the Privacy Policy promises deletion on request; today it's done by hand). Add log rotation so "server logs are kept only as long as needed" has a number.
+  - Count the sign-up funnel (visit → sign-up → verified) once analytics exist, to measure the conversion changes. If analytics are added, update the Privacy Policy, which says there are none.
   - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
   - Translate the app pages (sign-up, sign-in, emails) into Hindi, so the language choice carries past the home page.
   - Verify `chiragdev.com` in Google Search Console and Bing Webmaster Tools (DNS TXT records cover every subdomain), submit `sitemap.xml`, request indexing, and check with Google's Rich Results Test [C10, C11]. Add an IndexNow ping to `deploy.sh` [C12].

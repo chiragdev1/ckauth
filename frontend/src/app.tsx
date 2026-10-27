@@ -18,6 +18,8 @@ const VerifyEmail = lazy(() => import('./pages/verify-email.tsx').then(module =>
 const ForgotPassword = lazy(() => import('./pages/forgot-password.tsx').then(module => ({ default: module.ForgotPassword })))
 const ResetPassword = lazy(() => import('./pages/reset-password.tsx').then(module => ({ default: module.ResetPassword })))
 const Dashboard = lazy(() => import('./pages/dashboard.tsx').then(module => ({ default: module.Dashboard })))
+const PrivacyPolicy = lazy(() => import('./pages/legal.tsx').then(module => ({ default: module.PrivacyPolicy })))
+const Terms = lazy(() => import('./pages/legal.tsx').then(module => ({ default: module.Terms })))
 
 // these paths are fixed by the links the api puts in emails (docs/API.md, "Frontend pages the emails link to").
 // the web Caddyfile lists them too (@app), so a new route must be added there as well
@@ -36,6 +38,8 @@ export const routes: RouteObject[] = [
       { path: '/verify-email', element: <VerifyEmail /> },
       { path: '/forgot-password', element: <ForgotPassword /> },
       { path: '/reset-password', element: <ResetPassword /> },
+      { path: '/privacy', element: <PrivacyPolicy /> },
+      { path: '/terms', element: <Terms /> },
       {
         element: <RequireAuth />,
         children: [{ path: '/dashboard', element: <Dashboard /> }],

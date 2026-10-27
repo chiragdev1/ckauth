@@ -86,10 +86,12 @@ function SiteFooter() {
           <p>© {new Date().getFullYear()} CKAuth · {footer.tagline}</p>
           <p className="mt-1">{footer.question} <a href={`mailto:${CONTACT_EMAIL}`} className="text-foreground underline underline-offset-4">{CONTACT_EMAIL}</a></p>
         </div>
-        <div className="flex gap-5">
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-2">
           <Link to="/sign-in" className="hover:text-foreground">{footer.signIn}</Link>
           <Link to="/sign-up" className="hover:text-foreground">{footer.createAccount}</Link>
           <Link to="/forgot-password" className="hover:text-foreground">{footer.forgot}</Link>
+          <Link to="/privacy" className="hover:text-foreground">{footer.privacy}</Link>
+          <Link to="/terms" className="hover:text-foreground">{footer.terms}</Link>
         </div>
       </div>
     </footer>
