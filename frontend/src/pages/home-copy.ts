@@ -15,6 +15,7 @@ const en = {
     tryFree: 'Get started free',
     switchTo: 'हिंदी',
     switchLabel: 'हिंदी में पढ़ें',
+    skip: 'Skip to content',
   },
   footer: {
     tagline: 'Your website\'s security guard',
@@ -49,6 +50,7 @@ const en = {
     checks: ['Email confirmed', 'Password stored unreadable', 'Repeated guesses blocked'],
     caption: 'What your users see. What CKAuth checks.',
   },
+  tickerPause: 'Pause the moving strip',
   ticker: ['Email-confirmed accounts', 'Password-guessing protection', 'Unreadable passwords', 'One-time links', 'A private user list', 'Verified image uploads', 'Works on every device'],
   features: {
     eyebrow: 'On duty, around the clock',
@@ -78,7 +80,7 @@ const en = {
   business: {
     eyebrow: 'Why it matters',
     title: 'Big-company security. No security team needed.',
-    body: 'One break-in can undo years of trust. Whether you run a shop, a clinic, a startup or a community, CKAuth helps you keep that trust.',
+    body: 'One break-in can undo years of trust. Whether you run a shop, a clinic, a startup or a community, CKAuth on your sign-in helps you keep that trust.',
     items: [
       { title: 'Fewer support requests', body: 'People reset their own passwords and update their own photo.' },
       { title: 'Users who trust you', body: 'A safe, smooth sign-in looks professional. People stay where they feel safe.' },
@@ -97,7 +99,7 @@ const en = {
     title: 'Simple pricing. Free while we launch.',
     body: 'Every plan includes the full security guard. Pay only when you grow.',
     banner: 'Early access: every feature is free today. Paid plans have not started yet.',
-    recommended: 'Best value',
+    recommended: 'Available now',
     plans: [
       { name: 'Free', price: '₹0', period: '', tagline: 'To get started', features: ['All security features', 'Email confirmation for every user', 'Password reset by email'], button: 'Start free', available: true },
       { name: 'Monthly', price: '₹99', period: '/ month', tagline: 'For growing teams', features: ['Everything in Free', 'Priority email support', 'Your brand name on sign-in emails'], button: 'Coming soon', available: false },
@@ -109,7 +111,7 @@ const en = {
     title: 'Frequently asked questions',
     items: [
       { q: 'Who is CKAuth for?', lead: 'Anyone with users to protect.', a: 'Online shops, clinics, tutors, startups, communities and side projects: if people sign in, CKAuth keeps their accounts safe.' },
-      { q: 'Do I need to know how to code?', lead: 'No.', a: 'Your users simply see a clean, secure sign-in.' },
+      { q: 'Do I need to know how to code?', lead: 'Today, a developer sets it up.', a: 'CKAuth is open source, and a developer can add it to your website by following its README. A no-code way to connect your website is on the way. Until then, you can create an account and try the sign-in your users would see.' },
       { q: 'Can you see my users\' passwords?', lead: 'No, never.', a: 'They\'re stored as a one-way code that nobody can read, including us.' },
       { q: 'What do you do with my data?', lead: 'Only what the service needs.', a: 'No ads, no tracking, and we never sell it.', link: { to: '/privacy', label: 'Read the Privacy Policy' } },
       { q: 'What if someone forgets their password?', lead: 'They fix it themselves.', a: 'An email link lets them choose a new one. No support ticket needed.' },
@@ -139,6 +141,7 @@ const hi: HomeCopy = {
     tryFree: 'मुफ़्त शुरू करें',
     switchTo: 'English',
     switchLabel: 'Read in English',
+    skip: 'सीधे मुख्य हिस्से पर जाएँ',
   },
   footer: {
     tagline: 'आपकी वेबसाइट का सुरक्षा गार्ड',
@@ -173,6 +176,7 @@ const hi: HomeCopy = {
     checks: ['ईमेल पक्का किया गया', 'पासवर्ड कोई पढ़ नहीं सकता', 'बार-बार के अंदाज़े पर रोक'],
     caption: 'आपके यूज़र यह देखते हैं। CKAuth यह जाँचता है।',
   },
+  tickerPause: 'चलती पट्टी रोकें',
   ticker: ['ईमेल से पक्के अकाउंट', 'पासवर्ड के अंदाज़े पर रोक', 'पासवर्ड कोई पढ़ नहीं सकता', 'एक बार चलने वाले लिंक', 'यूज़र्स की लिस्ट निजी', 'जाँची हुई फ़ोटो', 'हर डिवाइस पर चलता है'],
   features: {
     eyebrow: 'हर घड़ी ड्यूटी पर',
@@ -202,7 +206,7 @@ const hi: HomeCopy = {
   business: {
     eyebrow: 'यह क्यों ज़रूरी है',
     title: 'बड़ी कंपनियों जैसी सुरक्षा। सिक्योरिटी टीम की ज़रूरत नहीं।',
-    body: 'एक सेंध सालों का भरोसा तोड़ सकती है। आप दुकान चलाएँ, क्लिनिक, स्टार्टअप या कोई कम्युनिटी, CKAuth वह भरोसा बनाए रखने में मदद करता है।',
+    body: 'एक सेंध सालों का भरोसा तोड़ सकती है। आप दुकान चलाएँ, क्लिनिक, स्टार्टअप या कोई कम्युनिटी, आपके साइन-इन पर CKAuth वह भरोसा बनाए रखने में मदद करता है।',
     items: [
       { title: 'सपोर्ट की कम ज़रूरत', body: 'लोग अपना पासवर्ड और फ़ोटो खुद बदल लेते हैं।' },
       { title: 'भरोसा करने वाले यूज़र', body: 'सुरक्षित और आसान साइन-इन प्रोफ़ेशनल लगता है। लोग वहीं टिकते हैं जहाँ सुरक्षित महसूस करें।' },
@@ -221,7 +225,7 @@ const hi: HomeCopy = {
     title: 'सीधी-सादी कीमत। लॉन्च तक मुफ़्त।',
     body: 'हर प्लान में पूरा सुरक्षा गार्ड। पैसे तभी, जब आप आगे बढ़ें।',
     banner: 'शुरुआती दौर: आज हर सुविधा मुफ़्त है। पेड प्लान अभी शुरू नहीं हुए हैं।',
-    recommended: 'सबसे फ़ायदेमंद',
+    recommended: 'अभी उपलब्ध',
     plans: [
       { name: 'Free', price: '₹0', period: '', tagline: 'शुरुआत के लिए', features: ['सारी सुरक्षा सुविधाएँ', 'हर यूज़र का ईमेल पक्का', 'ईमेल से पासवर्ड रीसेट'], button: 'मुफ़्त शुरू करें', available: true },
       { name: 'Monthly', price: '₹99', period: '/ महीना', tagline: 'बढ़ती टीमों के लिए', features: ['Free की सारी सुविधाएँ', 'ईमेल पर जल्दी मदद', 'साइन-इन ईमेल पर आपके ब्रांड का नाम'], button: 'जल्द आ रहा है', available: false },
@@ -233,7 +237,7 @@ const hi: HomeCopy = {
     title: 'अक्सर पूछे जाने वाले सवाल',
     items: [
       { q: 'CKAuth किसके लिए है?', lead: 'हर उस व्यक्ति के लिए जिसके यूज़र हैं।', a: 'ऑनलाइन दुकान, क्लिनिक, ट्यूटर, स्टार्टअप, कम्युनिटी या साइड प्रोजेक्ट: जहाँ लोग साइन-इन करते हैं, CKAuth उनके अकाउंट सुरक्षित रखता है।' },
-      { q: 'क्या मुझे कोडिंग आनी चाहिए?', lead: 'नहीं।', a: 'आपके यूज़र्स को बस साफ़ और सुरक्षित साइन-इन दिखता है।' },
+      { q: 'क्या मुझे कोडिंग आनी चाहिए?', lead: 'अभी इसे कोई डेवलपर सेट करता है।', a: 'CKAuth ओपन सोर्स है, और कोई भी डेवलपर README देखकर इसे आपकी वेबसाइट पर लगा सकता है। बिना कोड के वेबसाइट जोड़ने का तरीका जल्द आ रहा है। तब तक आप अकाउंट बनाकर वही साइन-इन आज़मा सकते हैं जो आपके यूज़र्स देखेंगे।' },
       { q: 'क्या आप मेरे यूज़र्स के पासवर्ड देख सकते हैं?', lead: 'नहीं, कभी नहीं।', a: 'वे एकतरफ़ा कोड में रखे जाते हैं जिसे कोई नहीं पढ़ सकता, हम भी नहीं।' },
       { q: 'आप मेरे डेटा का क्या करते हैं?', lead: 'सिर्फ़ उतना, जितना सेवा के लिए ज़रूरी है।', a: 'न विज्ञापन, न ट्रैकिंग, और हम इसे कभी नहीं बेचते।', link: { to: '/privacy', label: 'प्राइवेसी पॉलिसी पढ़ें' } },
       { q: 'अगर कोई पासवर्ड भूल जाए तो?', lead: 'वह खुद ठीक कर लेता है।', a: 'ईमेल लिंक से नया पासवर्ड चुन सकता है। सपोर्ट की ज़रूरत नहीं।' },

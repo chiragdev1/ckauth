@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
-import { ArrowRight, BadgeCheck, Check, ChevronDown, CodeXml, ExternalLink, EyeOff, Fingerprint, HeartHandshake, ImageUp, KeyRound, LogOut, Mail, MailCheck, PhoneOff, RefreshCcw, ShieldBan, ShieldCheck, Timer, UserCheck, UserPlus, Vault, type LucideIcon } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronDown, CodeXml, ExternalLink, EyeOff, Fingerprint, HeartHandshake, ImageUp, KeyRound, LogOut, Mail, MailCheck, Pause, PhoneOff, Play, RefreshCcw, ShieldBan, ShieldCheck, Timer, UserCheck, UserPlus, Vault, type LucideIcon } from 'lucide-react'
 import { useAuth } from '@/lib/auth.tsx'
 import { useLanguage } from '@/lib/language.tsx'
 import { cn } from '@/lib/utils.ts'
@@ -16,7 +17,7 @@ export function Home() {
   return (
     <div lang={language}>
       <Hero copy={copy} />
-      <Ticker items={copy.ticker} />
+      <Ticker items={copy.ticker} pauseLabel={copy.tickerPause} />
       <Features copy={copy} />
       <Steps copy={copy} />
       <Business copy={copy} />
@@ -91,9 +92,10 @@ function Hero({ copy }: { copy: HomeCopy }) {
           <Reassurance items={hero.reassurance} />
           <dl className="mt-12 grid max-w-lg grid-cols-3 divide-x border-t pt-6">
             {hero.stats.map(stat => (
-              <div key={stat.label} className="px-4 first:pl-0">
-                <dd className="font-display text-2xl font-semibold">{stat.value}</dd>
+              // a term must come before its value in a <dl>, so screen readers read "1 min, to create an account" in order; flipped back visually
+              <div key={stat.label} className="flex flex-col-reverse px-4 first:pl-0">
                 <dt className="mt-1 text-xs leading-snug text-muted-foreground">{stat.label}</dt>
+                <dd className="font-display text-2xl font-semibold">{stat.value}</dd>
               </div>
             ))}
           </dl>
@@ -135,20 +137,35 @@ function SignInPreview({ copy }: { copy: HomeCopy }) {
   )
 }
 
-function Ticker({ items }: { items: string[] }) {
+// the strip itself is hidden from screen readers (the features section says the same); the pause button isn't (index.css, .ticker)
+function Ticker({ items, pauseLabel }: { items: string[], pauseLabel: string }) {
+  const [paused, setPaused] = useState(false)
+
   return (
-    <div className="overflow-hidden border-y bg-secondary py-3.5 text-secondary-foreground" aria-hidden>
-      <div className="flex w-max animate-marquee">
-        {[0, 1].map(copy => (
-          <div key={copy} className="flex shrink-0 items-center">
-            {items.map(item => (
-              <span key={item} className="flex items-center gap-6 px-6 text-sm font-medium whitespace-nowrap">
-                {item}<span className="text-primary">✦</span>
-              </span>
-            ))}
-          </div>
-        ))}
+    <div className="ticker relative border-y bg-secondary text-secondary-foreground" data-paused={paused ? '' : undefined}>
+      <div className="overflow-hidden py-3.5 pr-12" aria-hidden>
+        <div className="flex w-max animate-marquee">
+          {[0, 1].map(copy => (
+            <div key={copy} className="flex shrink-0 items-center">
+              {items.map(item => (
+                <span key={item} className="flex items-center gap-6 px-6 text-sm font-medium whitespace-nowrap">
+                  {item}<span className="text-primary">✦</span>
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
+      {/* reduced motion already stops the strip, so the button has nothing to do there */}
+      <button
+        type="button"
+        onClick={() => setPaused(current => !current)}
+        aria-label={pauseLabel}
+        aria-pressed={paused}
+        className="absolute inset-y-0 right-0 flex w-12 items-center justify-center border-l border-border/20 bg-secondary transition-colors hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none motion-reduce:hidden"
+      >
+        {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+      </button>
     </div>
   )
 }
@@ -168,7 +185,7 @@ function Features({ copy }: { copy: HomeCopy }) {
           {features.items.map((item, index) => {
             const Icon = featureIcons[index]!
             return (
-              <article key={item.title} className="rounded-2xl border bg-card p-7 transition-transform duration-300 hover:-translate-y-1">
+              <article key={item.title} className="rounded-2xl border bg-card p-7">
                 <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Icon className="size-5" />
                 </span>
@@ -261,10 +278,11 @@ function Developers({ copy }: { copy: HomeCopy }) {
   )
 }
 
-// placeholder plans: ckauth is free for now, so the paid buttons stay disabled until those features exist
+// placeholder plans: ckauth is free for now, so the paid buttons stay disabled until those features exist.
+// the highlight goes on the first plan you can actually pick, not the best deal, so the loudest card isn't a dead end
 function Pricing({ copy }: { copy: HomeCopy }) {
   const { pricing } = copy
-  const recommended = pricing.plans.length - 1
+  const recommended = pricing.plans.findIndex(plan => plan.available)
 
   return (
     <section id="pricing" className="relative scroll-mt-20 border-b py-24 sm:py-32">

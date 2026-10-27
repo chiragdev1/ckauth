@@ -38,8 +38,8 @@ export function useForm<F extends string>({ initial, validate = {}, submit }: Op
       name,
       id: name,
       value: values[name],
+      // aria-describedby is set by the field (components/form.tsx), which knows its hint and requirements too
       'aria-invalid': errors[name] ? true : undefined,
-      'aria-describedby': errors[name] ? `${name}-error` : undefined,
       onChange: (event: ChangeEvent<HTMLInputElement>) => {
         setValues(previous => ({ ...previous, [name]: event.target.value }))
         setServerErrors(({ [name]: _dropped, ...rest }) => rest)

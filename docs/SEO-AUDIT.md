@@ -114,8 +114,8 @@ Can everyone use the page, including people using screen readers, keyboards only
 |---|---|---|---|---|---|---|---|
 | A01 | Lighthouse accessibility score | 100 | ❌ | ✅ | Live 96. 23 Oct build: 100 | Deploy | yes |
 | A02 | All text meets WCAG AA contrast | 4.5:1 for normal text | ❌ | ✅ | Live: 10 elements. Fixed 23 Oct: darker light `--primary`/`--success`, no opacity on text; lowest now 4.72:1 | Deploy | yes |
-| A03 | Skip-to-content link | First focusable element skips to main | ❌ | ❌ | None | Add one in Layout | yes |
-| A04 | Honours reduced motion | Animations off under prefers-reduced-motion | ✅ | ✅ | Global rule in index.css | None needed | no |
+| A03 | Skip-to-content link | First focusable element skips to main | ❌ | ✅ | Fixed 27 Oct: "Skip to content" (English and Hindi) is the first focusable element in Layout | Deploy; not yet counted in the scores above | yes |
+| A04 | Honours reduced motion | Animations off under prefers-reduced-motion | ✅ | ✅ | Global rule in index.css. 27 Oct: it now also stops infinite animations (the ticker flickered before), and the ticker has a pause button (WCAG 2.2.2) | None needed | no |
 | A05 | Language and landmarks | lang, header, nav, main, footer | ✅ | ✅ | All present | None needed | no |
 | A06 | Hero readable without waiting | No opacity-0 entrance on the main text | ❌ | ✅ | Fixed 23 Oct: slides in, never starts transparent | Deploy | yes |
 

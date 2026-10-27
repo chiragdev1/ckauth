@@ -20,15 +20,16 @@ So, on this page:
 8. **Short lines.** Most sentences are under 15 words, and headings are often fragments.
 9. **Honest proof only.** Use real numbers from the product, and label anything that's a placeholder. There are no customers yet, so **no** made-up logos, testimonials or user counts.
 10. **Familiar comparisons:** bank locker, ATM PIN, OTP. Prices stay in ₹. Hindi uses everyday Hinglish words (login, password, email, link).
-11. **Only promise what CKAuth does today.** There's no SMS/WhatsApp OTP and no Google login yet, so don't mention them. CKAuth is free during early access. The paid plans are placeholders, so the page must say clearly that they haven't started.
+11. **Only promise what CKAuth does today.** There's no SMS/WhatsApp OTP and no Google login yet, so don't mention them. There's also no no-code way to connect a website yet: today a developer adds CKAuth by following the README, so never say coding isn't needed until the dashboard can connect a site. CKAuth is free during early access. The paid plans are placeholders, so the page must say clearly that they haven't started.
 
 ### Written to convert
 
 The page has one job: turn a visit into a sign-up.
 - **One primary action, everywhere:** "Create your free account" in the hero, the pricing card and the closing section; "Get started free" in the header. Specific button text ("your free account") beats generic ("Try it").
 - **The hero's second button stays on the page** ("See how it works" scrolls down). Links that leave the page (GitHub, email) only appear further down.
+- **Screen-reader and control labels** (not visible): skip link EN: Skip to content · HI: सीधे मुख्य हिस्से पर जाएँ; ticker pause button EN: Pause the moving strip · HI: चलती पट्टी रोकें.
 - **Answer "what's the catch?" under the button:** Free during early access · No card required · Ready in under a minute. It appears under the hero buttons and again under the closing buttons.
-- **Handle doubts in the FAQ:** who it's for, coding, passwords, data use (with a link to the Privacy Policy), cost.
+- **Handle doubts in the FAQ:** who it's for, coding (honestly: a developer sets it up today), passwords, data use (with a link to the Privacy Policy), cost.
 - **Low-friction consent:** sign-up says what you agree to in one line with links to the Terms and Privacy Policy, instead of adding a field.
 
 Fixed details:
@@ -114,7 +115,7 @@ Fixed details:
 
 - Eyebrow: EN: Why it matters · HI: यह क्यों ज़रूरी है
 - Title: EN: Big-company security. No security team needed. · HI: बड़ी कंपनियों जैसी सुरक्षा। सिक्योरिटी टीम की ज़रूरत नहीं।
-- Body: EN: One break-in can undo years of trust. Whether you run a shop, a clinic, a startup or a community, CKAuth helps you keep that trust. · HI: एक सेंध सालों का भरोसा तोड़ सकती है। आप दुकान चलाएँ, क्लिनिक, स्टार्टअप या कोई कम्युनिटी, CKAuth वह भरोसा बनाए रखने में मदद करता है।
+- Body: EN: One break-in can undo years of trust. Whether you run a shop, a clinic, a startup or a community, CKAuth on your sign-in helps you keep that trust. · HI: एक सेंध सालों का भरोसा तोड़ सकती है। आप दुकान चलाएँ, क्लिनिक, स्टार्टअप या कोई कम्युनिटी, आपके साइन-इन पर CKAuth वह भरोसा बनाए रखने में मदद करता है।
 
 | EN title | EN text | HI title | HI text |
 |---|---|---|---|
@@ -153,7 +154,7 @@ Fixed details:
 Notes on the placeholder plans:
 - ₹99 × 12 = ₹1,188, so the yearly plan saves ₹189 (about 16%, close to two months free).
 - The paid plans list **features CKAuth doesn't have yet** (priority support, your brand on emails, early access). Keep "Coming soon" on those buttons and the banner until the features exist.
-- Mark the yearly card as the recommended plan.
+- Highlight the first plan people can actually pick (Free today), labelled "Available now" · "अभी उपलब्ध". Highlighting a "Coming soon" plan makes the loudest card a dead end. The yearly card's tagline still says it's the best value.
 
 ---
 
@@ -164,7 +165,7 @@ Each answer starts with a short reply in bold, then the detail. On the page, the
 | EN question | EN short answer | EN detail | HI question | HI short answer | HI detail |
 |---|---|---|---|---|---|
 | Who is CKAuth for? | Anyone with users to protect. | Online shops, clinics, tutors, startups, communities and side projects: if people sign in, CKAuth keeps their accounts safe. | CKAuth किसके लिए है? | हर उस व्यक्ति के लिए जिसके यूज़र हैं। | ऑनलाइन दुकान, क्लिनिक, ट्यूटर, स्टार्टअप, कम्युनिटी या साइड प्रोजेक्ट: जहाँ लोग साइन-इन करते हैं, CKAuth उनके अकाउंट सुरक्षित रखता है। |
-| Do I need to know how to code? | No. | Your users simply see a clean, secure sign-in. | क्या मुझे कोडिंग आनी चाहिए? | नहीं। | आपके यूज़र्स को बस साफ़ और सुरक्षित साइन-इन दिखता है। |
+| Do I need to know how to code? | Today, a developer sets it up. | CKAuth is open source, and a developer can add it to your website by following its README. A no-code way to connect your website is on the way. Until then, you can create an account and try the sign-in your users would see. | क्या मुझे कोडिंग आनी चाहिए? | अभी इसे कोई डेवलपर सेट करता है। | CKAuth ओपन सोर्स है, और कोई भी डेवलपर README देखकर इसे आपकी वेबसाइट पर लगा सकता है। बिना कोड के वेबसाइट जोड़ने का तरीका जल्द आ रहा है। तब तक आप अकाउंट बनाकर वही साइन-इन आज़मा सकते हैं जो आपके यूज़र्स देखेंगे। |
 | Can you see my users' passwords? | No, never. | They're stored as a one-way code that nobody can read, including us. | क्या आप मेरे यूज़र्स के पासवर्ड देख सकते हैं? | नहीं, कभी नहीं। | वे एकतरफ़ा कोड में रखे जाते हैं जिसे कोई नहीं पढ़ सकता, हम भी नहीं। |
 | What do you do with my data? | Only what the service needs. | No ads, no tracking, and we never sell it. *Link:* Read the Privacy Policy | आप मेरे डेटा का क्या करते हैं? | सिर्फ़ उतना, जितना सेवा के लिए ज़रूरी है। | न विज्ञापन, न ट्रैकिंग, और हम इसे कभी नहीं बेचते। *लिंक:* प्राइवेसी पॉलिसी पढ़ें |
 | What if someone forgets their password? | They fix it themselves. | An email link lets them choose a new one. No support ticket needed. | अगर कोई पासवर्ड भूल जाए तो? | वह खुद ठीक कर लेता है। | ईमेल लिंक से नया पासवर्ड चुन सकता है। सपोर्ट की ज़रूरत नहीं। |

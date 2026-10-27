@@ -16,10 +16,16 @@ type FieldProps = ComponentProps<'input'> & {
   optional?: boolean
 }
 
+// the error replaces the hint below a field, so the input points at whichever one is showing (plus any extras)
+function describedBy(id: string | undefined, error?: string, hint?: ReactNode, ...extra: (string | false | undefined)[]) {
+  const ids = [error ? `${id}-error` : hint ? `${id}-hint` : false, ...extra].filter(Boolean)
+  return ids.length ? ids.join(' ') : undefined
+}
+
 export function TextField({ label, error, hint, action, optional, className, ...props }: FieldProps) {
   return (
     <FieldShell id={props.id} label={label} error={error} hint={hint} action={action} optional={optional}>
-      <Input className={cn('h-10 bg-card', className)} {...props} />
+      <Input className={cn('h-10 bg-card', className)} aria-describedby={describedBy(props.id, error, hint)} {...props} />
     </FieldShell>
   )
 }
@@ -33,6 +39,7 @@ export function PasswordField({ showStrength, label, error, hint, action, option
       <div className="relative">
         <Input
           {...props}
+          aria-describedby={describedBy(props.id, error, hint, showStrength && `${props.id}-requirements`)}
           type={visible ? 'text' : 'password'}
           className={cn('h-10 bg-card pr-11', className)}
           // a revealed password is plain text, and spellcheck could send it to a cloud dictionary
@@ -50,7 +57,7 @@ export function PasswordField({ showStrength, label, error, hint, action, option
           {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
         </button>
       </div>
-      {showStrength && <PasswordStrength password={value} />}
+      {showStrength && <PasswordStrength id={`${props.id}-requirements`} password={value} />}
     </FieldShell>
   )
 }
@@ -72,34 +79,36 @@ function FieldShell({ id, label, error, hint, action, optional, children }: Pick
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[0.8rem] text-muted-foreground">{hint}</p>
+        <p id={`${id}-hint`} className="text-[0.8rem] text-muted-foreground">{hint}</p>
       ) : null}
     </div>
   )
 }
 
-function PasswordStrength({ password }: { password: string }) {
+// the requirements are the field's description (read with it, once); only the strength word is live, so a screen reader
+// hears "Weak", then "Strong", as it changes, rather than the whole list on every keystroke
+function PasswordStrength({ id, password }: { id: string, password: string }) {
   const score = scorePassword(password)
   const level = strengthLevels[score]
   const requirements = passwordRequirements(password)
 
   return (
-    <div className="space-y-2.5 pt-1" aria-live="polite">
+    <div className="space-y-2.5 pt-1">
       <div className="flex items-center gap-3">
         <div className="grid flex-1 grid-cols-4 gap-1" aria-hidden>
           {[1, 2, 3, 4].map(step => (
             <span key={step} className={cn('h-1.5 rounded-full transition-colors duration-300', password && score >= step ? level.tone : 'bg-muted')} />
           ))}
         </div>
-        <span className="font-display w-20 text-right text-xs tracking-widest text-muted-foreground uppercase">
-          {password ? level.label : 'Strength'}
+        <span className="font-display w-20 text-right text-xs tracking-widest text-muted-foreground uppercase" aria-live="polite">
+          <span className="sr-only">Password strength: </span>{password ? level.label : 'Strength'}
         </span>
       </div>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8rem]">
+      <ul id={id} className="flex flex-wrap gap-x-4 gap-y-1 text-[0.8rem]">
         {requirements.map(rule => (
           <li key={rule.label} className={cn('flex items-center gap-1.5 transition-colors', rule.met ? 'text-success' : 'text-muted-foreground')}>
             {rule.met ? <Check className="size-3.5" /> : <X className="size-3.5 opacity-60" />}
-            {rule.label}
+            <span className="sr-only">{rule.met ? 'Done: ' : 'Needed: '}</span>{rule.label}
           </li>
         ))}
       </ul>

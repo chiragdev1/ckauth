@@ -68,8 +68,8 @@ export function SignUp() {
             new tabs, so reading the terms doesn't throw away what's been typed */}
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
           By creating an account, you agree to our{' '}
-          <Link to="/terms" target="_blank" className="font-medium text-primary hover:underline">Terms of Service</Link> and{' '}
-          <Link to="/privacy" target="_blank" className="font-medium text-primary hover:underline">Privacy Policy</Link>.
+          <Link to="/terms" target="_blank" className="font-medium text-primary hover:underline">Terms of Service<span className="sr-only"> (opens in a new tab)</span></Link> and{' '}
+          <Link to="/privacy" target="_blank" className="font-medium text-primary hover:underline">Privacy Policy<span className="sr-only"> (opens in a new tab)</span></Link>.
         </p>
       </form>
     </AuthShell>

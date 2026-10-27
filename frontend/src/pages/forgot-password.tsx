@@ -30,7 +30,12 @@ export function ForgotPassword() {
   })
 
   return (
-    <AuthShell eyebrow="Forgot password" title="Reset your password" subtitle="Enter your email and we'll send a link to choose a new password." footer={backToSignIn}>
+    <AuthShell
+      eyebrow="Forgot password"
+      title={sent ? 'Check your inbox' : 'Reset your password'}
+      subtitle={sent ? undefined : 'Enter your email and we\'ll send a link to choose a new password.'}
+      footer={backToSignIn}
+    >
       {sent ? (
         // same message whether or not the account exists, like the api
         <FormAlert kind="success">If an account exists for that email, a reset link is on its way. It expires in 15 minutes.</FormAlert>

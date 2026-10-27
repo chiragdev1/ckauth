@@ -149,6 +149,27 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   → Bundle Noto Sans Devanagari, scale it with `size-adjust: 112%`, load it only for Devanagari characters (`unicode-range`), and give `:lang(hi)` taller lines, no letter-spacing, slightly bigger small text and darker grey text.
   **Rule:** a second script needs its own typography, not just a translation. Mark the text with `lang`, and tune size, line height and spacing for that script.
 
+## Frontend UX & accessibility
+
+- **A placeholder shipped as a feature.** `scorePassword()` was left as a `TODO` that returned 2 for every password, and it reached production. The meter said "Holding" for `a` and for a 40-character passphrase alike, on every page with a new password, while the landing page promised "a meter shows how strong the password is".
+  → A real scorer: length first, a bonus for mixing character types, and 0 for repeats, runs (`1234`) and leaked words (`password`).
+  **Rule:** a stub must fail loudly (throw, or hide the feature), never return a plausible value. Search for `TODO` before every merge.
+- **The reduced-motion reset made the ticker flicker.** The usual rule sets `animation-duration: 0.01ms`, but the marquee runs `infinite`, so it looped 100,000 times a second and landed on a random spot every frame, for exactly the users who asked for less motion.
+  → `animation-iteration-count: 1` in the same rule, plus a pause button on the ticker (WCAG 2.2.2: anything that moves for more than 5 seconds needs a way to stop it).
+  **Rule:** a "turn animations off" rule needs both duration and iteration count. Check every `infinite` animation with reduced motion on.
+- **A deploy broke tabs that were already open.** Lazy pages are hashed files that each deploy replaces, and the router had no `errorElement`, so a visitor who opened the home page before a deploy and then clicked "Sign in" got React Router's raw "Unexpected Application Error!".
+  → `pages/route-error.tsx` as the error element (inside the layout), and one automatic reload on `vite:preloadError`.
+  **Rule:** with code-splitting, a missing chunk is a normal event, not a bug. Give the router an error screen, and reload once when a chunk is gone.
+- **The page promised what a new sign-up couldn't find.** The FAQ said a shop owner needs no code, but the dashboard had nothing to connect a website to, so every conversion ended at a dead end.
+  → An honest FAQ answer (a developer sets it up today; no-code is coming) and a "Connect your website · Coming soon" card on the dashboard.
+  **Rule:** walk the funnel after every copy change: each promise on the landing page must be something a new account can find on the dashboard, or be labelled as coming.
+- **An SPA forgets what a full page load does for free.** With no `<ScrollRestoration />`, a footer link opened the next page at the old scroll depth. Focus stayed on the clicked link, and when "Create account" swapped the form for "Check your inbox", focus fell to `<body>` without a word to screen readers.
+  → `<ScrollRestoration />`, focus on `<main>` after each navigation, and focus on the new heading when an auth page swaps views.
+  **Rule:** after any client-side navigation or view swap, decide where scroll and focus go. The browser only decides for you on a real page load.
+- **The loudest pricing card was a dead end.** "Best value" highlighted the yearly plan, which is "Coming soon" and disabled.
+  → The highlight follows the first plan you can pick ("Available now").
+  **Rule:** visual emphasis goes to an action people can take today.
+
 ## Process
 
 - Commit messages for behaviour or security changes need a body explaining *why*, plus a `BREAKING CHANGE:` footer when the API changes. One-line messages are only for trivial commits.

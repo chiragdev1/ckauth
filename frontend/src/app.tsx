@@ -8,6 +8,7 @@ import { LanguageProvider } from './lib/language.tsx'
 import { GuestOnly, Layout, RequireAuth } from './components/layout.tsx'
 import { Home } from './pages/home.tsx'
 import { NotFound } from './pages/not-found.tsx'
+import { RouteError } from './pages/route-error.tsx'
 import { DesignLabPanel } from './components/design-lab-panel.tsx'
 
 // the home page is prerendered and every visitor lands there first, so it ships in the main bundle;
@@ -27,24 +28,30 @@ export const routes: RouteObject[] = [
   {
     element: <Layout />,
     children: [
-      { path: '/', element: <Home /> },
       {
-        element: <GuestOnly />,
+        // pathless, so an error in any page renders inside the layout instead of replacing it
+        errorElement: <RouteError />,
         children: [
-          { path: '/sign-up', element: <SignUp /> },
-          { path: '/sign-in', element: <SignIn /> },
+          { path: '/', element: <Home /> },
+          {
+            element: <GuestOnly />,
+            children: [
+              { path: '/sign-up', element: <SignUp /> },
+              { path: '/sign-in', element: <SignIn /> },
+            ],
+          },
+          { path: '/verify-email', element: <VerifyEmail /> },
+          { path: '/forgot-password', element: <ForgotPassword /> },
+          { path: '/reset-password', element: <ResetPassword /> },
+          { path: '/privacy', element: <PrivacyPolicy /> },
+          { path: '/terms', element: <Terms /> },
+          {
+            element: <RequireAuth />,
+            children: [{ path: '/dashboard', element: <Dashboard /> }],
+          },
+          { path: '*', element: <NotFound /> },
         ],
       },
-      { path: '/verify-email', element: <VerifyEmail /> },
-      { path: '/forgot-password', element: <ForgotPassword /> },
-      { path: '/reset-password', element: <ResetPassword /> },
-      { path: '/privacy', element: <PrivacyPolicy /> },
-      { path: '/terms', element: <Terms /> },
-      {
-        element: <RequireAuth />,
-        children: [{ path: '/dashboard', element: <Dashboard /> }],
-      },
-      { path: '*', element: <NotFound /> },
     ],
   },
 ]

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { KeyRound, MailCheck, ShieldCheck } from 'lucide-react'
 
 type AuthShellProps = {
@@ -12,6 +12,17 @@ type AuthShellProps = {
 
 // every auth page: the form on a dossier card, with the safety panel beside it on wide screens
 export function AuthShell({ eyebrow, title, subtitle, children, footer }: AuthShellProps) {
+  const heading = useRef<HTMLHeadingElement>(null)
+  const shownTitle = useRef(title)
+
+  // a page that swaps views (form → "check your inbox") unmounts the focused button, dropping focus to <body>.
+  // a new title means a new view: move focus to it, so screen readers announce it and tab order starts there
+  useEffect(() => {
+    if(shownTitle.current === title) return
+    shownTitle.current = title
+    if(document.activeElement === document.body) heading.current?.focus()
+  }, [title])
+
   return (
     <div className="relative flex flex-1">
       <SafetyPanel />
@@ -20,7 +31,7 @@ export function AuthShell({ eyebrow, title, subtitle, children, footer }: AuthSh
         <div className="relative w-full max-w-[26rem] animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="dossier rounded-2xl border bg-card/95 p-6 backdrop-blur sm:p-8">
             <p className="eyebrow">{eyebrow}</p>
-            <h1 className="font-display mt-2 text-3xl font-semibold">{title}</h1>
+            <h1 ref={heading} tabIndex={-1} className="font-display mt-2 text-3xl font-semibold outline-none">{title}</h1>
             {subtitle && <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>}
             <div className="mt-7">{children}</div>
           </div>

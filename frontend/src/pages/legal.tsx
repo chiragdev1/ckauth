@@ -103,7 +103,7 @@ const privacySections: Section[] = [
           <li><strong>access_token</strong> proves who you are for about 15 minutes.</li>
           <li><strong>refresh_token</strong> renews it for up to a day, until you sign out.</li>
         </ul>
-        <p>Both are <code>httpOnly</code> (page scripts can't read them), only sent over HTTPS, and only sent to this site. Your browser's local storage also remembers your light or dark theme and your language choice. That stays on your device and is never sent to us. Since we don't track you, there's nothing for a "Do Not Track" or Global Privacy Control signal to switch off.</p>
+        <p>Both are <code>httpOnly</code> (page scripts can't read them), only sent over HTTPS, and only sent to this site. Your browser's local storage also remembers your light or dark theme and your language choice, and its session storage (cleared when you close the tab) notes the time of an automatic reload after we release a new version, so it can't repeat in a loop. All of this stays on your device and is never sent to us. Since we don't track you, there's nothing for a "Do Not Track" or Global Privacy Control signal to switch off.</p>
       </>
     ),
   },

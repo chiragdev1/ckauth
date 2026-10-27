@@ -208,6 +208,14 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **`lang` attribute.** Tells the browser (and screen readers) which language a piece of the page is in, e.g. `lang="hi"`. CSS can then style that language with `:lang(hi)`.
 
+**Error boundary.** A component that catches a crash in the pages below it and shows a friendly screen instead of a blank or raw error page. CKAuth's is `pages/route-error.tsx`, set as the router's `errorElement`.
+
+**Stale chunk.** A lazy-loaded file that no longer exists on the server. Each deploy replaces the hashed files, so a tab opened before it can't load the next page; CKAuth reloads once to fetch the new build (`main.tsx`).
+
+**Scroll restoration.** Starting each new page at the top, and returning to the old position on Back. A full page load does this by itself; an SPA has to do it on purpose (React Router's `<ScrollRestoration />`).
+
+**Focus / focus management.** The focused element is the one that receives the keyboard. When an SPA swaps a page or a view, it must move focus on purpose (CKAuth moves it to `<main>` or the new heading), or keyboard and screen-reader users are left on something that has vanished.
+
 **`unicode-range` / `size-adjust`.** Two `@font-face` settings. `unicode-range` makes the browser download a font only when the page shows characters in that range (here, Hindi). `size-adjust` scales one font so it matches the size of the fonts around it.
 
 ---
@@ -349,6 +357,16 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 **IndexNow.** A protocol for telling Bing and others straight away that a page changed.
 
 **WCAG / contrast ratio.** WCAG is the web accessibility standard. The contrast ratio compares text colour with its background; level AA needs at least 4.5:1 for normal text.
+
+**Screen reader.** Software that reads the page aloud (or to a braille display) for people who can't see it, such as VoiceOver, NVDA and TalkBack.
+
+**Skip link.** A "Skip to content" link that is the first thing the Tab key reaches. It stays hidden until focused and jumps past the header, so keyboard users don't tab through the navigation on every page.
+
+**ARIA attributes.** Extra HTML attributes that tell screen readers what an element is or how it relates to others. CKAuth uses `aria-describedby` (the hint or error that belongs to a field), `aria-live` (a region read out when its text changes, like the password strength word), `aria-pressed` (an on/off button, like the theme and ticker-pause buttons) and `aria-invalid`.
+
+**Reduced motion (`prefers-reduced-motion`).** An operating-system setting for people whom movement on screen makes dizzy or distracts. CKAuth's CSS stops every animation when it's on.
+
+**Touch target.** The area a finger can tap to hit a control. WCAG AA asks for at least 24×24 px; Apple and Google recommend 44–48 px. CKAuth's header controls are 40 px on phones.
 
 ## Growth and legal
 

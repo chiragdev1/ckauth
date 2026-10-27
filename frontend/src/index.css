@@ -180,6 +180,8 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* without this, an infinite animation (the ticker) loops 100,000 times a second and flickers */
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -195,4 +197,10 @@
 }
 @utility animate-marquee {
   animation: marquee 40s linear infinite;
+}
+/* wcag 2.2.2: anything that moves for more than 5 seconds needs a way to stop it. hovering pauses it,
+   and the button beside it (data-paused) stops it for keyboard and touch */
+.ticker:hover .animate-marquee,
+.ticker[data-paused] .animate-marquee {
+  animation-play-state: paused;
 }
