@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { Camera, LogOut, ShieldCheck, X } from 'lucide-react'
+import { Camera, ExternalLink, Globe, LogOut, Mail, ShieldCheck, X } from 'lucide-react'
 import { api } from '@/lib/api.ts'
 import { useAuth } from '@/lib/auth.tsx'
 import { useForm } from '@/lib/use-form.ts'
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import { Separator } from '@/components/ui/separator.tsx'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
+import { CONTACT_EMAIL, REPO_URL } from './home-copy.ts'
 
 // mirrors the api's limits so obvious mistakes fail instantly; the api still checks the real bytes
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024
@@ -45,8 +46,8 @@ export function Dashboard() {
           <div className="dossier flex items-start gap-4 rounded-2xl border border-success/40 bg-success/10 p-5 animate-in fade-in slide-in-from-top-2">
             <ShieldCheck className="mt-0.5 size-6 shrink-0 text-success" />
             <div className="flex-1">
-              <p className="font-display text-lg font-semibold">Enlistment complete</p>
-              <p className="text-sm text-muted-foreground">Your email is verified and you're signed in. Welcome inside the walls, {user.firstName}. Your heart is dedicated.</p>
+              <p className="font-display text-lg font-semibold">You're all set</p>
+              <p className="text-sm text-muted-foreground">Your email is verified and you're signed in. Welcome, {user.firstName}.</p>
             </div>
             <button type="button" onClick={() => setWelcome(false)} aria-label="Dismiss" className="rounded p-1 text-muted-foreground hover:text-foreground">
               <X className="size-4" />
@@ -56,7 +57,7 @@ export function Dashboard() {
 
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="eyebrow">Garrison HQ · Command post</p>
+            <p className="eyebrow">Your account</p>
             <h1 className="font-display mt-1 text-4xl font-semibold">Hi, {user.firstName}</h1>
             <p className="mt-1 text-sm text-muted-foreground">Manage your profile and keep your account secure.</p>
           </div>
@@ -64,6 +65,7 @@ export function Dashboard() {
         </div>
 
         <ProfileCard />
+        <ConnectWebsiteCard />
         <ChangePasswordCard />
       </div>
     </div>
@@ -107,8 +109,8 @@ function ProfileCard() {
   return (
     <Card className="dossier">
       <CardHeader>
-        <CardTitle className="font-display text-lg font-semibold">Service record</CardTitle>
-        <CardDescription>Your profile as others see it.</CardDescription>
+        <CardTitle className="font-display text-lg font-semibold">Profile</CardTitle>
+        <CardDescription>Your name, email and profile picture.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
@@ -147,7 +149,39 @@ function ProfileCard() {
   )
 }
 
+// the landing page sells ckauth to people with a website, so the dashboard says plainly what connecting one takes today
+// and what's coming, instead of leaving a new sign-up wondering where the rest is (home-copy.ts, faq "do I need to code?")
+function ConnectWebsiteCard() {
+  return (
+    <Card className="border-dashed">
+      <CardHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          <Globe className="size-5 text-primary" />
+          <CardTitle className="font-display text-lg font-semibold">Connect your website</CardTitle>
+          <Badge variant="outline" className="border-brass/40 bg-brass/10 text-foreground">Coming soon</Badge>
+        </div>
+        <CardDescription>Soon you'll add CKAuth to your own website from here, without writing code.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Until then, CKAuth is open source: a developer can set it up on any website by following its README.
+          The sign-in you just used is exactly what your users would see.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline">
+            <a href={REPO_URL} target="_blank" rel="noreferrer">Read the setup guide<ExternalLink /><span className="sr-only"> (opens in a new tab)</span></a>
+          </Button>
+          <Button asChild variant="ghost">
+            <a href={`mailto:${CONTACT_EMAIL}?subject=Connecting my website to CKAuth`}><Mail />Tell us what you need</a>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function ChangePasswordCard() {
+  const { user } = useAuth()
   const [done, setDone] = useState(false)
 
   const form = useForm({
@@ -174,12 +208,14 @@ function ChangePasswordCard() {
       <Separator />
       <CardContent>
         <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="max-w-md space-y-5">
+          {/* password managers file the new password under this username; without it they guess, or ask */}
+          <input type="email" name="username" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
           {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
           {done && !form.formError && <FormAlert kind="success">Password changed. Every other session has been signed out.</FormAlert>}
           <PasswordField label="Current password" autoComplete="current-password" error={form.errors.currentPassword} {...form.register('currentPassword')} />
           <PasswordField label="New password" autoComplete="new-password" showStrength error={form.errors.newPassword} {...form.register('newPassword')} />
           <PasswordField label="Confirm new password" autoComplete="new-password" error={form.errors.confirmPassword} {...form.register('confirmPassword')} />
-          <Button type="submit" disabled={form.pending} className="font-display tracking-[0.2em] uppercase">
+          <Button type="submit" disabled={form.pending}>
             {form.pending ? 'Updating…' : 'Update password'}
           </Button>
         </form>

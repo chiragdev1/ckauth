@@ -46,7 +46,7 @@ export function VerifyEmail() {
   if(!token || deadLink) {
     return (
       <AuthShell
-        eyebrow="Gate sealed"
+        eyebrow="Link expired"
         title="This link doesn't work"
         footer={<><Link to="/sign-in" className="font-medium text-primary hover:underline">Sign in</Link><span className="mx-2">·</span><Link to="/sign-up" className="font-medium text-primary hover:underline">Sign up</Link></>}
       >
@@ -61,12 +61,12 @@ export function VerifyEmail() {
   }
 
   return (
-    <AuthShell eyebrow="The oath" title="Verify your email" subtitle="Enter the password you chose when you signed up. It proves the account is yours, and signs you straight in.">
+    <AuthShell eyebrow="Last step" title="Verify your email" subtitle="Enter the password you chose when you signed up. It proves the account is yours, and signs you straight in.">
       <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="space-y-5">
         {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
         <PasswordField label="Password" autoComplete="current-password" autoFocus error={form.errors.password} {...form.register('password')} />
-        <Button type="submit" size="lg" disabled={form.pending} className="font-display w-full tracking-[0.2em] uppercase">
-          {form.pending ? 'Taking the oath…' : 'Verify and enter'}
+        <Button type="submit" size="lg" disabled={form.pending} className="w-full">
+          {form.pending ? 'Verifying…' : 'Verify and enter'}
         </Button>
       </form>
     </AuthShell>

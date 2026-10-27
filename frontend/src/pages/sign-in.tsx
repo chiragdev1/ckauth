@@ -40,10 +40,10 @@ export function SignIn() {
 
   return (
     <AuthShell
-      eyebrow="Return to post"
+      eyebrow="Sign in"
       title="Welcome back"
       subtitle="Sign in to continue to your dashboard."
-      footer={<>New recruit? <Link to="/sign-up" className="font-medium text-primary hover:underline">Create an account</Link></>}
+      footer={<>New here? <Link to="/sign-up" className="font-medium text-primary hover:underline">Create an account</Link></>}
     >
       <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="space-y-5">
         {state?.notice && !form.formError && <FormAlert kind="success">{state.notice}</FormAlert>}
@@ -56,8 +56,8 @@ export function SignIn() {
           action={<Link to="/forgot-password" className="text-[0.8rem] font-medium text-primary hover:underline">Forgot password?</Link>}
           {...form.register('password')}
         />
-        <Button type="submit" size="lg" disabled={form.pending} className="font-display w-full tracking-[0.2em] uppercase">
-          {form.pending ? 'Opening the gate…' : 'Sign in'}
+        <Button type="submit" size="lg" disabled={form.pending} className="w-full">
+          {form.pending ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
     </AuthShell>

@@ -10,7 +10,7 @@ type LookOption = { id: string, name: string, blurb: string, swatch: string[] }
 
 // the first entry is the shipped design; the panel only appears once there is something to compare it with
 export const looks: LookOption[] = [
-  { id: 'dusk', name: 'Dusk', blurb: 'Current · ember and steel', swatch: ['#f0642a', '#2d3a4a', '#0e0d14'] },
+  { id: 'guard', name: 'Guard', blurb: 'Current · slate and ember', swatch: ['#c2410c', '#0f172a', '#f7f8fb'] },
 ]
 
 const STORAGE_KEY = 'ckauth-look'

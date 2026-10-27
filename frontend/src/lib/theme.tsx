@@ -8,6 +8,7 @@ const STORAGE_KEY = 'ckauth-theme'
 type ThemeState = {
   theme: Theme
   resolvedTheme: 'light' | 'dark'
+  systemTheme: 'light' | 'dark'
   setTheme: (theme: Theme) => void
 }
 
@@ -38,7 +39,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => query.removeEventListener('change', onChange)
   }, [])
 
-  const resolvedTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme
+  const systemTheme = systemDark ? 'dark' : 'light'
+  const resolvedTheme = theme === 'system' ? systemTheme : theme
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', resolvedTheme === 'dark')
@@ -55,7 +57,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, resolvedTheme, systemTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   )

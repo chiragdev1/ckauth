@@ -13,6 +13,7 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 - [Logs and monitoring](#logs-and-monitoring)
 - [Email delivery](#email-delivery)
 - [Search, speed and accessibility](#search-speed-and-accessibility)
+- [Growth and legal](#growth-and-legal)
 
 ---
 
@@ -203,6 +204,20 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Design lab.** CKAuth's development-only switcher for comparing candidate designs on the real pages (`frontend/src/lib/design-lab.tsx`).
 
+**Devanagari.** The script Hindi is written in. Its letters hang from a line along the top (the *shirorekha*) and carry marks above and below, so it needs taller lines than English.
+
+**`lang` attribute.** Tells the browser (and screen readers) which language a piece of the page is in, e.g. `lang="hi"`. CSS can then style that language with `:lang(hi)`.
+
+**Error boundary.** A component that catches a crash in the pages below it and shows a friendly screen instead of a blank or raw error page. CKAuth's is `pages/route-error.tsx`, set as the router's `errorElement`.
+
+**Stale chunk.** A lazy-loaded file that no longer exists on the server. Each deploy replaces the hashed files, so a tab opened before it can't load the next page; CKAuth reloads once to fetch the new build (`main.tsx`).
+
+**Scroll restoration.** Starting each new page at the top, and returning to the old position on Back. A full page load does this by itself; an SPA has to do it on purpose (React Router's `<ScrollRestoration />`).
+
+**Focus / focus management.** The focused element is the one that receives the keyboard. When an SPA swaps a page or a view, it must move focus on purpose (CKAuth moves it to `<main>` or the new heading), or keyboard and screen-reader users are left on something that has vanished.
+
+**`unicode-range` / `size-adjust`.** Two `@font-face` settings. `unicode-range` makes the browser download a font only when the page shows characters in that range (here, Hindi). `size-adjust` scales one font so it matches the size of the fonts around it.
+
 ---
 
 ## Hosting and deployment
@@ -342,3 +357,31 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 **IndexNow.** A protocol for telling Bing and others straight away that a page changed.
 
 **WCAG / contrast ratio.** WCAG is the web accessibility standard. The contrast ratio compares text colour with its background; level AA needs at least 4.5:1 for normal text.
+
+**Screen reader.** Software that reads the page aloud (or to a braille display) for people who can't see it, such as VoiceOver, NVDA and TalkBack.
+
+**Skip link.** A "Skip to content" link that is the first thing the Tab key reaches. It stays hidden until focused and jumps past the header, so keyboard users don't tab through the navigation on every page.
+
+**ARIA attributes.** Extra HTML attributes that tell screen readers what an element is or how it relates to others. CKAuth uses `aria-describedby` (the hint or error that belongs to a field), `aria-live` (a region read out when its text changes, like the password strength word), `aria-pressed` (an on/off button, like the theme and ticker-pause buttons) and `aria-invalid`.
+
+**Reduced motion (`prefers-reduced-motion`).** An operating-system setting for people whom movement on screen makes dizzy or distracts. CKAuth's CSS stops every animation when it's on.
+
+**Touch target.** The area a finger can tap to hit a control. WCAG AA asks for at least 24×24 px; Apple and Google recommend 44–48 px. CKAuth's header controls are 40 px on phones.
+
+## Growth and legal
+
+**Conversion rate.** The share of visitors who take the action a page is built for. For CKAuth's landing page, that's creating an account: 30 sign-ups from 1,000 visits is a 3% conversion rate.
+
+**CTA (call to action).** The button or link that asks the visitor to act, such as "Create your free account". A page converts best with one main CTA, repeated, rather than several competing ones.
+
+**Friction.** Anything that makes acting harder: extra form fields, a required card, unclear cost. The reassurance line under CKAuth's buttons ("No card required") removes the most common worries before the click.
+
+**Privacy policy.** A public page saying what personal data a service collects, why, who it's shared with, how long it's kept and how people can use their rights. CKAuth's is at `/privacy` and must match what the code does.
+
+**Terms of service.** The rules for using a service and the limits of the provider's responsibility. CKAuth's are at `/terms`.
+
+**Personal data.** Any information about an identifiable person, such as a name, an email address or an IP address.
+
+**Data processor.** A company that handles personal data on another company's behalf, such as Resend sending CKAuth's emails or ImageKit storing its photos.
+
+**DPDP Act.** India's Digital Personal Data Protection Act, 2023: the law on how services handle Indians' personal data. It gives people the right to see, correct and erase their data and to complain to the Data Protection Board of India.

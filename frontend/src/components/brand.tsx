@@ -17,7 +17,8 @@ export function Logo({ className }: { className?: string }) {
   return (
     <Link to="/" className={cn('group flex items-center gap-2.5 rounded-md focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none', className)}>
       <Crest className="transition-transform duration-300 group-hover:-rotate-6" />
-      <span className="font-display text-xl font-bold tracking-[0.12em] uppercase">CKAuth</span>
+      {/* the narrowest phones (320 px) keep just the crest, so the header controls still fit */}
+      <span className="font-display text-lg font-bold tracking-[0.12em] uppercase max-[340px]:sr-only sm:text-xl">CKAuth</span>
     </Link>
   )
 }

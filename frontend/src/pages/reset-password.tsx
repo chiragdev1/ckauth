@@ -34,19 +34,19 @@ export function ResetPassword() {
 
   if(!token) {
     return (
-      <AuthShell eyebrow="Gate sealed" title="This link doesn't work" footer={requestNewLink}>
+      <AuthShell eyebrow="Link expired" title="This link doesn't work" footer={requestNewLink}>
         <FormAlert kind="error">The reset link is missing its token. Open the link from your email again.</FormAlert>
       </AuthShell>
     )
   }
 
   return (
-    <AuthShell eyebrow="Recover access" title="Choose a new password" subtitle="You'll be signed out on every device, including this one." footer={requestNewLink}>
+    <AuthShell eyebrow="Reset password" title="Choose a new password" subtitle="You'll be signed out on every device, including this one." footer={requestNewLink}>
       <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="space-y-5">
         {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
         <PasswordField label="New password" autoComplete="new-password" showStrength autoFocus error={form.errors.newPassword} {...form.register('newPassword')} />
         <PasswordField label="Confirm new password" autoComplete="new-password" error={form.errors.confirmPassword} {...form.register('confirmPassword')} />
-        <Button type="submit" size="lg" disabled={form.pending} className="font-display w-full tracking-[0.2em] uppercase">
+        <Button type="submit" size="lg" disabled={form.pending} className="w-full">
           {form.pending ? 'Updating…' : 'Update password'}
         </Button>
       </form>

@@ -1,7 +1,19 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@fontsource-variable/inter";
-@import "@fontsource-variable/cinzel";
+
+/* hindi letters (inter has none). the unicode-range means only pages showing hindi download it, and
+   size-adjust lifts it to match inter: at the same font-size, devanagari looks a size smaller than latin.
+   not @fontsource's own css, which would also load its latin files */
+@font-face {
+  font-family: "Noto Sans Devanagari";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../node_modules/@fontsource-variable/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
+  size-adjust: 112%;
+}
 
 /* theme.tsx puts .dark on <html>, so dark: follows the toggle instead of the os setting */
 @custom-variant dark (&:is(.dark *));
@@ -10,60 +22,60 @@
    :root[data-look="<id>"].dark, placed after the defaults below. for markup tweaks, add a variant like
    @custom-variant <id> (&:is([data-look="<id>"] *)); and use <id>:… classes. delete a candidate once it's decided */
 
-/* day: morning over the walls. warm parchment, ember for anything that acts, steel for quiet accents */
+/* day: slate ink on near-white, ember for anything that acts */
 :root {
   --radius: 0.75rem;
-  --background: #f5efe8;
-  --foreground: #1b1520;
-  --card: #fffaf4;
-  --card-foreground: #1b1520;
-  --popover: #fffaf4;
-  --popover-foreground: #1b1520;
-  --primary: #b93d0b;
+  --background: #f7f8fb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #c2410c;
   --primary-foreground: #fff7ed;
-  --secondary: #2d3a4a;
-  --secondary-foreground: #f5efe8;
-  --muted: #ece3d9;
-  --muted-foreground: #6b5f66;
-  --accent: #efe5da;
-  --accent-foreground: #1b1520;
+  --secondary: #0f172a;
+  --secondary-foreground: #f1f5f9;
+  --muted: #eef1f6;
+  --muted-foreground: #4b5568;
+  --accent: #eef1f6;
+  --accent-foreground: #0f172a;
   --destructive: #b91c1c;
   --success: #2f6b3e;
   --brass: #a16207;
-  --border: #e0d4c6;
-  --input: #d6c8b8;
-  --ring: #b93d0b;
-  --wall: rgb(194 65 12 / 0.08);
+  --border: #e2e6ee;
+  --input: #d5dbe5;
+  --ring: #c2410c;
+  --wall: rgb(194 65 12 / 0.07);
 }
 
-/* night: dusk over the walls. indigo sky, ember light, charcoal stone */
+/* night: deep navy, a brighter ember */
 .dark {
-  --background: #0e0d14;
-  --foreground: #f1e8dc;
-  --card: #16141e;
-  --card-foreground: #f1e8dc;
-  --popover: #1a1824;
-  --popover-foreground: #f1e8dc;
-  --primary: #f0642a;
+  --background: #0a0f1c;
+  --foreground: #e8ecf4;
+  --card: #111827;
+  --card-foreground: #e8ecf4;
+  --popover: #131c2e;
+  --popover-foreground: #e8ecf4;
+  --primary: #fb7a3c;
   --primary-foreground: #1b0d05;
-  --secondary: #3b4a5e;
-  --secondary-foreground: #f1e8dc;
-  --muted: #1f1c29;
-  --muted-foreground: #a79bab;
-  --accent: #241f2f;
-  --accent-foreground: #f1e8dc;
+  --secondary: #1e293b;
+  --secondary-foreground: #e8ecf4;
+  --muted: #131c2e;
+  --muted-foreground: #9aa6ba;
+  --accent: #172036;
+  --accent-foreground: #e8ecf4;
   --destructive: #f87171;
   --success: #6fcf8f;
   --brass: #e0a84f;
-  --border: #2a2533;
-  --input: #363042;
-  --ring: #f0642a;
-  --wall: rgb(240 100 42 / 0.07);
+  --border: #1f2a3d;
+  --input: #2a3750;
+  --ring: #fb7a3c;
+  --wall: rgb(251 122 60 / 0.08);
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Cinzel Variable", "Trajan Pro", Georgia, serif;
+  --font-sans: "Inter Variable", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sans);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -116,10 +128,32 @@
 @layer utilities {
   .font-display {
     font-family: var(--font-display);
-    letter-spacing: 0.01em;
+    letter-spacing: -0.02em;
   }
   .eyebrow {
-    @apply font-display text-xs font-semibold tracking-[0.3em] text-primary uppercase;
+    @apply font-display text-xs font-semibold tracking-[0.15em] text-primary uppercase;
+  }
+
+  /* hindi reads worse than english at the same settings: its letters hang from a top line (shirorekha) and carry
+     marks above and below, so it needs taller lines, no letter-spacing (which breaks the top line into pieces),
+     slightly bigger small text and stronger grey text. the font itself is scaled up in the @font-face below */
+  :lang(hi) {
+    line-height: 1.8;
+  }
+  :lang(hi) :is(h1, h2, h3, .font-display) {
+    line-height: 1.45;
+  }
+  :lang(hi) :is(.font-display, .eyebrow, [class*="tracking-"]) {
+    letter-spacing: normal;
+  }
+  :lang(hi) .text-xs {
+    font-size: 0.8125rem;
+  }
+  :lang(hi) .text-sm {
+    font-size: 0.9375rem;
+  }
+  :lang(hi) .text-muted-foreground {
+    color: color-mix(in oklab, var(--muted-foreground) 70%, var(--foreground));
   }
 
   /* a soft ember glow from the top of a section */
@@ -146,6 +180,8 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* without this, an infinite animation (the ticker) loops 100,000 times a second and flickers */
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
@@ -161,4 +197,10 @@
 }
 @utility animate-marquee {
   animation: marquee 40s linear infinite;
+}
+/* wcag 2.2.2: anything that moves for more than 5 seconds needs a way to stop it. hovering pauses it,
+   and the button beside it (data-paused) stops it for keyboard and touch */
+.ticker:hover .animate-marquee,
+.ticker[data-paused] .animate-marquee {
+  animation-play-state: paused;
 }

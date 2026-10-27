@@ -1,341 +1,387 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
-import { ArrowRight, CircleCheck, EyeOff, Fingerprint, Gauge, KeyRound, Lock, MailCheck, RefreshCcw, ShieldCheck, UserPlus, type LucideIcon } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronDown, CodeXml, ExternalLink, EyeOff, Fingerprint, HeartHandshake, ImageUp, KeyRound, LogOut, Mail, MailCheck, Pause, PhoneOff, Play, RefreshCcw, ShieldBan, ShieldCheck, Timer, UserCheck, UserPlus, Vault, type LucideIcon } from 'lucide-react'
 import { useAuth } from '@/lib/auth.tsx'
-import { Badge } from '@/components/ui/badge.tsx'
+import { useLanguage } from '@/lib/language.tsx'
+import { cn } from '@/lib/utils.ts'
 import { Button } from '@/components/ui/button.tsx'
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card.tsx'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
+import { CONTACT_EMAIL, homeCopy, REPO_URL, type HomeCopy } from './home-copy.ts'
 
+// the landing page, written for anyone running a website or app (words: home-copy.ts, from content/landing-page.md)
 export function Home() {
   useDocumentTitle()
+  const { language } = useLanguage()
+  const copy = homeCopy[language]
+
   return (
-    <>
-      <Hero />
-      <Ticker />
-      <Defenses />
-      <HowItWorks />
-      <Security />
-      <FinalCall />
-    </>
+    <div lang={language}>
+      <Hero copy={copy} />
+      <Ticker items={copy.ticker} pauseLabel={copy.tickerPause} />
+      <Features copy={copy} />
+      <Steps copy={copy} />
+      <Business copy={copy} />
+      <Developers copy={copy} />
+      <Pricing copy={copy} />
+      <Faq copy={copy} />
+      <FinalCall copy={copy} />
+    </div>
   )
 }
 
-function PrimaryActions() {
+// the secondary button stays on the page in the hero (how it works), so the only way off it is signing up
+function Actions({ copy, secondary }: { copy: HomeCopy, secondary: 'how' | 'contact' }) {
   const { user } = useAuth()
 
-  if(user) {
-    return (
-      <Button asChild size="lg">
-        <Link to="/dashboard">Go to dashboard<ArrowRight /></Link>
-      </Button>
-    )
-  }
   return (
     <>
       <Button asChild size="lg">
-        <Link to="/sign-up">Create an account<ArrowRight /></Link>
+        {user ? <Link to="/dashboard">{copy.hero.dashboard}<ArrowRight /></Link> : <Link to="/sign-up">{copy.hero.primary}<ArrowRight /></Link>}
       </Button>
       <Button asChild size="lg" variant="outline">
-        <Link to="/sign-in">Sign in</Link>
+        {secondary === 'how'
+          ? <a href="#how-it-works">{copy.hero.secondary}</a>
+          : <a href={`mailto:${CONTACT_EMAIL}`}><Mail />{copy.final.contact}</a>}
       </Button>
     </>
   )
 }
 
-const heroStats = [
-  { value: '15 min', label: 'Email link lifetime' },
-  { value: '1 use', label: 'Per refresh token' },
-  { value: '0', label: 'Answers that reveal an account' },
-]
+// answers "what's the catch?" right under the button, where people decide whether to click
+function Reassurance({ items, center }: { items: string[], center?: boolean }) {
+  return (
+    <ul className={cn('mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground', center && 'justify-center')}>
+      {items.map(item => (
+        <li key={item} className="flex items-center gap-1.5"><Check className="size-4 text-success" />{item}</li>
+      ))}
+    </ul>
+  )
+}
 
-// the checks authenticateToken runs on every protected request, in the same order and with the same failure codes
-const requestChecks: { stage: string, checks: { label: string, detail: string, fails?: string }[] }[] = [
-  {
-    stage: 'Authentication · who is asking',
-    checks: [
-      { label: 'Session cookie present', detail: 'httpOnly, never readable by scripts', fails: '401' },
-      { label: 'Access token verified', detail: 'signature and 15 min expiry', fails: '401' },
-      { label: 'Account still exists', detail: 'looked up on every request', fails: '401' },
-    ],
-  },
-  {
-    stage: 'Authorization · what they may do',
-    checks: [
-      { label: 'Email verified', detail: 'unverified accounts get no session', fails: '403' },
-      { label: 'Own data only', detail: 'every query is scoped to the token\'s user id' },
-    ],
-  },
-]
+function Heading({ eyebrow, title, body, center }: { eyebrow: string, title: string, body?: string, center?: boolean }) {
+  return (
+    <div className={cn('max-w-2xl', center && 'mx-auto text-center')}>
+      <p className={cn('eyebrow flex items-center gap-3', center && 'justify-center')}><span className="h-px w-8 bg-primary" />{eyebrow}</p>
+      <h2 className="font-display mt-4 text-3xl leading-tight font-semibold sm:text-5xl">{title}</h2>
+      {body && <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{body}</p>}
+    </div>
+  )
+}
 
-function Hero() {
+function Hero({ copy }: { copy: HomeCopy }) {
+  const { hero } = copy
+
   return (
     <section className="relative isolate overflow-hidden border-b">
       <div aria-hidden className="bg-grid pointer-events-none absolute inset-0 -z-10 opacity-60" />
       <div aria-hidden className="bg-wall pointer-events-none absolute inset-0 -z-10" />
 
-      <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[1.1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[1.15fr_1fr]">
         {/* slides in but never fades: text that starts at opacity 0 doesn't count as painted, which delays lcp by the whole fade */}
         <div className="animate-in slide-in-from-bottom-2 duration-700">
-          <Badge variant="outline" className="gap-1.5 bg-card px-3 py-1">
-            <ShieldCheck className="text-primary" />Authentication &amp; authorization
-          </Badge>
-          <h1 className="font-display mt-6 text-4xl leading-[1.1] font-semibold sm:text-6xl">
-            Know who's signing in.<br /><span className="text-primary">Decide what gets through.</span>
-          </h1>
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            CKAuth verifies every account by email and password, keeps sessions in rotating httpOnly cookies, and checks each request before it reaches your data.
+          <p className="inline-flex items-center gap-2 rounded-full border bg-card px-3.5 py-1.5 text-sm font-medium">
+            <ShieldCheck className="size-4 shrink-0 text-primary" />{hero.badge}
           </p>
+          <h1 className="font-display mt-6 text-4xl leading-[1.1] font-semibold sm:text-6xl">
+            {hero.title}<br /><span className="text-primary">{hero.titleAccent}</span>
+          </h1>
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">{hero.body}</p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <PrimaryActions />
+            <Actions copy={copy} secondary="how" />
           </div>
+          <Reassurance items={hero.reassurance} />
           <dl className="mt-12 grid max-w-lg grid-cols-3 divide-x border-t pt-6">
-            {heroStats.map(stat => (
-              <div key={stat.label} className="px-4 first:pl-0">
-                <dd className="font-display text-2xl font-semibold">{stat.value}</dd>
+            {hero.stats.map(stat => (
+              // a term must come before its value in a <dl>, so screen readers read "1 min, to create an account" in order; flipped back visually
+              <div key={stat.label} className="flex flex-col-reverse px-4 first:pl-0">
                 <dt className="mt-1 text-xs leading-snug text-muted-foreground">{stat.label}</dt>
+                <dd className="font-display text-2xl font-semibold">{stat.value}</dd>
               </div>
             ))}
           </dl>
         </div>
 
-        <RequestCard />
+        <SignInPreview copy={copy} />
       </div>
     </section>
   )
 }
 
-// a protected request walking through the checks; decorative, so screen readers get the summary line instead
-function RequestCard() {
+// the sign-in screen a shop's customer would see, with what ckauth checks behind it. decorative, so the
+// fake fields are plain divs (nothing to tab into) and screen readers get the caption
+function SignInPreview({ copy }: { copy: HomeCopy }) {
+  const { phone } = copy
+
   return (
-    <Card className="dossier gap-0 py-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <CardHeader className="flex flex-row items-center justify-between border-b py-4 [.border-b]:pb-4">
-        <div className="flex items-center gap-2 font-mono text-sm">
-          <Badge variant="secondary" className="font-mono">GET</Badge>/auth/me
+    <figure className="mx-auto w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div aria-hidden className="dossier rounded-[2.5rem] border-secondary bg-card p-6 pt-8">
+        <p className="text-center text-xs font-semibold tracking-wide text-muted-foreground uppercase">{phone.shop}</p>
+        <p className="font-display mt-2 text-center text-2xl font-semibold">{phone.heading}</p>
+        <div className="mt-6 space-y-3">
+          <div className="rounded-xl border bg-background px-4 py-3 text-sm text-muted-foreground">{phone.email}</div>
+          <div className="rounded-xl border bg-background px-4 py-3 text-sm tracking-[0.3em] text-muted-foreground">••••••••••</div>
+          <div className="rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground">{phone.button}</div>
         </div>
-        <Badge className="bg-success/15 font-mono text-success">200 OK</Badge>
-      </CardHeader>
-      <CardContent className="space-y-6 py-6">
-        <p className="sr-only">A request to a protected endpoint passes three authentication checks and two authorization checks before it is answered.</p>
-        {requestChecks.map(({ stage, checks }) => (
-          <div key={stage} aria-hidden>
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{stage}</p>
-            <ul className="mt-3 space-y-3">
-              {checks.map(({ label, detail, fails }) => (
-                <li key={label} className="flex items-start gap-3">
-                  <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{label}</p>
-                    <p className="text-xs text-muted-foreground">{detail}</p>
-                  </div>
-                  {fails && <span className="font-mono text-xs text-muted-foreground">else {fails}</span>}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </CardContent>
-      <CardFooter className="justify-between border-t py-4 text-xs text-muted-foreground [.border-t]:pt-4">
-        <span className="flex items-center gap-1.5"><Lock className="size-3.5" />Signed in as ada@example.com</span>
-        <span className="font-mono">12 ms</span>
-      </CardFooter>
-    </Card>
-  )
-}
-
-const tickerItems = ['Verified sign-ups', 'Rotating sessions', 'No account enumeration', 'Rate-limited gates', 'Hashed tokens', 'bcrypt passwords', 'httpOnly cookies', 'Single-use links']
-
-function Ticker() {
-  return (
-    <div className="overflow-hidden border-y bg-secondary py-3.5 text-secondary-foreground" aria-hidden>
-      <div className="flex w-max animate-marquee">
-        {[0, 1].map(copy => (
-          <div key={copy} className="flex shrink-0 items-center">
-            {tickerItems.map(item => (
-              <span key={item} className="font-display flex items-center gap-6 px-6 text-sm tracking-[0.25em] whitespace-nowrap uppercase">
-                {item}<span className="text-primary">✦</span>
-              </span>
-            ))}
-          </div>
-        ))}
+        <ul className="mt-6 space-y-2.5 border-t pt-5">
+          {phone.checks.map(check => (
+            <li key={check} className="flex items-center gap-2.5 text-sm">
+              <span className="flex size-5 items-center justify-center rounded-full bg-success/15 text-success"><Check className="size-3.5" /></span>
+              {check}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5 text-primary" />{phone.protectedBy}</p>
       </div>
-    </div>
+      <figcaption className="mt-4 text-center text-sm text-muted-foreground">{phone.caption}</figcaption>
+    </figure>
   )
 }
 
-function SectionHeading({ eyebrow, title, body }: { eyebrow: string, title: string, body: string }) {
-  return (
-    <div className="max-w-2xl">
-      <p className="eyebrow flex items-center gap-3"><span className="h-px w-8 bg-primary" />{eyebrow}</p>
-      <h2 className="font-display mt-4 text-4xl font-medium uppercase sm:text-5xl">{title}</h2>
-      <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{body}</p>
-    </div>
-  )
-}
+// the strip itself is hidden from screen readers (the features section says the same); the pause button isn't (index.css, .ticker)
+function Ticker({ items, pauseLabel }: { items: string[], pauseLabel: string }) {
+  const [paused, setPaused] = useState(false)
 
-// named outermost to innermost, the way the three walls stand
-const defenses: { wall: string, name: string, icon: LucideIcon, summary: string, points: string[] }[] = [
-  {
-    wall: 'Maria',
-    name: 'The outer wall',
-    icon: Gauge,
-    summary: 'Every gate that checks a password, sends an email or spends a token is rate limited.',
-    points: ['Limits per IP, per email and per user', 'Same 429 whether or not an account exists', 'IPv6 grouped by /56, so rotating addresses doesn\'t help'],
-  },
-  {
-    wall: 'Rose',
-    name: 'The second wall',
-    icon: Fingerprint,
-    summary: 'No session until the inbox owner proves they\'re also the person who signed up.',
-    points: ['Single-use email links that expire in 15 minutes', 'Verification asks for the sign-up password', 'Unverified accounts get no cookies at all'],
-  },
-  {
-    wall: 'Sina',
-    name: 'The inner wall',
-    icon: Lock,
-    summary: 'Even with the database in hand, there\'s nothing an attacker can replay.',
-    points: ['Passwords hashed with bcrypt', 'Every token stored as a SHA-256 hash', 'Sessions live in httpOnly cookies scripts can\'t read'],
-  },
-]
-
-function Defenses() {
   return (
-    <section id="defenses" className="relative scroll-mt-20 border-b py-24 sm:py-32">
-      <div aria-hidden className="bg-wall pointer-events-none absolute inset-0" />
-      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-        <SectionHeading eyebrow="The defenses" title="Three walls, no weak gate" body="Most breaches walk through the one door nobody guarded. CKAuth guards every one of them the same way, whether the account exists or not." />
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
-          {defenses.map(({ wall, name, icon: Icon, summary, points }) => (
-            <article key={name} className="dossier group relative flex flex-col rounded-2xl border bg-card p-7 transition-all duration-300 hover:-translate-y-1">
-              <span aria-hidden className="font-display absolute top-6 right-7 text-sm font-semibold tracking-[0.3em] text-muted-foreground uppercase transition-colors group-hover:text-primary">Wall {wall}</span>
-              <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Icon className="size-5" />
-              </span>
-              <h3 className="font-display mt-6 text-xl font-semibold">{name}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{summary}</p>
-              <ul className="mt-6 space-y-2.5 border-t pt-5 text-sm">
-                {points.map(point => (
-                  <li key={point} className="flex gap-2.5">
-                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </article>
+    <div className="ticker relative border-y bg-secondary text-secondary-foreground" data-paused={paused ? '' : undefined}>
+      <div className="overflow-hidden py-3.5 pr-12" aria-hidden>
+        <div className="flex w-max animate-marquee">
+          {[0, 1].map(copy => (
+            <div key={copy} className="flex shrink-0 items-center">
+              {items.map(item => (
+                <span key={item} className="flex items-center gap-6 px-6 text-sm font-medium whitespace-nowrap">
+                  {item}<span className="text-primary">✦</span>
+                </span>
+              ))}
+            </div>
           ))}
         </div>
       </div>
+      {/* reduced motion already stops the strip, so the button has nothing to do there */}
+      <button
+        type="button"
+        onClick={() => setPaused(current => !current)}
+        aria-label={pauseLabel}
+        aria-pressed={paused}
+        className="absolute inset-y-0 right-0 flex w-12 items-center justify-center border-l border-border/20 bg-secondary transition-colors hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none motion-reduce:hidden"
+      >
+        {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+      </button>
+    </div>
+  )
+}
+
+// same order as copy.features.items
+const featureIcons: LucideIcon[] = [UserCheck, ShieldBan, Vault, Timer, EyeOff, LogOut]
+
+function Features({ copy }: { copy: HomeCopy }) {
+  const { features } = copy
+
+  return (
+    <section id="features" className="relative scroll-mt-20 border-b py-24 sm:py-32">
+      <div aria-hidden className="bg-wall pointer-events-none absolute inset-0" />
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+        <Heading eyebrow={features.eyebrow} title={features.title} body={features.body} center />
+        <div className={"mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3"}>
+          {features.items.map((item, index) => {
+            const Icon = featureIcons[index]!
+            return (
+              <article key={item.title} className="rounded-2xl border bg-card p-7">
+                <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Icon className="size-5" />
+                </span>
+                <h3 className="font-display mt-6 text-xl font-semibold">{item.title}</h3>
+                <p className="mt-2 leading-relaxed text-muted-foreground">{item.body}</p>
+              </article>
+            )
+          })}
+        </div>
+      </div>
     </section>
   )
 }
 
-const steps: { icon: LucideIcon, title: string, body: string }[] = [
-  { icon: UserPlus, title: 'Enlist', body: 'Sign up with your name, email and a strong password. The meter shows how well it holds.' },
-  { icon: MailCheck, title: 'Take the oath', body: 'Open the link we email you and confirm with your password. You\'re signed in on the spot.' },
-  { icon: RefreshCcw, title: 'Hold your post', body: 'Short-lived access, silently refreshed. Each refresh token works once, then it\'s replaced.' },
-  { icon: KeyRound, title: 'Find your way back', body: 'Forgot it? A reset link puts you back inside, and signs out every other device on the way.' },
-]
+const stepIcons: LucideIcon[] = [UserPlus, MailCheck, RefreshCcw, KeyRound]
 
-function HowItWorks() {
+function Steps({ copy }: { copy: HomeCopy }) {
+  const { steps } = copy
+
   return (
     <section id="how-it-works" className="relative scroll-mt-20 overflow-hidden border-b bg-muted/40 py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <SectionHeading eyebrow="Field manual" title="From cadet to inside, in four moves" body="No passwords in emails, no codes to copy, no guessing which step comes next." />
+        <Heading eyebrow={steps.eyebrow} title={steps.title} body={steps.body} />
         <ol className="relative mt-16 grid gap-10 md:grid-cols-4 md:gap-6">
           <span aria-hidden className="absolute top-6 right-[12%] left-[12%] hidden h-px bg-[repeating-linear-gradient(90deg,var(--border)_0_8px,transparent_8px_14px)] md:block" />
-          {steps.map(({ icon: Icon, title, body }, index) => (
-            <li key={title} className="relative">
-              <div className="flex items-center gap-4 md:flex-col md:items-start">
-                <span className="relative z-10 flex size-12 items-center justify-center rounded-full border-2 border-primary bg-background text-primary">
-                  <Icon className="size-5" />
-                </span>
-                <span className="font-display text-xs tracking-[0.3em] text-muted-foreground uppercase">Step {String(index + 1).padStart(2, '0')}</span>
-              </div>
-              <h3 className="font-display mt-4 text-2xl font-semibold">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-            </li>
-          ))}
+          {steps.items.map((step, index) => {
+            const Icon = stepIcons[index]!
+            return (
+              <li key={step.title} className="relative">
+                <div className="flex items-center gap-4 md:flex-col md:items-start">
+                  <span className="relative z-10 flex size-12 items-center justify-center rounded-full border-2 border-primary bg-background text-primary">
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">{steps.stepLabel} {index + 1}</span>
+                </div>
+                <h3 className="font-display mt-4 text-2xl font-semibold">{step.title}</h3>
+                <p className="mt-2 leading-relaxed text-muted-foreground">{step.body}</p>
+              </li>
+            )
+          })}
         </ol>
       </div>
     </section>
   )
 }
 
-const guarantees: { icon: LucideIcon, title: string, body: string }[] = [
-  { icon: EyeOff, title: 'Silent on who\'s registered', body: 'Sign-up, sign-in and recovery answer identically for every email. Only the inbox owner learns the difference.' },
-  { icon: Fingerprint, title: 'No one can wear your face', body: 'Registering your address with their password gets an impostor nothing: verifying needs both the inbox and the password.' },
-  { icon: RefreshCcw, title: 'A stolen refresh token dies on use', body: 'Tokens rotate on every refresh, and changing or resetting your password ends every other session.' },
-]
+const businessIcons: LucideIcon[] = [PhoneOff, HeartHandshake, Fingerprint, ImageUp]
 
-const logLines = [
-  { method: 'POST', path: '/auth/sign-up', status: '201', note: 'cadet enlisted' },
-  { method: 'POST', path: '/auth/verify-email/••••', status: '200', note: 'oath taken · cookies set' },
-  { method: 'GET', path: '/auth/me', status: '200', note: 'inside the walls' },
-  { method: 'GET', path: '/auth/me', status: '401', note: 'access expired' },
-  { method: 'POST', path: '/auth/refresh', status: '200', note: 'token rotated' },
-  { method: 'POST', path: '/auth/sign-in', status: '429', note: 'titan at the gate · held' },
-]
+function Business({ copy }: { copy: HomeCopy }) {
+  const { business } = copy
 
-function Security() {
   return (
-    <section id="security" className="scroll-mt-20 border-b py-24 sm:py-32">
-      <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-2">
-        <div>
-          <SectionHeading eyebrow="Security" title="Built for the worst day" body="Assume the attacker knows your users' emails, has a botnet, and one day gets a copy of your database. The walls still hold." />
-          <ul className="mt-10 space-y-7">
-            {guarantees.map(({ icon: Icon, title, body }) => (
-              <li key={title} className="flex gap-4">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full border bg-card text-primary">
-                  <Icon className="size-5" />
-                </span>
-                <div>
-                  <h3 className="font-semibold">{title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
-                </div>
+    <section id="business" className="scroll-mt-20 border-b py-24 sm:py-32">
+      <div className="mx-auto grid max-w-6xl gap-14 px-4 sm:px-6 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+        <Heading eyebrow={business.eyebrow} title={business.title} body={business.body} />
+        <ul className="grid gap-5 sm:grid-cols-2">
+          {business.items.map((item, index) => {
+            const Icon = businessIcons[index]!
+            return (
+              <li key={item.title} className="rounded-2xl border bg-card p-6">
+                <Icon className="size-6 text-primary" />
+                <h3 className="mt-4 font-semibold">{item.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
               </li>
-            ))}
-          </ul>
-        </div>
+            )
+          })}
+        </ul>
+      </div>
+    </section>
+  )
+}
 
-        {/* a watchtower log of what the api actually answers; always a dark terminal, whatever the theme */}
-        <div className="dossier overflow-hidden rounded-2xl border border-[#2a2533] bg-[#0e0d14] font-mono text-[0.8rem] text-[#f1e8dc]">
-          <div className="flex items-center justify-between border-b border-[#2a2533] px-5 py-3">
-            <span className="font-display text-xs tracking-[0.3em] text-[#a79bab] uppercase">Watchtower log</span>
-            <span className="flex gap-1.5">
-              <span className="size-2.5 rounded-full bg-[#f0642a]" />
-              <span className="size-2.5 rounded-full bg-[#e0a84f]" />
-              <span className="size-2.5 rounded-full bg-[#6fcf8f]" />
-            </span>
-          </div>
-          <ul className="space-y-2.5 p-5">
-            {logLines.map((line, index) => (
-              <li key={index} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 animate-in fade-in slide-in-from-left-2 fill-mode-both" style={{ animationDelay: `${index * 120}ms` }}>
-                <span className="w-10 text-[#a79bab]">{line.method}</span>
-                <span className="min-w-0 flex-1 truncate">{line.path}</span>
-                <span className={line.status.startsWith('2') ? 'text-[#6fcf8f]' : line.status === '429' ? 'text-[#f0642a]' : 'text-[#e0a84f]'}>{line.status}</span>
-                <span className="w-full pl-[3.25rem] text-[#a79bab]/80 sm:w-auto sm:pl-0">· {line.note}</span>
-              </li>
-            ))}
-            <li className="flex items-center gap-2 pt-1 text-[#a79bab]">
-              <span>$</span><span className="h-4 w-2 animate-pulse bg-[#f1e8dc]/70" />
-            </li>
-          </ul>
+// the second way in, for developers building sites for clients or for themselves
+function Developers({ copy }: { copy: HomeCopy }) {
+  const { developers } = copy
+
+  return (
+    <section id="developers" className="scroll-mt-20 bg-secondary py-20 text-secondary-foreground">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 sm:px-6 md:flex-row md:items-center md:justify-between">
+        <div className="max-w-2xl">
+          <p className="flex items-center gap-2 text-sm font-semibold"><CodeXml className="size-4" />{developers.eyebrow}</p>
+          <h2 className="font-display mt-3 text-3xl font-semibold sm:text-4xl">{developers.title}</h2>
+          <p className="mt-3 leading-relaxed">{developers.body}</p>
+        </div>
+        <Button asChild size="lg" className="shrink-0">
+          <a href={REPO_URL} target="_blank" rel="noreferrer">{developers.button}<ExternalLink /></a>
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+// placeholder plans: ckauth is free for now, so the paid buttons stay disabled until those features exist.
+// the highlight goes on the first plan you can actually pick, not the best deal, so the loudest card isn't a dead end
+function Pricing({ copy }: { copy: HomeCopy }) {
+  const { pricing } = copy
+  const recommended = pricing.plans.findIndex(plan => plan.available)
+
+  return (
+    <section id="pricing" className="relative scroll-mt-20 border-b py-24 sm:py-32">
+      <div aria-hidden className="bg-wall pointer-events-none absolute inset-0" />
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+        <Heading eyebrow={pricing.eyebrow} title={pricing.title} body={pricing.body} center />
+        <p className="mx-auto mt-8 w-fit rounded-full border border-success/30 bg-success/10 px-4 py-2 text-center text-sm font-medium">{pricing.banner}</p>
+        <div className="mt-12 grid gap-6 md:grid-cols-3 md:items-start">
+          {pricing.plans.map((plan, index) => {
+            const highlighted = index === recommended
+            return (
+              <article key={plan.name} className={cn('relative flex flex-col rounded-2xl border bg-card p-7', highlighted && 'dossier border-primary')}>
+                {highlighted && (
+                  <span className="absolute -top-3 left-7 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">{pricing.recommended}</span>
+                )}
+                <h3 className="font-semibold">{plan.name}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
+                <p className="mt-6 flex items-baseline gap-1.5">
+                  <span className="font-display text-4xl font-semibold">{plan.price}</span>
+                  {plan.period && <span className="text-sm text-muted-foreground">{plan.period}</span>}
+                </p>
+                <ul className="mt-6 space-y-2.5 border-t pt-6 text-sm">
+                  {plan.features.map(feature => (
+                    <li key={feature} className="flex gap-2.5"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-success" />{feature}</li>
+                  ))}
+                </ul>
+                {plan.available ? (
+                  <Button asChild className="mt-8"><Link to="/sign-up">{plan.button}</Link></Button>
+                ) : (
+                  <Button variant="outline" className="mt-8" disabled>{plan.button}</Button>
+                )}
+              </article>
+            )
+          })}
         </div>
       </div>
     </section>
   )
 }
 
-function FinalCall() {
+// <details> opens and closes without javascript, so the answers work on the prerendered page too
+function Faq({ copy }: { copy: HomeCopy }) {
+  const { faq } = copy
+
+  return (
+    <section id="faq" className="scroll-mt-20 border-b bg-muted/40 py-24 sm:py-32">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+        <Heading eyebrow={faq.eyebrow} title={faq.title} center />
+        <div className="mt-12 divide-y rounded-2xl border bg-card">
+          {faq.items.map(item => (
+            <details key={item.q} className="group px-6 py-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium [&::-webkit-details-marker]:hidden">
+                {item.q}
+                <ChevronDown className="size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <FaqAnswer item={item} />
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+type FaqItem = HomeCopy['faq']['items'][number]
+
+// a faint bubble, like a chat reply: the tint, the shape and the bold short answer set it apart from the question
+function FaqAnswer({ item }: { item: FaqItem }) {
+  return (
+    <p className="mt-3 rounded-2xl rounded-tl-sm bg-primary/5 px-4 py-3 leading-relaxed">
+      <strong className="font-semibold">{item.lead}</strong> <WithEmailLink text={item.a} />
+      {item.link && <> <Link to={item.link.to} className="font-medium text-foreground underline underline-offset-4">{item.link.label}</Link>.</>}
+    </p>
+  )
+}
+
+// the help answer names the contact email; make it a link wherever it appears
+function WithEmailLink({ text }: { text: string }) {
+  const [before, after] = text.split(CONTACT_EMAIL)
+  if(after === undefined) return text
+  return <>{before}<a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-foreground underline underline-offset-4">{CONTACT_EMAIL}</a>{after}</>
+}
+
+function FinalCall({ copy }: { copy: HomeCopy }) {
+  const { final } = copy
+
   return (
     <section className="relative isolate overflow-hidden py-24 text-center sm:py-28">
       <div aria-hidden className="bg-grid pointer-events-none absolute inset-0 -z-10 opacity-60" />
       <div className="mx-auto max-w-2xl px-4">
-        <p className="eyebrow">Your post is waiting</p>
-        <h2 className="font-display mt-4 text-4xl font-semibold sm:text-5xl">Take your place on the wall</h2>
-        <p className="mx-auto mt-5 max-w-md text-muted-foreground">Create an account in under a minute. Verify your email once, and you're in.</p>
+        <h2 className="font-display text-4xl font-semibold sm:text-5xl">{final.title}</h2>
+        <p className="mx-auto mt-5 max-w-md text-lg text-muted-foreground">{final.body}</p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
-          <PrimaryActions />
+          <Actions copy={copy} secondary="contact" />
         </div>
+        <Reassurance items={copy.hero.reassurance} center />
+        <p className="mt-6 text-sm text-muted-foreground">
+          {final.emailLine} <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-foreground underline underline-offset-4">{CONTACT_EMAIL}</a>
+        </p>
       </div>
     </section>
   )

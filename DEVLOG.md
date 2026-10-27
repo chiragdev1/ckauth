@@ -188,6 +188,53 @@ New entries go at the bottom, under a dated heading.
   - *JavaScript on the landing page* went from 150 to 121 KiB gzip, and *unused JavaScript* from 79 to 56 KiB: the account menu (Radix dropdown + Floating UI) is lazy-loaded, since only signed-in users see it.
   - *Contrast failures* went from 10 to 0, so accessibility went from 96 to 100. The light theme's `--primary` and `--success` are slightly darker, and muted text no longer has opacity modifiers.
 
+## 24 Oct 2026 · A landing page for small business owners, in English and Hindi
+**In short:** the home page now speaks to small business owners in India instead of developers, in plain words and in Hindi as well as English.
+
+- **New message.** CKAuth is introduced as "your website's security guard", with features named by what they do for the owner ("Stops anyone guessing passwords") and compared to things they already trust: a bank locker, an ATM PIN, an OTP. The messaging borrows from Devin's and Chai Prep's landing pages (the product as a team member; one clear path; promise the outcome). The full copy and its rules are in `frontend/content/landing-page.md`; the page reads it from `src/pages/home-copy.ts`.
+- **New sections:** a demo sign-in screen in the hero (what a shop's customer sees, and what CKAuth checks), a section for web developers linking to the GitHub repo, placeholder pricing (Free, ₹99/month, ₹999/year, shown as "coming soon" under a "free for now" banner) and an FAQ built on `<details>`, so it works without JavaScript. Each answer starts with a short bold reply ("No, never.", "Free for now.") in a faint bubble under the question.
+- **Hindi.** An English/हिंदी switch in the header (`lib/language.tsx`) changes the page, menu and footer. The page always renders in English first, so the prerendered HTML hydrates cleanly, then applies a saved choice.
+- **Hindi readability.** Devanagari, the script Hindi is written in, at English settings looked small and cramped. The Noto Sans Devanagari font is now bundled, scaled up 12% with `size-adjust` and loaded only when Hindi appears (`unicode-range`). Hindi text also gets taller lines, no letter-spacing, slightly bigger small text and darker grey text.
+- **Design.** Chosen from three looks in the design lab (Dusk, Guard and Chai): **Guard**, slate and ember, with Inter for headings. Cinzel, the old all-caps heading font, is gone. The app pages lost their soldier wording ("Enlist", "Take the oath", "Garrison HQ") for plain words, since shop owners land on them straight from the new page.
+- **Search copy:** "Secure Website Login for Small Businesses in India · CKAuth" plus a matching description and share image (`og.png`).
+
+## 27 Oct 2026 · A landing page for every website, a Privacy Policy and Terms
+**In short:** the home page now speaks to anyone with users to protect, reads more professionally, is built to turn visits into sign-ups, and the site has a Privacy Policy and Terms of Service.
+
+- **Broader audience, same message.** CKAuth is still "your website's security guard", with the same action-first headings and familiar comparisons (ATM PIN, bank locker, OTP). "Customers" and "shop" became "users" and "your website"; where a concrete picture helps, the copy lists a range (a shop, a clinic, a startup, a community) instead of one kind of business. The demo sign-in screen shows `yourwebsite.com` instead of a made-up store.
+- **More professional tone.** No emoji, no "cup of chai" pricing line, an "early access" banner instead of a "launch offer", and a new FAQ question, "Who is CKAuth for?".
+- **Built to convert** (turn a visit into a sign-up; terms in the [glossary](docs/GLOSSARY.md#growth-and-legal)):
+  - One primary call to action everywhere: "Create your free account" (the header says "Get started free").
+  - The hero's second button now scrolls to "How it works" instead of to the developer section, so the only way off the first screen is signing up.
+  - A reassurance line under the hero and closing buttons answers "what's the catch?": Free during early access · No card required · Ready in under a minute.
+  - A "What do you do with my data?" FAQ answer links to the Privacy Policy.
+- **Privacy Policy (`/privacy`) and Terms of Service (`/terms`)** in `src/pages/legal.tsx`, lazy-loaded so the landing page's JavaScript doesn't grow, linked from the footer, and added to the `@app` route list in `frontend/Caddyfile` (so they're `noindex`, like the other app screens). The policy describes what the code really does: the stored fields in `schema.ts`, the two `httpOnly` cookies, local storage for theme and language, rate-limit counters (at most an hour), 14-day backups, and the three processors (Hostinger, Resend, ImageKit). It covers the rights India's DPDP Act gives. Neither page has been reviewed by a lawyer yet.
+- **Reviewed both pages against the usual checklists** (GDPR, India's DPDP Act and Rules 2025, California's CCPA, standard SaaS terms, and India's IT Rules 2021, which apply because users upload photos) and filled the gaps:
+  - **Privacy:** the legal basis for each use, where data comes from, international transfers, a business-transfer clause, "no profiling" (the only automatic decision is a temporary rate-limit block), EU/UK portability, objection and restriction rights, identity checks on requests, links to other sites, a Grievance Officer, and an "In short" summary at the top.
+  - **Privacy, accuracy fixes found in the code:** the API accepts an optional `age`, unconfirmed sign-ups are never cleaned up, error logs can include an email address, and ImageKit sees a viewer's IP address when it serves a photo.
+  - **Terms:** using CKAuth on behalf of an organisation, an early-access warning, intellectual property and feedback, other services, survival after an account ends, a limited indemnity, a Grievance Officer with the IT Rules' 24-hour and 15-day timelines, 15 days' notice of changes, and a "General" section (notices, whole agreement, severability, no waiver, transfer, force majeure).
+- **Consent at sign-up:** a line under the button, "By creating an account, you agree to our Terms of Service and Privacy Policy", with both links opening in a new tab so the form isn't lost. A line rather than a required checkbox, since every extra click costs sign-ups; terms only bind if sign-up says so.
+- **Search copy:** "Secure Sign-In and User Accounts for Your Website · CKAuth", with a description ending in "Free, no card. Get started now." The headline didn't change, so `og.png` stays.
+- `frontend/content/landing-page.md` was rewritten to match, with a new "Written to convert" section listing the rules above.
+
+## 27 Oct 2026 · Frontend review: UX, accessibility and honest copy
+**In short:** a review of the web app against common UX and accessibility standards found a password meter that never worked, a landing page that promised more than the dashboard offers, and several gaps an SPA has to close on purpose; all the frontend findings are fixed. Lessons are in [LEARNINGS](LEARNINGS.md#frontend-ux--accessibility), new terms in the [glossary](docs/GLOSSARY.md#frontend).
+
+- **Password strength meter.** `scorePassword()` had been a placeholder returning "Holding" for every password since the shadcn rebuild. It now scores length first (8 / 12 / 16 / 20 characters), adds a point for three or more character types, takes one off for mostly repeated characters, and gives 0 ("Breached") to one repeated character, a straight run (`abcd`, `4321`) or a password whose letters are a common leaked word (`Password123!`). There's no extra library: zxcvbn would add ~400 KiB.
+- **Honest positioning.** The FAQ "Do I need to know how to code?" now says a developer sets CKAuth up today (from the README) and that a no-code way is coming; the business section says CKAuth helps "on your sign-in". The dashboard has a new **Connect your website · Coming soon** card with the setup guide and a "Tell us what you need" email. `content/landing-page.md` has the new copy and a new rule.
+- **Deploys no longer break open tabs:** `pages/route-error.tsx` is the router's `errorElement` (inside the layout, so the header stays), and `main.tsx` reloads once on `vite:preloadError`.
+- **Header on phones:** "Sign in" is visible again (it was hidden below 640 px), the phone header shows only the one of Sign in / Sign up you aren't on, the language button is icon-only, the controls are 40 px tall, and on 320 px screens the logo shows just the crest, so nothing scrolls sideways. The signed-out buttons render straight away instead of a blank that filled in after two API calls, and sign-in and sign-up no longer wait behind a spinner.
+- **Accessibility:**
+  - A skip link [A03].
+  - `<ScrollRestoration />`, so new pages start at the top.
+  - Focus moves to `<main>` after each navigation, and to the new heading when an auth page swaps views ("Check your inbox"; forgot-password got that title too).
+  - Hints and password requirements are tied to their input with `aria-describedby`; only the strength word is a live region, so it's no longer read out on every keystroke.
+  - The theme button reports its state (`aria-pressed`), and picking the system's own theme goes back to following the system.
+  - The hero stats list puts each label before its number for screen readers.
+  - The Terms and Privacy links say they open a new tab.
+- **Motion:** the reduced-motion rule also sets `animation-iteration-count: 1` (the ticker used to flicker under it), and the ticker pauses on hover or with its own button.
+- **Smaller fixes:** pricing highlights Free ("Available now") instead of the unavailable yearly plan; feature cards no longer lift on hover (they aren't links); the dashboard's "Service record" card is now "Profile"; the change-password form carries a hidden username field, so password managers save the new password to the right account.
+
 ---
 
 ## Lessons
@@ -197,10 +244,20 @@ Mistakes and the rules learned from them are kept topic by topic in [LEARNINGS.m
 Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md).
 
 - **SEO phase 1:**
-  - Deploy the new search title and description (written 23 Oct) [O01, O02]; consider "authentication" in the h1 itself, not only the badge above it [O03].
+  - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].
+  - Have a lawyer review the Privacy Policy and Terms, and confirm the operator and Grievance Officer name, the ₹1,000 liability cap, and a city for "Governing law" (it says only "the courts of India").
+  - Make the policy's retention promises concrete: delete unconfirmed sign-ups after a fixed period (e.g. 30 days), and rotate logs with a stated period.
+  - Check that open and click tracking is off for the sending domain in Resend; then the policy can say emails aren't tracked.
+  - Self-serve account basics from the frontend review (each needs an API endpoint, a rate limiter, `docs/API.md` and, where data changes, the Privacy Policy): a "Resend the email" button on "Check your inbox" (today a resend means signing up again), editing your name, and "Sign out everywhere".
+  - Check the new header at 320, 360 and 390 px in a real phone or DevTools, and the skip link, focus moves and ticker pause with a screen reader (VoiceOver or NVDA); the review fixes were built and prerendered but not yet tried in a browser.
+  - Build the "Connect your website" flow the dashboard now announces (see Future scope, "Hosted sign-in for other apps"); until it ships, keep the FAQ saying a developer sets CKAuth up.
+  - Let users delete their own account (the Privacy Policy promises deletion on request; today it's done by hand). Add log rotation so "server logs are kept only as long as needed" has a number.
+  - Count the sign-up funnel (visit → sign-up → verified) once analytics exist, to measure the conversion changes. If analytics are added, update the Privacy Policy, which says there are none.
+  - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
+  - Translate the app pages (sign-up, sign-in, emails) into Hindi, so the language choice carries past the home page.
   - Verify `chiragdev.com` in Google Search Console and Bing Webmaster Tools (DNS TXT records cover every subdomain), submit `sitemap.xml`, request indexing, and check with Google's Rich Results Test [C10, C11]. Add an IndexNow ping to `deploy.sh` [C12].
   - Replace the Hostinger parked page on `chiragdev.com` with a portfolio that links to CKAuth [D02].
-  - Add a skip link [A03]. LCP is still ~2.2 s in the mobile lab [P02]: next steps are a smaller first-screen font load and a CDN [P09].
+  - LCP is still ~2.2 s in the mobile lab [P02]: next steps are a smaller first-screen font load and a CDN [P09].
   - Stop the `/auth/me` + `/auth/refresh` 401 errors on every visit by a signed-out user [B01].
   - Add a CAA record, an AAAA (IPv6) record, COOP/CORP headers and a `/index.html` → `/` redirect [B06, P12, B07, C07].
   - Set the GitHub repo's homepage, description and topics; link the repo and API docs from the footer; add Person JSON-LD with `sameAs`; add PNG icons and a `site.webmanifest` [D05, O11, O08, O09].

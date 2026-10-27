@@ -1,6 +1,10 @@
-import { lazy, Suspense } from 'react'
-import { Link, Navigate, Outlet, useLocation } from 'react-router'
+import { lazy, Suspense, useEffect, useRef } from 'react'
+import { Link, Navigate, Outlet, ScrollRestoration, useLocation } from 'react-router'
+import { Languages } from 'lucide-react'
 import { useAuth } from '@/lib/auth.tsx'
+import { useLanguage } from '@/lib/language.tsx'
+import { cn } from '@/lib/utils.ts'
+import { CONTACT_EMAIL, homeCopy } from '@/pages/home-copy.ts'
 import { Logo, Spinner } from '@/components/brand.tsx'
 import { ThemeToggle } from '@/components/theme-toggle.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -9,10 +13,28 @@ import { Button } from '@/components/ui/button.tsx'
 const UserMenu = lazy(() => import('@/components/user-menu.tsx'))
 
 export function Layout() {
+  const { pathname } = useLocation()
+  const { language } = useLanguage()
+  const main = useRef<HTMLElement>(null)
+  const shownPath = useRef(pathname)
+
+  // an spa navigation leaves focus on the link that was clicked, so screen readers hear nothing about the new page.
+  // move it to <main>, unless the page already focused something inside it (autoFocus on reset/verify)
+  useEffect(() => {
+    if(shownPath.current === pathname) return
+    shownPath.current = pathname
+    if(!main.current?.contains(document.activeElement)) main.current?.focus({ preventScroll: true })
+  }, [pathname])
+
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* new pages start at the top, and back/forward return to where you were */}
+      <ScrollRestoration />
+      <a href="#main" lang={language} className="sr-only z-50 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
+        {homeCopy[language].nav.skip}
+      </a>
       <SiteHeader />
-      <main className="flex flex-1 flex-col">
+      <main id="main" ref={main} tabIndex={-1} className="flex flex-1 flex-col outline-none">
         {/* the app pages are lazy-loaded (app.tsx); header and footer stay put while one arrives */}
         <Suspense fallback={<Spinner />}>
           <Outlet />
@@ -24,36 +46,46 @@ export function Layout() {
 }
 
 function SiteHeader() {
-  const { user, loading } = useAuth()
+  const { user } = useAuth()
   const { pathname } = useLocation()
+  const { language, setLanguage } = useLanguage()
   const onHome = pathname === '/'
+  const nav = homeCopy[language].nav
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/65">
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+    <header lang={language} className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/65">
+      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
         <Logo />
         {onHome && (
-          <div className="font-display hidden items-center gap-7 text-sm tracking-[0.15em] text-muted-foreground uppercase md:flex">
-            <a href="#defenses" className="transition-colors hover:text-foreground">Defenses</a>
-            <a href="#how-it-works" className="transition-colors hover:text-foreground">How it works</a>
-            <a href="#security" className="transition-colors hover:text-foreground">Security</a>
+          <div className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
+            <a href="#features" className="transition-colors hover:text-foreground">{nav.features}</a>
+            <a href="#how-it-works" className="transition-colors hover:text-foreground">{nav.howItWorks}</a>
+            <a href="#pricing" className="transition-colors hover:text-foreground">{nav.pricing}</a>
+            <a href="#faq" className="transition-colors hover:text-foreground">{nav.faq}</a>
           </div>
         )}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* only the home page has hindi words so far; icon-only on phones, where the header has room for four controls */}
+          {onHome && (
+            <Button variant="ghost" onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} aria-label={nav.switchLabel} lang={language === 'en' ? 'hi' : 'en'} className="size-10 px-0 sm:size-auto sm:h-9 sm:px-3">
+              <Languages /><span className="hidden sm:inline">{nav.switchTo}</span>
+            </Button>
+          )}
           <ThemeToggle />
-          {loading ? (
-            <div className="h-9 w-24" />
-          ) : user ? (
+          {/* signed-out buttons while the session check runs: most visitors are signed out, and the prerendered home page
+              can't know, so this is what it shows. a signed-in user sees them swap for the menu once /auth/me answers */}
+          {user ? (
             <Suspense fallback={<div className="size-9" />}>
               <UserMenu />
             </Suspense>
           ) : (
             <>
-              <Button asChild variant="ghost" className="hidden sm:inline-flex">
-                <Link to="/sign-in">Sign in</Link>
+              {/* phones show one of the two, the one you're not on; the hero has the big sign-up button */}
+              <Button asChild variant="ghost" className={cn('h-10 sm:h-9', pathname === '/sign-in' && 'hidden sm:inline-flex')}>
+                <Link to="/sign-in">{nav.signIn}</Link>
               </Button>
-              <Button asChild>
-                <Link to="/sign-up">Enlist</Link>
+              <Button asChild className={cn('h-10 sm:h-9', pathname !== '/sign-in' && 'hidden sm:inline-flex')}>
+                <Link to="/sign-up">{nav.tryFree}</Link>
               </Button>
             </>
           )}
@@ -64,18 +96,22 @@ function SiteHeader() {
 }
 
 function SiteFooter() {
+  const { language } = useLanguage()
+  const footer = homeCopy[language].footer
+
   return (
-    <footer className="border-t border-border/70">
+    <footer lang={language} className="border-t border-border/70">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6">
-        <p className="font-display tracking-[0.2em] uppercase">
-          © {new Date().getFullYear()} CKAuth · Hold the wall
-          {/* "dedicate your hearts": the salute, for whoever notices */}
-          <span lang="ja" title="Dedicate your hearts" className="ml-3 tracking-normal normal-case">心臓を捧げよ</span>
-        </p>
-        <div className="flex gap-5">
-          <Link to="/sign-in" className="hover:text-foreground">Sign in</Link>
-          <Link to="/sign-up" className="hover:text-foreground">Create account</Link>
-          <Link to="/forgot-password" className="hover:text-foreground">Recover access</Link>
+        <div className="text-center sm:text-left">
+          <p>© {new Date().getFullYear()} CKAuth · {footer.tagline}</p>
+          <p className="mt-1">{footer.question} <a href={`mailto:${CONTACT_EMAIL}`} className="text-foreground underline underline-offset-4">{CONTACT_EMAIL}</a></p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-2">
+          <Link to="/sign-in" className="hover:text-foreground">{footer.signIn}</Link>
+          <Link to="/sign-up" className="hover:text-foreground">{footer.createAccount}</Link>
+          <Link to="/forgot-password" className="hover:text-foreground">{footer.forgot}</Link>
+          <Link to="/privacy" className="hover:text-foreground">{footer.privacy}</Link>
+          <Link to="/terms" className="hover:text-foreground">{footer.terms}</Link>
         </div>
       </div>
     </footer>
@@ -93,10 +129,10 @@ export function RequireAuth() {
 }
 
 // signed-in users have no reason to see sign-in or sign-up
+// the form shows straight away instead of waiting on the session check (two round trips for a signed-out visitor)
 export function GuestOnly() {
-  const { user, loading } = useAuth()
+  const { user } = useAuth()
 
-  if(loading) return <Spinner />
   if(user) return <Navigate to="/dashboard" replace />
   return <Outlet />
 }

@@ -16,9 +16,10 @@ function replaceOnce(html, search, replacement) {
 
 const shell = await readFile(new URL('index.html', dist), 'utf8')
 
-// the latin files of the two fonts the first screen uses; preloading starts them with the html instead of after the css
-const fonts = (await readdir(new URL('assets/', dist))).filter(name => /^(inter|cinzel)-latin-wght-normal-.+\.woff2$/.test(name))
-if(fonts.length !== 2) throw new Error(`prerender: expected the inter and cinzel latin fonts, found ${fonts.join(', ') || 'none'}`)
+// the latin file of the font the first screen uses; preloading starts it with the html instead of after the css.
+// the hindi font isn't preloaded: the page starts in english, and most visitors never switch
+const fonts = (await readdir(new URL('assets/', dist))).filter(name => /^inter-latin-wght-normal-.+\.woff2$/.test(name))
+if(fonts.length !== 1) throw new Error(`prerender: expected the inter latin font, found ${fonts.join(', ') || 'none'}`)
 const preloads = fonts.map(name => `<link rel="preload" href="/assets/${name}" as="font" type="font/woff2" crossorigin />`).join('\n    ')
 let appShell = replaceOnce(shell, '</head>', `  ${preloads}\n  </head>`)
 

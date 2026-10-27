@@ -1,0 +1,258 @@
+// the landing page words for anyone running a website or app, in english and hindi (source: content/landing-page.md).
+// hindi keeps everyday hinglish (login, password, email, link), because that's how people actually say them.
+// only promise what ckauth does today: the paid plans are placeholders and say "coming soon" until they're real
+
+export const CONTACT_EMAIL = 'chiragaroradev@gmail.com'
+export const REPO_URL = 'https://github.com/chiragdev1/ckauth'
+
+const en = {
+  nav: {
+    features: 'Features',
+    howItWorks: 'How it works',
+    pricing: 'Pricing',
+    faq: 'FAQ',
+    signIn: 'Sign in',
+    tryFree: 'Get started free',
+    switchTo: 'हिंदी',
+    switchLabel: 'हिंदी में पढ़ें',
+    skip: 'Skip to content',
+  },
+  footer: {
+    tagline: 'Your website\'s security guard',
+    question: 'Questions? Write to',
+    signIn: 'Sign in',
+    createAccount: 'Create account',
+    forgot: 'Forgot password',
+    privacy: 'Privacy',
+    terms: 'Terms',
+  },
+  hero: {
+    badge: 'Every sign-in is a door. Is yours guarded?',
+    title: 'Meet CKAuth,',
+    titleAccent: 'your website\'s security guard.',
+    body: 'It confirms every new account, stops anyone guessing passwords, and keeps watch day and night. You build what matters. CKAuth guards the door.',
+    primary: 'Create your free account',
+    dashboard: 'Go to dashboard',
+    secondary: 'See how it works',
+    reassurance: ['Free during early access', 'No card required', 'Ready in under a minute'],
+    stats: [
+      { value: '1 min', label: 'to create an account' },
+      { value: '15 min', label: 'and every email link expires' },
+      { value: '0', label: 'people who can read a password, not even us' },
+    ],
+  },
+  phone: {
+    shop: 'yourwebsite.com',
+    heading: 'Sign in',
+    email: 'you@example.com',
+    button: 'Sign in',
+    protectedBy: 'Protected by CKAuth',
+    checks: ['Email confirmed', 'Password stored unreadable', 'Repeated guesses blocked'],
+    caption: 'What your users see. What CKAuth checks.',
+  },
+  tickerPause: 'Pause the moving strip',
+  ticker: ['Email-confirmed accounts', 'Password-guessing protection', 'Unreadable passwords', 'One-time links', 'A private user list', 'Verified image uploads', 'Works on every device'],
+  features: {
+    eyebrow: 'On duty, around the clock',
+    title: 'A guard that never takes a day off',
+    body: 'Attackers look for the one door nobody is watching. CKAuth watches every door, every time.',
+    items: [
+      { title: 'Checks every new account at the door', body: 'No account opens until its owner proves the email is theirs. Fake and mistyped addresses stay out.' },
+      { title: 'Stops anyone guessing passwords', body: 'Like an ATM after too many wrong PINs, CKAuth blocks repeated wrong tries, even when the attacker keeps switching networks.' },
+      { title: 'Locks passwords away, even from us', body: 'Passwords are stored as a one-way code, like valuables in a bank locker. Stolen data is useless to a thief.' },
+      { title: 'Sends links that work only once', body: 'Every email link works one time and expires after 15 minutes, just like an OTP.' },
+      { title: 'Keeps your user list private', body: 'Nobody can find out who has an account. Everyone gets the same answer.' },
+      { title: 'Signs out lost devices for you', body: 'When someone changes or resets their password, every other phone and computer is signed out.' },
+    ],
+  },
+  steps: {
+    eyebrow: 'How it works',
+    title: 'Sign up. Confirm. Stay safe.',
+    body: 'No passwords in emails, no codes to copy, no guessing what comes next.',
+    stepLabel: 'Step',
+    items: [
+      { title: 'Sign up', body: 'Name, email, password. A meter shows how strong the password is.' },
+      { title: 'Confirm your email', body: 'Open the link we send and enter your password once more. You\'re in.' },
+      { title: 'Stay signed in, safely', body: 'No sign-in on every visit. CKAuth quietly checks it\'s still you.' },
+      { title: 'Forgot your password?', body: 'A reset link by email, and you\'re back in a minute.' },
+    ],
+  },
+  business: {
+    eyebrow: 'Why it matters',
+    title: 'Big-company security. No security team needed.',
+    body: 'One break-in can undo years of trust. Whether you run a shop, a clinic, a startup or a community, CKAuth on your sign-in helps you keep that trust.',
+    items: [
+      { title: 'Fewer support requests', body: 'People reset their own passwords and update their own photo.' },
+      { title: 'Users who trust you', body: 'A safe, smooth sign-in looks professional. People stay where they feel safe.' },
+      { title: 'Nobody can pose as your users', body: 'Signing up with someone else\'s email gets an impostor nothing. They\'d need the inbox and the password.' },
+      { title: 'Only real images get in', body: 'Every profile photo is checked, so harmful files disguised as pictures are blocked.' },
+    ],
+  },
+  developers: {
+    eyebrow: 'Building for clients, or for yourself?',
+    title: 'Give every project the same strong lock.',
+    body: 'CKAuth is open source on GitHub, and its README walks through setup. Set it up once, and use it on every site you build.',
+    button: 'View the code on GitHub',
+  },
+  pricing: {
+    eyebrow: 'Pricing',
+    title: 'Simple pricing. Free while we launch.',
+    body: 'Every plan includes the full security guard. Pay only when you grow.',
+    banner: 'Early access: every feature is free today. Paid plans have not started yet.',
+    recommended: 'Available now',
+    plans: [
+      { name: 'Free', price: '₹0', period: '', tagline: 'To get started', features: ['All security features', 'Email confirmation for every user', 'Password reset by email'], button: 'Start free', available: true },
+      { name: 'Monthly', price: '₹99', period: '/ month', tagline: 'For growing teams', features: ['Everything in Free', 'Priority email support', 'Your brand name on sign-in emails'], button: 'Coming soon', available: false },
+      { name: 'Yearly', price: '₹999', period: '/ year', tagline: 'Best value: save ₹189', features: ['Everything in Monthly', 'About two months free', 'Early access to new features'], button: 'Coming soon', available: false },
+    ],
+  },
+  faq: {
+    eyebrow: 'Good to know',
+    title: 'Frequently asked questions',
+    items: [
+      { q: 'Who is CKAuth for?', lead: 'Anyone with users to protect.', a: 'Online shops, clinics, tutors, startups, communities and side projects: if people sign in, CKAuth keeps their accounts safe.' },
+      { q: 'Do I need to know how to code?', lead: 'Today, a developer sets it up.', a: 'CKAuth is open source, and a developer can add it to your website by following its README. A no-code way to connect your website is on the way. Until then, you can create an account and try the sign-in your users would see.' },
+      { q: 'Can you see my users\' passwords?', lead: 'No, never.', a: 'They\'re stored as a one-way code that nobody can read, including us.' },
+      { q: 'What do you do with my data?', lead: 'Only what the service needs.', a: 'No ads, no tracking, and we never sell it.', link: { to: '/privacy', label: 'Read the Privacy Policy' } },
+      { q: 'What if someone forgets their password?', lead: 'They fix it themselves.', a: 'An email link lets them choose a new one. No support ticket needed.' },
+      { q: 'What if someone loses their phone?', lead: 'Change the password.', a: 'Every other phone and computer is signed out at once.' },
+      { q: 'How much does it cost?', lead: 'Free during early access.', a: 'Paid plans will start later at ₹99/month or ₹999/year, and there will always be a free plan.' },
+      { q: 'How do I get help?', lead: 'Email us.', a: `Write to ${CONTACT_EMAIL}.` },
+    ],
+  },
+  final: {
+    title: 'Put a guard on your door today.',
+    body: 'Create a free account in under a minute and see how safe and simple it feels.',
+    primary: 'Create your free account',
+    contact: 'Talk to us',
+    emailLine: 'Questions? Write to',
+  },
+}
+
+export type HomeCopy = typeof en
+
+const hi: HomeCopy = {
+  nav: {
+    features: 'सुविधाएँ',
+    howItWorks: 'कैसे काम करता है',
+    pricing: 'कीमत',
+    faq: 'सवाल-जवाब',
+    signIn: 'साइन इन',
+    tryFree: 'मुफ़्त शुरू करें',
+    switchTo: 'English',
+    switchLabel: 'Read in English',
+    skip: 'सीधे मुख्य हिस्से पर जाएँ',
+  },
+  footer: {
+    tagline: 'आपकी वेबसाइट का सुरक्षा गार्ड',
+    question: 'कोई सवाल? लिखें',
+    signIn: 'साइन इन',
+    createAccount: 'अकाउंट बनाएँ',
+    forgot: 'पासवर्ड भूल गए',
+    privacy: 'प्राइवेसी',
+    terms: 'शर्तें',
+  },
+  hero: {
+    badge: 'हर साइन-इन एक दरवाज़ा है। क्या आपके दरवाज़े पर पहरा है?',
+    title: 'मिलिए CKAuth से,',
+    titleAccent: 'आपकी वेबसाइट का सुरक्षा गार्ड।',
+    body: 'यह हर नए अकाउंट को पक्का करता है, पासवर्ड का अंदाज़ा लगाने वालों को रोकता है, और दिन-रात पहरा देता है। आप अपना काम कीजिए, दरवाज़ा CKAuth संभालेगा।',
+    primary: 'मुफ़्त अकाउंट बनाएँ',
+    dashboard: 'डैशबोर्ड पर जाएँ',
+    secondary: 'देखें कैसे काम करता है',
+    reassurance: ['शुरुआती दौर में मुफ़्त', 'कार्ड की ज़रूरत नहीं', 'एक मिनट से कम में तैयार'],
+    stats: [
+      { value: '1 मिनट', label: 'में अकाउंट तैयार' },
+      { value: '15 मिनट', label: 'में हर ईमेल लिंक बंद' },
+      { value: '0', label: 'लोग पासवर्ड पढ़ सकते हैं, हम भी नहीं' },
+    ],
+  },
+  phone: {
+    shop: 'yourwebsite.com',
+    heading: 'साइन इन',
+    email: 'you@example.com',
+    button: 'साइन इन',
+    protectedBy: 'CKAuth से सुरक्षित',
+    checks: ['ईमेल पक्का किया गया', 'पासवर्ड कोई पढ़ नहीं सकता', 'बार-बार के अंदाज़े पर रोक'],
+    caption: 'आपके यूज़र यह देखते हैं। CKAuth यह जाँचता है।',
+  },
+  tickerPause: 'चलती पट्टी रोकें',
+  ticker: ['ईमेल से पक्के अकाउंट', 'पासवर्ड के अंदाज़े पर रोक', 'पासवर्ड कोई पढ़ नहीं सकता', 'एक बार चलने वाले लिंक', 'यूज़र्स की लिस्ट निजी', 'जाँची हुई फ़ोटो', 'हर डिवाइस पर चलता है'],
+  features: {
+    eyebrow: 'हर घड़ी ड्यूटी पर',
+    title: 'ऐसा गार्ड जो कभी छुट्टी नहीं लेता',
+    body: 'हमलावर वही दरवाज़ा ढूँढते हैं जिस पर किसी की नज़र न हो। CKAuth हर दरवाज़े पर हमेशा नज़र रखता है।',
+    items: [
+      { title: 'हर नए अकाउंट को दरवाज़े पर जाँचता है', body: 'जब तक मालिक साबित न करे कि ईमेल उसका है, अकाउंट नहीं खुलता। नकली और गलत ईमेल बाहर रहते हैं।' },
+      { title: 'पासवर्ड का अंदाज़ा लगाने वालों को रोकता है', body: 'जैसे ATM बार-बार गलत PIN पर रुक जाता है, वैसे ही CKAuth गलत कोशिशें रोक देता है, चाहे हमलावर नेटवर्क बदलता रहे।' },
+      { title: 'पासवर्ड तिजोरी में रखता है, हमसे भी दूर', body: 'पासवर्ड एकतरफ़ा कोड में रखे जाते हैं, जैसे बैंक लॉकर में कीमती सामान। चोरी हुआ डेटा चोर के किसी काम का नहीं।' },
+      { title: 'एक बार चलने वाले लिंक भेजता है', body: 'हर ईमेल लिंक सिर्फ़ एक बार चलता है और 15 मिनट में बंद हो जाता है, बिल्कुल OTP की तरह।' },
+      { title: 'यूज़र्स की लिस्ट निजी रखता है', body: 'कोई पता नहीं लगा सकता कि किसका अकाउंट है। सबको एक जैसा जवाब मिलता है।' },
+      { title: 'खोए डिवाइस से अपने-आप साइन-आउट', body: 'कोई पासवर्ड बदले या रीसेट करे, तो बाकी सभी फ़ोन और कंप्यूटर साइन-आउट हो जाते हैं।' },
+    ],
+  },
+  steps: {
+    eyebrow: 'यह कैसे काम करता है',
+    title: 'साइन-अप करें। पक्का करें। सुरक्षित रहें।',
+    body: 'ईमेल में कोई पासवर्ड नहीं, कोई कोड कॉपी नहीं, कोई उलझन नहीं।',
+    stepLabel: 'स्टेप',
+    items: [
+      { title: 'साइन-अप करें', body: 'नाम, ईमेल, पासवर्ड। मीटर बताता है कि पासवर्ड कितना मज़बूत है।' },
+      { title: 'ईमेल पक्का करें', body: 'भेजा गया लिंक खोलें और पासवर्ड एक बार फिर डालें। आप अंदर हैं।' },
+      { title: 'सुरक्षित साइन-इन रहें', body: 'हर बार साइन-इन नहीं। CKAuth चुपचाप जाँचता रहता है कि यह आप ही हैं।' },
+      { title: 'पासवर्ड भूल गए?', body: 'ईमेल पर रीसेट लिंक, और एक मिनट में वापस अंदर।' },
+    ],
+  },
+  business: {
+    eyebrow: 'यह क्यों ज़रूरी है',
+    title: 'बड़ी कंपनियों जैसी सुरक्षा। सिक्योरिटी टीम की ज़रूरत नहीं।',
+    body: 'एक सेंध सालों का भरोसा तोड़ सकती है। आप दुकान चलाएँ, क्लिनिक, स्टार्टअप या कोई कम्युनिटी, आपके साइन-इन पर CKAuth वह भरोसा बनाए रखने में मदद करता है।',
+    items: [
+      { title: 'सपोर्ट की कम ज़रूरत', body: 'लोग अपना पासवर्ड और फ़ोटो खुद बदल लेते हैं।' },
+      { title: 'भरोसा करने वाले यूज़र', body: 'सुरक्षित और आसान साइन-इन प्रोफ़ेशनल लगता है। लोग वहीं टिकते हैं जहाँ सुरक्षित महसूस करें।' },
+      { title: 'कोई आपके यूज़र का रूप नहीं ले सकता', body: 'किसी और के ईमेल से साइन-अप करके धोखेबाज़ को कुछ नहीं मिलता। उसे ईमेल और पासवर्ड, दोनों चाहिए।' },
+      { title: 'सिर्फ़ असली फ़ोटो', body: 'हर प्रोफ़ाइल फ़ोटो जाँची जाती है, फ़ोटो के भेस में आई खतरनाक फ़ाइलें रुक जाती हैं।' },
+    ],
+  },
+  developers: {
+    eyebrow: 'क्लाइंट्स के लिए बनाते हैं, या अपने लिए?',
+    title: 'हर प्रोजेक्ट को वही मज़बूत ताला दीजिए।',
+    body: 'CKAuth ओपन सोर्स है और GitHub पर है, README में सेटअप समझाया गया है। एक बार सेट करें, हर वेबसाइट पर इस्तेमाल करें।',
+    button: 'GitHub पर कोड देखें',
+  },
+  pricing: {
+    eyebrow: 'कीमत',
+    title: 'सीधी-सादी कीमत। लॉन्च तक मुफ़्त।',
+    body: 'हर प्लान में पूरा सुरक्षा गार्ड। पैसे तभी, जब आप आगे बढ़ें।',
+    banner: 'शुरुआती दौर: आज हर सुविधा मुफ़्त है। पेड प्लान अभी शुरू नहीं हुए हैं।',
+    recommended: 'अभी उपलब्ध',
+    plans: [
+      { name: 'Free', price: '₹0', period: '', tagline: 'शुरुआत के लिए', features: ['सारी सुरक्षा सुविधाएँ', 'हर यूज़र का ईमेल पक्का', 'ईमेल से पासवर्ड रीसेट'], button: 'मुफ़्त शुरू करें', available: true },
+      { name: 'Monthly', price: '₹99', period: '/ महीना', tagline: 'बढ़ती टीमों के लिए', features: ['Free की सारी सुविधाएँ', 'ईमेल पर जल्दी मदद', 'साइन-इन ईमेल पर आपके ब्रांड का नाम'], button: 'जल्द आ रहा है', available: false },
+      { name: 'Yearly', price: '₹999', period: '/ साल', tagline: 'सबसे फ़ायदेमंद: ₹189 की बचत', features: ['Monthly की सारी सुविधाएँ', 'लगभग दो महीने मुफ़्त', 'नई सुविधाएँ सबसे पहले'], button: 'जल्द आ रहा है', available: false },
+    ],
+  },
+  faq: {
+    eyebrow: 'काम की बातें',
+    title: 'अक्सर पूछे जाने वाले सवाल',
+    items: [
+      { q: 'CKAuth किसके लिए है?', lead: 'हर उस व्यक्ति के लिए जिसके यूज़र हैं।', a: 'ऑनलाइन दुकान, क्लिनिक, ट्यूटर, स्टार्टअप, कम्युनिटी या साइड प्रोजेक्ट: जहाँ लोग साइन-इन करते हैं, CKAuth उनके अकाउंट सुरक्षित रखता है।' },
+      { q: 'क्या मुझे कोडिंग आनी चाहिए?', lead: 'अभी इसे कोई डेवलपर सेट करता है।', a: 'CKAuth ओपन सोर्स है, और कोई भी डेवलपर README देखकर इसे आपकी वेबसाइट पर लगा सकता है। बिना कोड के वेबसाइट जोड़ने का तरीका जल्द आ रहा है। तब तक आप अकाउंट बनाकर वही साइन-इन आज़मा सकते हैं जो आपके यूज़र्स देखेंगे।' },
+      { q: 'क्या आप मेरे यूज़र्स के पासवर्ड देख सकते हैं?', lead: 'नहीं, कभी नहीं।', a: 'वे एकतरफ़ा कोड में रखे जाते हैं जिसे कोई नहीं पढ़ सकता, हम भी नहीं।' },
+      { q: 'आप मेरे डेटा का क्या करते हैं?', lead: 'सिर्फ़ उतना, जितना सेवा के लिए ज़रूरी है।', a: 'न विज्ञापन, न ट्रैकिंग, और हम इसे कभी नहीं बेचते।', link: { to: '/privacy', label: 'प्राइवेसी पॉलिसी पढ़ें' } },
+      { q: 'अगर कोई पासवर्ड भूल जाए तो?', lead: 'वह खुद ठीक कर लेता है।', a: 'ईमेल लिंक से नया पासवर्ड चुन सकता है। सपोर्ट की ज़रूरत नहीं।' },
+      { q: 'अगर किसी का फ़ोन खो जाए तो?', lead: 'पासवर्ड बदल दें।', a: 'बाकी सभी फ़ोन और कंप्यूटर तुरंत साइन-आउट हो जाते हैं।' },
+      { q: 'इसकी कीमत क्या है?', lead: 'शुरुआती दौर में मुफ़्त।', a: 'पेड प्लान बाद में ₹99/महीना या ₹999/साल से शुरू होंगे, और मुफ़्त प्लान हमेशा रहेगा।' },
+      { q: 'मदद कैसे मिलेगी?', lead: 'हमें ईमेल करें।', a: `${CONTACT_EMAIL} पर लिखें।` },
+    ],
+  },
+  final: {
+    title: 'आज ही अपने दरवाज़े पर पहरा लगाइए।',
+    body: 'एक मिनट से कम में मुफ़्त अकाउंट बनाएँ और खुद देखें कि यह कितना आसान और सुरक्षित है।',
+    primary: 'मुफ़्त अकाउंट बनाएँ',
+    contact: 'हमसे बात करें',
+    emailLine: 'कोई सवाल? लिखें',
+  },
+}
+
+export const homeCopy = { en, hi }

@@ -16,7 +16,7 @@ const backToSignIn = (
 )
 
 export function ForgotPassword() {
-  useDocumentTitle('Recover access')
+  useDocumentTitle('Forgot password')
 
   const [sent, setSent] = useState(false)
 
@@ -30,7 +30,12 @@ export function ForgotPassword() {
   })
 
   return (
-    <AuthShell eyebrow="Search party" title="Reset your password" subtitle="Enter your email and we'll send a link to choose a new password." footer={backToSignIn}>
+    <AuthShell
+      eyebrow="Forgot password"
+      title={sent ? 'Check your inbox' : 'Reset your password'}
+      subtitle={sent ? undefined : 'Enter your email and we\'ll send a link to choose a new password.'}
+      footer={backToSignIn}
+    >
       {sent ? (
         // same message whether or not the account exists, like the api
         <FormAlert kind="success">If an account exists for that email, a reset link is on its way. It expires in 15 minutes.</FormAlert>
@@ -38,7 +43,7 @@ export function ForgotPassword() {
         <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="space-y-5">
           {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
           <TextField label="Email" type="email" inputMode="email" autoComplete="email" placeholder="you@example.com" error={form.errors.email} {...form.register('email')} />
-          <Button type="submit" size="lg" disabled={form.pending} className="font-display w-full tracking-[0.2em] uppercase">
+          <Button type="submit" size="lg" disabled={form.pending} className="w-full">
             {form.pending ? 'Sending…' : 'Send reset link'}
           </Button>
         </form>

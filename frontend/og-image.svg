@@ -1,28 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <!-- source of public/og.png (1200×630 link-preview card). browsers and link previews never load this file; to change the card,
-       edit it and render to png with fonts that have Cinzel and Inter (e.g. @resvg/resvg-js with the OFL ttfs from github.com/google/fonts) -->
+       edit it and render to png with the Inter font (e.g. @resvg/resvg-js with the OFL ttfs from github.com/google/fonts) -->
   <defs>
     <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#f0642a" stroke-opacity="0.07" stroke-width="1"/>
+      <path d="M48 0H0V48" fill="none" stroke="#fb7a3c" stroke-opacity="0.07" stroke-width="1"/>
     </pattern>
     <radialGradient id="glow" cx="0.12" cy="0.1" r="0.75">
-      <stop offset="0" stop-color="#f0642a" stop-opacity="0.22"/>
-      <stop offset="1" stop-color="#f0642a" stop-opacity="0"/>
+      <stop offset="0" stop-color="#fb7a3c" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#fb7a3c" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="1200" height="630" fill="#0e0d14"/>
+  <rect width="1200" height="630" fill="#0a0f1c"/>
   <rect width="1200" height="630" fill="url(#grid)"/>
   <rect width="1200" height="630" fill="url(#glow)"/>
   <g transform="translate(96 92) scale(4)">
-    <path d="M16 1.5 28 5.5v9.2c0 7.4-5 12.9-12 15.8C9 27.6 4 22.1 4 14.7V5.5z" fill="#f0642a"/>
-    <path d="M8.5 12.5v-3h2.6v1.6h2.2V9.5h5.4v1.6h2.2V9.5h2.6v3z M8.5 13.5h15v6.8c0 3.6-3.3 6.6-7.5 8.2-4.2-1.6-7.5-4.6-7.5-8.2z" fill="#0e0d14"/>
-    <circle cx="16" cy="18" r="2" fill="#f0642a"/>
-    <path d="M15 19h2l.7 4.5h-3.4z" fill="#f0642a"/>
+    <path d="M16 1.5 28 5.5v9.2c0 7.4-5 12.9-12 15.8C9 27.6 4 22.1 4 14.7V5.5z" fill="#fb7a3c"/>
+    <path d="M8.5 12.5v-3h2.6v1.6h2.2V9.5h5.4v1.6h2.2V9.5h2.6v3z M8.5 13.5h15v6.8c0 3.6-3.3 6.6-7.5 8.2-4.2-1.6-7.5-4.6-7.5-8.2z" fill="#0a0f1c"/>
+    <circle cx="16" cy="18" r="2" fill="#fb7a3c"/>
+    <path d="M15 19h2l.7 4.5h-3.4z" fill="#fb7a3c"/>
   </g>
-  <text x="246" y="182" font-family="Cinzel" font-weight="700" font-size="58" letter-spacing="9" fill="#f1e8dc">CKAUTH</text>
-  <text x="96" y="352" font-family="Cinzel" font-weight="600" font-size="62" fill="#f1e8dc">Know who's signing in.</text>
-  <text x="96" y="438" font-family="Cinzel" font-weight="600" font-size="62" fill="#f0642a">Decide what gets through.</text>
-  <line x1="96" y1="500" x2="1104" y2="500" stroke="#2a2533" stroke-width="2"/>
-  <text x="96" y="552" font-family="Inter" font-size="26" fill="#a79bab">Verified sign-ups · rotating sessions · hashed tokens</text>
-  <text x="1104" y="552" text-anchor="end" font-family="Inter" font-weight="600" font-size="26" fill="#f1e8dc">ckauth.chiragdev.com</text>
+  <text x="246" y="180" font-family="Inter" font-weight="700" font-size="56" letter-spacing="2" fill="#e8ecf4">CKAUTH</text>
+  <text x="96" y="352" font-family="Inter" font-weight="700" font-size="60" fill="#e8ecf4">Meet CKAuth,</text>
+  <text x="96" y="436" font-family="Inter" font-weight="700" font-size="60" fill="#fb7a3c">your website’s security guard.</text>
+  <line x1="96" y1="500" x2="1104" y2="500" stroke="#1f2a3d" stroke-width="2"/>
+  <text x="96" y="552" font-family="Inter" font-size="26" fill="#9aa6ba">Safe logins for small businesses · free to try</text>
+  <text x="1104" y="552" text-anchor="end" font-family="Inter" font-weight="600" font-size="26" fill="#e8ecf4">ckauth.chiragdev.com</text>
 </svg>
