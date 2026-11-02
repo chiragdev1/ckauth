@@ -17,6 +17,11 @@ const SignUp = lazy(() => import('./pages/sign-up.tsx').then(module => ({ defaul
 const SignIn = lazy(() => import('./pages/sign-in.tsx').then(module => ({ default: module.SignIn })))
 const VerifyEmail = lazy(() => import('./pages/verify-email.tsx').then(module => ({ default: module.VerifyEmail })))
 const ForgotPassword = lazy(() => import('./pages/forgot-password.tsx').then(module => ({ default: module.ForgotPassword })))
+// development only, like the design lab. written out here rather than imported as LAB_ENABLED: vite replaces
+// import.meta.env values in place, so a production build sees `false` and drops the page, while an imported constant
+// isn't folded across modules and would ship it
+const DevEmails = import.meta.env.DEV || import.meta.env.VITE_DESIGN_LAB === '1' ? lazy(() => import('./pages/dev-emails.tsx').then(module => ({ default: module.DevEmails }))) : null
+const ConfirmEmail = lazy(() => import('./pages/confirm-email.tsx').then(module => ({ default: module.ConfirmEmail })))
 const ResetPassword = lazy(() => import('./pages/reset-password.tsx').then(module => ({ default: module.ResetPassword })))
 const Admin = lazy(() => import('./pages/admin.tsx').then(module => ({ default: module.Admin })))
 const Dashboard = lazy(() => import('./pages/dashboard.tsx').then(module => ({ default: module.Dashboard })))
@@ -44,6 +49,7 @@ export const routes: RouteObject[] = [
           { path: '/verify-email', element: <VerifyEmail /> },
           { path: '/forgot-password', element: <ForgotPassword /> },
           { path: '/reset-password', element: <ResetPassword /> },
+          { path: '/confirm-email', element: <ConfirmEmail /> },
           { path: '/privacy', element: <PrivacyPolicy /> },
           { path: '/terms', element: <Terms /> },
           {
@@ -56,6 +62,7 @@ export const routes: RouteObject[] = [
               },
             ],
           },
+          ...(DevEmails ? [{ path: '/dev/emails', element: <DevEmails /> }] : []),
           { path: '*', element: <NotFound /> },
         ],
       },

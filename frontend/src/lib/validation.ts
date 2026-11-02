@@ -58,6 +58,7 @@ const fieldFallbacks: Record<string, string> = {
   password: 'Check your password',
   newPassword: 'Choose a different password',
   currentPassword: 'Check your current password',
+  newEmail: 'Enter a valid email address',
 }
 
 // "Invalid input fields: email: Invalid email address, password: Too small: …" → { email, password }

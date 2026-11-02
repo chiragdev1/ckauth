@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, test } from 'node:test'
 
-import { api, ApiRequestError } from '../src/lib/api.ts'
+import { api, ApiRequestError, onSessionEnded } from '../src/lib/api.ts'
 
 type Reply = { status: number, body?: unknown }
 type Call = { url: string, method: string }
@@ -74,7 +74,28 @@ describe('api()', () => {
   test('a failed refresh gives back the original 401, with no loop', async () => {
     const calls = fakeFetch(() => unauthorized)
     await assert.rejects(api('/auth/me', { authed: true }), (error: unknown) => error instanceof ApiRequestError && error.status === 401)
-    assert.equal(calls.length, 2)
+    // one try, one refresh, and the logout that clears the dead cookie; never a second refresh
+    assert.deepEqual(calls.map(call => call.url), ['/api/auth/me', '/api/auth/refresh', '/api/auth/logout'])
+  })
+
+  test('a session that stopped working is reported once, and its cookie cleared', async () => {
+    const calls = fakeFetch(url => url.endsWith('/auth/refresh') ? { status: 401, body: { success: false, message: 'Invalid or expired refresh token' } } : unauthorized)
+    let reported = 0
+    const stop = onSessionEnded(() => { reported += 1 })
+    await Promise.allSettled([api('/auth/me', { authed: true }), api('/auth/sessions', { authed: true })])
+    stop()
+    assert.equal(reported, 1)
+    assert.equal(calls.filter(call => call.url === '/api/auth/logout').length, 1)
+  })
+
+  test('a visitor who was never signed in is not told they were signed out', async () => {
+    const calls = fakeFetch(url => url.endsWith('/auth/refresh') ? { status: 401, body: { success: false, message: 'Refresh token not provided', code: 'NO_SESSION' } } : unauthorized)
+    let reported = 0
+    const stop = onSessionEnded(() => { reported += 1 })
+    await assert.rejects(api('/auth/me', { authed: true }))
+    stop()
+    assert.equal(reported, 0)
+    assert.ok(!calls.some(call => call.url === '/api/auth/logout'))
   })
 
   test('a 401 on an unauthed request (wrong password at sign-in) is not refreshed', async () => {

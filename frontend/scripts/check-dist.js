@@ -14,7 +14,9 @@ const kib = bytes => (bytes / 1024).toFixed(1)
 
 // size limits in KiB, gzip. set just above today's numbers, so a regression fails the PR instead of slipping through.
 // initialJs went 125 → 127 on 2 Nov 2026: the 24–27 Oct landing pages grew it to 127.0 on main before this check was committed
-const budgets = { initialJs: 127, lazyChunk: 30, homeHtml: 22 }
+// homeHtml went 22 → 22.5 on 2 Nov 2026: the inlined css carries every tailwind class in the app, not only the home page's,
+// and the dashboard's device list, profile details and avatar viewer added 0.1 KiB of them
+const budgets = { initialJs: 127, lazyChunk: 30, homeHtml: 22.5 }
 
 const home = await read('index.html')
 const shell = await read('app.html')
@@ -69,6 +71,8 @@ for(const name of ['index.html', 'app.html', ...assets.filter(name => /\.(js|css
   const text = await read(name)
   if(/\bre_[A-Za-z0-9]{8,}_|private_[A-Za-z0-9+/=]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY/.test(text)) failures.push(`${name} contains something that looks like a secret`)
   if(/(?:src|href)="http:\/\//.test(text)) failures.push(`${name} loads something over plain http`)
+  // the dev-only email designs page (src/pages/dev-emails.tsx) talks to an api route production doesn't have
+  if(text.includes('/api/dev/emails')) failures.push(`${name} ships the dev-only email designs page`)
 }
 
 for(const failure of failures) console.log(`  FAIL  ${failure}`)

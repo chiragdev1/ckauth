@@ -7,6 +7,7 @@ import { validateEmail, validateFirstName, validateLastName, validateNewPassword
 import { AuthShell } from '@/components/auth-shell.tsx'
 import { FormAlert, PasswordField, TextField } from '@/components/form.tsx'
 import { Button } from '@/components/ui/button.tsx'
+import { ResendEmail } from '@/components/resend-email.tsx'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
 
 export function SignUp() {
@@ -41,6 +42,7 @@ export function SignUp() {
             <MailCheck className="size-7" />
           </span>
           <FormAlert kind="info">The link expires in 15 minutes. You'll confirm it with the password you just chose, and then you're straight in.</FormAlert>
+          <ResendEmail email={sentTo} />
         </div>
       </AuthShell>
     )
@@ -75,3 +77,4 @@ export function SignUp() {
     </AuthShell>
   )
 }
+

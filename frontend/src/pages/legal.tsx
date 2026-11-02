@@ -73,7 +73,8 @@ const privacySections: Section[] = [
         </ul>
         <p><strong>What we record automatically:</strong></p>
         <ul>
-          <li><strong>Security records:</strong> hashed copies of your session and email-link tokens, when they expire, whether your email is confirmed, your account's role (an ordinary user, or an admin who helps run CKAuth and can see and delete accounts), for admins the time they last confirmed their password, and when your account was created and last changed.</li>
+          <li><strong>Security records:</strong> hashed copies of your session and email-link tokens, when they expire, whether your email is confirmed, your account's role (an ordinary user, or an admin who helps run CKAuth and can see and delete accounts), when your account was created and last changed, and, while you're changing your email, the new address and a hashed copy of its confirmation link (both cleared once it's confirmed, replaced or expired).</li>
+          <li><strong>Your signed-in devices:</strong> for each device you're signed in on, the browser's description of itself (its "user agent", such as Chrome on Windows), the IP address it last used, when it signed in and when it was last active, and for admins when they last confirmed their password on it. You see this list on your dashboard, so you can spot and sign out a device that isn't yours. We don't work out your location from the IP address.</li>
           <li><strong>Server logs:</strong> your IP address, the time, the page or action requested and your browser's name and version. If sending an email to you fails, the error log includes your email address.</li>
           <li><strong>Rate-limit counters:</strong> to block password guessing, we count recent attempts per IP address, per email address and per account.</li>
         </ul>
@@ -101,7 +102,7 @@ const privacySections: Section[] = [
         <p>We use two cookies, both strictly necessary to keep you signed in. That's why we don't ask for cookie consent, and why they can't be switched off while you use your account:</p>
         <ul>
           <li><strong>access_token</strong> proves who you are for about 15 minutes.</li>
-          <li><strong>refresh_token</strong> renews it for up to a day, until you sign out.</li>
+          <li><strong>refresh_token</strong> renews it for up to a day, until you sign out. Each device has its own.</li>
         </ul>
         <p>Both are <code>httpOnly</code> (page scripts can't read them), only sent over HTTPS, and only sent to this site. Your browser's local storage also remembers your light or dark theme and your language choice, and its session storage (cleared when you close the tab) notes the time of an automatic reload after we release a new version, so it can't repeat in a loop. All of this stays on your device and is never sent to us. Since we don't track you, there's nothing for a "Do Not Track" or Global Privacy Control signal to switch off.</p>
       </>
@@ -112,8 +113,8 @@ const privacySections: Section[] = [
     heading: 'Why we use it, and on what basis',
     body: (
       <ul>
-        <li><strong>To run your account:</strong> creating it, confirming your email, signing you in, resetting your password and showing your photo. This is necessary to provide the service you asked for, and under the DPDP Act it rests on the consent you give when you sign up.</li>
-        <li><strong>To send account emails:</strong> confirmation links, password resets, a notice if someone tries to sign up with your address, an invitation if an admin creates an account for you, and a notice if an admin deletes your account (only to a confirmed address). These are part of the service. We don't send marketing emails.</li>
+        <li><strong>To run your account:</strong> creating it, confirming your email, signing you in, keeping you signed in on each of your devices, resetting your password and showing your photo. This is necessary to provide the service you asked for, and under the DPDP Act it rests on the consent you give when you sign up.</li>
+        <li><strong>To send account emails:</strong> confirmation links, password resets, a notice if someone tries to sign up with your address, an invitation if an admin creates an account for you, a notice when your account is signed in on a new browser (naming the browser and IP address), the messages that confirm a change of email (to the new address, and a notice to the old one), and a notice when your account is deleted, by you or by an admin (only to a confirmed address). These are part of the service. We don't send marketing emails.</li>
         <li><strong>To keep CKAuth and your account secure:</strong> blocking repeated wrong guesses, investigating abuse and fixing faults, using logs and rate-limit counters. This is our legitimate interest in protecting users, and a "legitimate use" under the DPDP Act.</li>
         <li><strong>To meet legal obligations,</strong> such as answering a lawful request from the authorities.</li>
       </ul>
@@ -144,7 +145,8 @@ const privacySections: Section[] = [
     heading: 'How long we keep it',
     body: (
       <ul>
-        <li><strong>Account data:</strong> for as long as your account exists. When you ask us to delete it, we remove it from the live database and delete your photo.</li>
+        <li><strong>Account data:</strong> for as long as your account exists. When you delete it from your dashboard, or ask us to, we remove it from the live database and delete your photo.</li>
+        <li><strong>Signed-in devices:</strong> until that device signs out, you sign it out from your dashboard, or its session expires (about a day after it was last used). Ten at most: signing in on an eleventh device removes the one used least recently.</li>
         <li><strong>Unconfirmed sign-ups:</strong> an account whose email was never confirmed is kept until it's confirmed or you ask us to delete it. It can't be used to sign in.</li>
         <li><strong>Backups:</strong> nightly copies of the database are kept for 14 days, so deleted data disappears from them within 14 days.</li>
         <li><strong>Rate-limit counters:</strong> one hour at most.</li>
@@ -172,7 +174,7 @@ const privacySections: Section[] = [
           <li><strong>nominate</strong> someone to act for you if you die or can't act yourself.</li>
         </ul>
         <p>If you're in the EU or UK, you can also ask for a copy of your data in a portable format, and object to or ask us to restrict how we use it.</p>
-        <p>You can change your password and photo yourself from your dashboard. For anything else, email <Email /> from the address on your account, so we know the request is really yours. It's free. We'll reply within 30 days.</p>
+        <p>You can change your name, email, password and photo, sign out your devices, and delete your account yourself from your dashboard. For anything else, email <Email /> from the address on your account, so we know the request is really yours. It's free. We'll reply within 30 days.</p>
         <p>If you're not satisfied with our answer, you can complain to the Data Protection Board of India, or to the data protection authority where you live.</p>
       </>
     ),
@@ -209,7 +211,7 @@ export function PrivacyPolicy() {
           <ul>
             <li>We keep only what's needed to run your account safely: your name, email, a hashed password and an optional photo.</li>
             <li>No ads, no tracking, and we never sell your data.</li>
-            <li>You can see, correct or delete your data at any time by emailing us.</li>
+            <li>You can correct or delete your data at any time from your dashboard, or by emailing us.</li>
           </ul>
         </>
       )}
@@ -291,7 +293,7 @@ const termsSections: Section[] = [
   {
     id: 'ending',
     heading: 'Ending your account',
-    body: <p>You can stop using CKAuth at any time and ask us to delete your account by emailing <Email />. We may suspend or close an account that breaks these terms or puts other users at risk, and we'll tell you why unless the law or safety prevents it. Sections that by their nature should last, such as "Our name and content", "No warranty", "Limitation of liability" and "Governing law", continue to apply after your account ends.</p>,
+    body: <p>You can stop using CKAuth at any time and delete your account from your dashboard, or ask us to by emailing <Email />. We may suspend or close an account that breaks these terms or puts other users at risk, and we'll tell you why unless the law or safety prevents it. Sections that by their nature should last, such as "Our name and content", "No warranty", "Limitation of liability" and "Governing law", continue to apply after your account ends.</p>,
   },
   {
     id: 'disclaimer',
@@ -349,7 +351,7 @@ export function Terms() {
           <ul>
             <li>Use CKAuth honestly, keep your password safe, and don't attack the service or other people's accounts.</li>
             <li>It's free during early access, and we'll never charge you without your choice.</li>
-            <li>You can leave at any time and ask us to delete your data.</li>
+            <li>You can leave at any time and delete your data from your dashboard.</li>
           </ul>
         </>
       )}

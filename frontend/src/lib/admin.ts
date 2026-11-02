@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type User } from './api.ts'
 import { describeError } from './validation.ts'
 
-// the fields GET /admin/users returns (docs/API.md); the same as /auth/me plus the signup date
-export type AdminUser = User & { createdAt: string }
+// the fields GET /admin/users returns (docs/API.md); the same as /auth/me plus when and on how many devices they're signed in
+export type AdminUser = User & { lastActiveAt: string | null, deviceCount: number }
 
 export type AdminStats = {
   totalUsers: number

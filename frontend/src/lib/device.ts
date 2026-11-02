@@ -1,0 +1,26 @@
+// "Chrome on Windows" from a user agent, for the device list. a rough guess on purpose: the header is whatever the browser
+// claims, so it only has to be recognisable, not exact. order matters: Edge and Opera also say "Chrome", and Chrome says "Safari"
+const browsers: [RegExp, string][] = [
+  [/Edg\//, 'Edge'],
+  [/OPR\/|Opera/, 'Opera'],
+  [/Firefox\//, 'Firefox'],
+  [/Chrome\//, 'Chrome'],
+  [/Safari\//, 'Safari'],
+]
+
+const systems: [RegExp, string][] = [
+  [/iPhone|iPad|iPod/, 'iOS'],
+  [/Android/, 'Android'],
+  [/Windows/, 'Windows'],
+  [/Mac OS X|Macintosh/, 'macOS'],
+  [/CrOS/, 'ChromeOS'],
+  [/Linux/, 'Linux'],
+]
+
+export function describeDevice(userAgent: string | null) {
+  if(!userAgent) return 'Unknown device'
+  const browser = browsers.find(([pattern]) => pattern.test(userAgent))?.[1]
+  const system = systems.find(([pattern]) => pattern.test(userAgent))?.[1]
+  if(browser && system) return `${browser} on ${system}`
+  return browser ?? system ?? 'Unknown device'
+}

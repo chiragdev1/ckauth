@@ -295,6 +295,72 @@ New entries go at the bottom, under a dated heading.
   - **The search box was cramped on phones**, so its placeholder was cut off. It now gets its own row.
   - **The password prompt wasn't a real modal:** Tab could reach the page behind it, and nothing hid that page from screen readers. It's now a Radix `Dialog`.
 
+## 2 Nov 2026 · A session per device, and self-serve account basics
+**In short:** each device now has its own session, so signing in on a phone no longer signs out the laptop, and signing a device out works at once. People can see their devices, edit their name, remove their photo, resend the confirmation email and delete their own account. Avatars open full size.
+
+- **A `sessions` table** (one row per device: the refresh token's SHA-256 hash, user agent, last IP, created / last used / expiry, and that session's sudo-mode time). `src/app/auth/utils/sessions.ts` starts sessions for sign-in, verify-email and change-password, keeps at most 10 per user (an 11th sign-in drops the one used least recently) and prunes expired ones.
+  - **The access token carries the session ID (`sid`),** and `authenticateToken` joins the session row on every request. Ending a session (logout, the device list, a password change or reset, a deleted account) now stops its access token at once, which closes two known gaps (a second device ending the first, and access tokens outliving logout).
+  - **Sudo mode moved onto the session,** so confirming the password on one device doesn't unlock admin writes on another.
+  - **Rollback-safe:** the migration only adds a table. `users.refresh_token` and `users.reauthenticated_at` stay, unused, so the previous API image still runs; they can be dropped in a later release. **Everyone is signed out once on the deploy** (old tokens have no `sid`), and once more on a rollback.
+  - Refresh rotates the token with `UPDATE … WHERE refresh_token_hash = <old>`, so two refreshes racing with the same token can't both win. A reset link is now matched on its token in the same `UPDATE`, so it can't be used twice at once either.
+- **New endpoints:** `GET /auth/sessions`, `DELETE /auth/sessions/:id` and `DELETE /auth/sessions` (all but this device); `PATCH /auth/me` (name and age, `.strict()` so it can't touch `email` or `role`); `DELETE /auth/avatar`; `DELETE /auth/me` (needs the password again, 5 wrong tries per 15 min; admins get a `403`, they're removed on the server); `POST /auth/resend-verification` (the same answer for every email, 10 per IP and 3 per email per hour).
+- **Sign-up gained a per-email limit** (5 per hour). Before, only the per-IP limit stood between one inbox and many IPs sending it sign-up emails.
+- **Frontend:** the dashboard has "Where you're signed in" (browser and system from the user agent, IP, last active, sign out one or all others), name editing, "Remove picture" and a "Delete account" card with the password step. Sign-up's "Check your inbox" has a resend button with a 60 s countdown. Tapping an avatar with a photo, on the dashboard or in `/admin`, opens it full size in a Radix `Dialog`; three viewers are in the design lab (Card, Stage, Zoom) for picking.
+- The Privacy Policy and Terms now describe the device list data and self-serve deletion. The "account deleted" email has a variant for deleting your own account.
+- **Tests:** 136 pass, plus 3 `test.todo`s for the remaining gaps. Removing the session check from `authenticateToken` on purpose made 4 of them fail.
+- **Follow-ups the same day:**
+  - **Resend has a 60 s cooldown, with no new column.** Every link lives 15 minutes, so its expiry says when it was sent: a link sent under a minute ago is kept and no mail goes out; after that a still-valid link is replaced. Turning the cooldown off made exactly its test fail.
+  - **The dashboard's profile shows more:** age, member since (`/auth/me` now returns `createdAt`), account type, and how many devices are signed in, with a "Manage devices" link to the device list. "Edit profile" opens one form for first name, last name and age. Change password is a button that opens its form in place.
+  - **The avatar opens as a big square,** like a profile picture in a messaging app. Three viewers were compared in the design lab (a card with the name under it, a black stage with the name above, and a rounded square that grows out of the avatar). **Zoom won** and the other two were deleted. The `homeHtml` budget is 22.5 KiB: the home page inlines every Tailwind class in the app, and the new dashboard added 0.1 KiB of them.
+  - **IPv4 addresses are stored plainly** (`203.0.113.7`, not Node's `::ffff:203.0.113.7`).
+  - **Checked in a real browser** (headless Chromium, desktop and 375 px, against the API on a spare port): 30 checks pass, from each viewer opening square, inside the screen, and returning focus on Escape, to the age edit and no sideways scrolling on phones. It found two problems, both fixed: the Cancel buttons needed two clicks (see LEARNINGS), and the page showed through the stage viewer on phones.
+
+## 2 Nov 2026 · A UX pass: explain, confirm, and let people fix things themselves
+**In short:** a review of the signed-in experience turned into twelve changes. CKAuth now says why someone was signed out, offers a new verification link wherever one can go missing, confirms what people did, lets them change their email and crop their photo, and emails them about sign-ins from a new browser.
+
+- **"You've been signed out on this device."** `api.ts` reports when a refresh fails for a browser that *had* a session, and the sign-in page says why. `/auth/refresh` now answers `"code": "NO_SESSION"` when there's no refresh cookie at all, so the frontend tells "never signed in" from "signed out" without reading the message text, and a visitor who never signed in sees nothing. The dead cookie is cleared, so the notice shows once.
+- **A new verification link wherever one can go missing:** sign-up's inbox screen, sign-in when the email isn't confirmed, and the verify page when a link has expired or was cancelled (which asks for the email, since the link only carries its token). One shared component (`resend-email.tsx`) with the API's 60 s cooldown as a countdown.
+- **Smaller fixes:**
+  - Each device's "Sign out" button names the device for screen readers.
+  - "Profile saved" confirms an edit.
+  - Times read "2 hours ago", with the exact time on hover.
+  - Deleting your account ends on the home page with a one-time "Your account has been deleted".
+- **Change email** (`POST /auth/change-email` with the password, then `POST /auth/confirm-email/:token` from a link to the new address, on a new `/confirm-email` page):
+  - The old address is told at once, and again when the change is done.
+  - A taken address gets the same response, and a notice instead of a link.
+  - Confirming cancels any reset link still in the old inbox, since people often move because they lost that inbox.
+  - The page confirms on a button press, never on load, because mail scanners open links.
+  - Three nullable columns (`pending_email`, `email_change_token`, `email_change_token_expiry`), so a rollback is safe.
+- **New sign-in emails:** when the browser signing in has no other live session on the account, the owner gets its name and IP, with a link to the device list. Signing in again on the same laptop sends nothing.
+- **Every mail-sending endpoint is tested with a failing mail** (`test/mail-failure.test.ts`; any `@mail-fails.test` address fails in memory mode), proving CLAUDE.md's "a failed email never fails the request". Making one mail awaited on purpose failed exactly its test.
+- **Search copy** now mentions new-device alerts (the description is 152 characters).
+- **Admin user cards** show when each user was last active and on how many devices (`lastActiveAt`, `deviceCount`), never the browsers or IPs themselves.
+- **Design lab candidates** (pick one each, then delete the other): the device list as **A** "this device and the 3 most recent, then Show all" or **B** "grouped by browser"; the new **photo cropper** with **A** a square frame and a dashed circle guide, or **C** a round mask. The cropper makes a 512 px JPEG in the browser, so a 15 MB phone photo uploads as a few KB and never hits the 2 MB limit.
+- **Decided the same day:**
+  - **The round crop mask won.** The square-with-guide frame is deleted.
+  - **The recent-first device list won** (this device and the 3 most recent, then "Show all"). Grouping by browser is deleted, and the design lab is back to one look, so its panel is hidden.
+  - **Age is off the profile again.** It was shown and editable earlier today; now neither. `age` stays in the API (`PATCH /auth/me`, sign-up) and the database, so nothing breaks, but the dashboard no longer invites people to give it. The Privacy Policy no longer lists age among what you can edit.
+- **Not done, on purpose:** Hindi past the home page. It needs every app string, the form messages, the API's English errors and the emails translated together, plus a stored language per user, and a review by a Hindi speaker. Half-translated pages would be worse than English. Age stays on the profile, as asked.
+- **Checked in a real browser** (25 new checks plus the 30 from before, desktop and 375 px). It found four bugs, all fixed:
+  - The cropper said every photo "can't be opened" in development.
+  - The account-deleted notice never showed, and the delete actually ended on the sign-in page.
+  - The policy's email list read "and and".
+  - The admin activity query counted nothing.
+
+## 2 Nov 2026 · Emails: one layout, dark mode, and three designs to choose from
+**In short:** every email now shares one layout with a dark mode, icons and the CKAuth shield, and a development-only page shows them all side by side in three candidate designs, in light, dark and an approximation of the Gmail app.
+
+- **Why they looked wrong in dark Gmail:** every template declared `color-scheme: light only` and had no dark styles, and four of the eleven emails were 150-line hand-written copies of the same layout. `mail.ts` went from 1,062 lines to 94: what each email says is in `emails.ts`, how it looks in `email-layout.ts`.
+- **Dark mode:** the layout declares `light dark`, and a `prefers-color-scheme: dark` block (plus Outlook.com's `[data-ogsc]`/`[data-ogsb]`) recolours page, card, text, links and dividers. Apple Mail, iOS Mail and Outlook follow it. **Gmail doesn't support it in any app:** the web app shows the light version, and the phone apps recolour light backgrounds and dark text themselves. So the light palette is chosen to survive that, and the icons are images (never recoloured) with their own solid circle.
+- **More graphic:** an icon per kind of email in one of three tones (ember for the brand, red for a security warning such as a new sign-in, slate for a plain notice), the shield logo, numbered steps in the welcome mail, and ember buttons instead of indigo, matching the site. The icons come from lucide (`frontend/scripts/email-icons.mjs` → `email-icons/*.svg` → `public/email/*.png`), because Gmail strips SVG.
+- **Wording changes:** a few links became buttons: welcome → "Go to your dashboard", account exists → "Sign in" plus "Forgot your password? Reset it here", email change requested → "Reset your password", and the new sign-in mail moved its reset link under the button.
+- **Three designs, compared at `/dev/emails`:** **A · Banner** (an ember band with the name), **B · Accent** (the calm card with a coloured stripe and the icon beside the title), **C · Spotlight** (a tinted top with a big centred icon and a pill button). Each shows in light, dark, and a Gmail-app approximation (the light version inverted, images kept), at phone or desktop width.
+  - **The page is development only.** The API's `/dev` router is mounted only when `NODE_ENV` isn't `production`, and a test proves it's absent in production. The frontend route exists only in dev builds, and `check-dist.js` now fails a build that ships it.
+  - The first try did ship it: the route was gated on the imported `LAB_ENABLED`, which the bundler doesn't fold across modules. Writing `import.meta.env.DEV` in place fixed it.
+- **Three colour themes on top** (asked for as "change the theme a little"), switchable on the same page: **Ember** (cool grey page, white card), **Midnight** (the site's slate and ember: a slate banner and headings, a blue-grey page) and **Warm** (cream page, warm off-white card, sand borders, soft brown text). Each has its own dark palette; the brand ember stays the same in all three, because the icons are drawn in it.
+- **Spotlight won** the same day; Banner and Accent are deleted, and `/dev/emails` now shows Spotlight in the three themes side by side.
+- **Tests:** every theme renders every email with dark mode, each has its own light and dark colours, user-supplied values are escaped, the text part keeps the steps and links, and the preview route works in development and is absent in production (166 API tests).
+
 ---
 
 ## Lessons
@@ -305,19 +371,21 @@ Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in
 
 - **Logs feature** (next): record admin actions (invites, deletes, role changes from `manage-users`) with who, whom, when and from where, kept for a stated period. Remove its `test.todo` in `test/known-gaps.test.ts` when it lands.
 - Delete the old `tests` branch and the 23 Oct stash, now that both are folded in. Watch the first CI run with the Postgres service.
-- **Admin panel:** after the next API deploy, make yourself admin on the VPS with `docker exec ckauth-api-1 …` (DEPLOYMENT.md, "Admins"). The production stack is in `/opt/ckauth`, not the `~/Authentication` clone.
 - **SEO phase 1:**
   - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].
   - Have a lawyer review the Privacy Policy and Terms, and confirm the operator and Grievance Officer name, the ₹1,000 liability cap, and a city for "Governing law" (it says only "the courts of India").
   - Make the policy's retention promises concrete: delete unconfirmed sign-ups after a fixed period (e.g. 30 days), and rotate logs with a stated period.
   - Check that open and click tracking is off for the sending domain in Resend; then the policy can say emails aren't tracked.
-  - Self-serve account basics from the frontend review (each needs an API endpoint, a rate limiter, `docs/API.md` and, where data changes, the Privacy Policy): a "Resend the email" button on "Check your inbox" (today a resend means signing up again), editing your name, and "Sign out everywhere".
+  - Decide whether the device list should show an approximate location (an offline GeoLite2 lookup at display time, nothing stored), and whether sessions should keep a sign-in history; either needs the Privacy Policy.
+  - Drop the unused `users.refresh_token` and `users.reauthenticated_at` columns, one release after the sessions deploy.
   - Check the new header at 320, 360 and 390 px in a real phone or DevTools, and the skip link, focus moves and ticker pause with a screen reader (VoiceOver or NVDA); the review fixes were built and prerendered but not yet tried in a browser.
   - Build the "Connect your website" flow the dashboard now announces (see Future scope, "Hosted sign-in for other apps"); until it ships, keep the FAQ saying a developer sets CKAuth up.
-  - Let users delete their own account (the Privacy Policy promises deletion on request; today it's done by hand). Add log rotation so "server logs are kept only as long as needed" has a number.
+  - Split the inlined CSS so the home page carries only its own classes, then lower the `homeHtml` budget back to 22.
+  - Add log rotation so "server logs are kept only as long as needed" has a number.
   - Count the sign-up funnel (visit → sign-up → verified) once analytics exist, to measure the conversion changes. If analytics are added, update the Privacy Policy, which says there are none.
   - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
-  - Translate the app pages (sign-up, sign-in, emails) into Hindi, so the language choice carries past the home page.
+  - Pick the email theme (Ember / Midnight / Warm) at `/dev/emails`, make it `DEFAULT_EMAIL_THEME`, delete the others, and send a real email to a Gmail inbox on a phone in dark mode to check it.
+  - Translate the app pages (sign-up, sign-in, dashboard), the form messages, the API's error messages and the emails into Hindi together, with a stored language per user, reviewed by a Hindi speaker; until then the language choice stops at the home page.
   - Verify `chiragdev.com` in Google Search Console and Bing Webmaster Tools (DNS TXT records cover every subdomain), submit `sitemap.xml`, request indexing, and check with Google's Rich Results Test [C10, C11]. Add an IndexNow ping to `deploy.sh` [C12].
   - Replace the Hostinger parked page on `chiragdev.com` with a portfolio that links to CKAuth [D02].
   - LCP is still ~2.2 s in the mobile lab [P02]: next steps are a smaller first-screen font load and a CDN [P09].
@@ -341,12 +409,9 @@ Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in
 Larger directions beyond Next up, roughly in order of value. Each one says what in the current code it builds on or changes.
 
 **Accounts and sessions**
-- **Many sessions per user.** `users.refresh_token` holds a single session, so signing in on a second device ends the first. A `sessions` table (the `microservice-architecture` branch already has one) would add a device list, "sign out this device" and "sign out everywhere else".
-- **Revoking access tokens at once.** Closes a known gap: today a signed-out access token keeps working until it expires (up to 15 minutes). A per-user session version checked by `authenticateToken` would end it immediately.
-- **Change email.** Verify the new address before switching, and tell the old one. Today the email is fixed once the account exists.
-- **Edit profile, delete account, export data.** Today the name only changes at sign-up and the avatar only through upload. Deletion and a JSON export cover the basics of GDPR, the EU's data-protection law (deletion must remove the ImageKit avatar too).
+- **Export data.** Editing the profile and deleting the account are done (2 Nov); a JSON export of everything stored would complete the basics of GDPR, the EU's data-protection law.
 - **Admin tools.** Filters on `/admin`, editing a user, resending an invite, and MFA for admins. A role rank (`user` < `admin` < `owner`) once more than one person administers CKAuth. Browser end-to-end tests (Playwright) of sign-up → verify → dashboard.
-- **Security emails.** "New sign-in from …", "Your password was changed", "Your email was verified": sent in the background, like the existing emails.
+- **Security emails.** "New sign-in" is done (2 Nov); still to come: "Your password was changed", "Your email was verified": sent in the background, like the existing emails.
 
 **Stronger sign-in**
 - **Two-factor authentication.** Six-digit codes from an authenticator app (TOTP), with hashed recovery codes; a second step after the password, with its own rate limit.

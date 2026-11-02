@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useRef } from 'react'
-import { Link, Navigate, Outlet, ScrollRestoration, useLocation } from 'react-router'
-import { Languages } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { Link, Navigate, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router'
+import { CheckCircle2, Languages, X } from 'lucide-react'
 import { useAuth } from '@/lib/auth.tsx'
 import { useLanguage } from '@/lib/language.tsx'
 import { cn } from '@/lib/utils.ts'
@@ -35,12 +35,43 @@ export function Layout() {
       </a>
       <SiteHeader />
       <main id="main" ref={main} tabIndex={-1} className="flex flex-1 flex-col outline-none">
+        <AccountDeletedNotice />
         {/* the app pages are lazy-loaded (app.tsx); header and footer stay put while one arrives */}
         <Suspense fallback={<Spinner />}>
           <Outlet />
         </Suspense>
       </main>
       <SiteFooter />
+    </div>
+  )
+}
+
+// shown once after someone deletes their own account (dashboard.tsx), so they know it worked. it comes from navigation
+// state, which only a client-side navigation sets: the prerendered home page never has it, so hydration isn't affected.
+// the layout stays mounted across pages, so the state is watched, not read once
+function AccountDeletedNotice() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const arrived = (location.state as { notice?: string } | null)?.notice === 'account-deleted'
+  // the page it belongs to; moving to another page hides it
+  const [shownOn, setShownOn] = useState<string | null>(null)
+
+  // remember it, then drop it from history, so a reload or the back button doesn't show it again
+  useEffect(() => {
+    if(!arrived) return
+    setShownOn(location.pathname)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [arrived])
+
+  if(shownOn !== location.pathname) return null
+
+  return (
+    <div role="status" className="mx-auto mt-4 flex w-[calc(100%-2rem)] max-w-4xl items-start gap-3 rounded-2xl border border-success/40 bg-success/10 p-4 animate-in fade-in slide-in-from-top-2">
+      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
+      <p className="flex-1 text-sm"><strong className="font-semibold">Your account has been deleted.</strong> Your profile, photo and sessions are gone, and a confirmation is on its way to your inbox.</p>
+      <button type="button" onClick={() => setShownOn(null)} aria-label="Dismiss" className="rounded p-1 text-muted-foreground hover:text-foreground">
+        <X className="size-4" />
+      </button>
     </div>
   )
 }

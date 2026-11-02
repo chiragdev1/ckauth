@@ -92,13 +92,23 @@ export const rateLimits = {
   signinPerIp: createRateLimiter({name: 'signin-ip', windowMs: 15 * MINUTE, limit: 100}),
   signinPerEmail: createRateLimiter({name: 'signin-email', windowMs: 15 * MINUTE, limit: 5, key: emailKey, failuresOnly: true}),
   signupPerIp: createRateLimiter({name: 'signup-ip', windowMs: HOUR, limit: 10}),
+  // sign-up mails the address it's given, so without this one inbox could be flooded from many IPs
+  signupPerEmail: createRateLimiter({name: 'signup-email', windowMs: HOUR, limit: 5, key: emailKey}),
+  resendVerificationPerIp: createRateLimiter({name: 'resend-verification-ip', windowMs: HOUR, limit: 10}),
+  resendVerificationPerEmail: createRateLimiter({name: 'resend-verification-email', windowMs: HOUR, limit: 3, key: emailKey}),
   forgotPasswordPerIp: createRateLimiter({name: 'forgot-ip', windowMs: HOUR, limit: 10}),
   forgotPasswordPerEmail: createRateLimiter({name: 'forgot-email', windowMs: HOUR, limit: 3, key: emailKey}),
   verifyEmailPerIp: createRateLimiter({name: 'verify-ip', windowMs: 15 * MINUTE, limit: 20}),
   resetPasswordPerIp: createRateLimiter({name: 'reset-ip', windowMs: 15 * MINUTE, limit: 20}),
   refreshPerIp: createRateLimiter({name: 'refresh-ip', windowMs: MINUTE, limit: 60}),
   changePasswordPerUser: createRateLimiter({name: 'change-password-user', windowMs: 15 * MINUTE, limit: 5, key: userKey}),
+  // shared by upload and remove: both call ImageKit
   uploadAvatarPerUser: createRateLimiter({name: 'upload-avatar-user', windowMs: HOUR, limit: 10, key: userKey}),
+  // sends two mails and checks the password, so every request counts, not only failures
+  changeEmailPerUser: createRateLimiter({name: 'change-email-user', windowMs: HOUR, limit: 5, key: userKey}),
+  confirmEmailChangePerIp: createRateLimiter({name: 'confirm-email-ip', windowMs: 15 * MINUTE, limit: 20}),
+  // a bcrypt compare, like sign-in: only wrong passwords count
+  deleteAccountPerUser: createRateLimiter({name: 'delete-account-user', windowMs: 15 * MINUTE, limit: 5, key: userKey, failuresOnly: true}),
   // invites send mail and deletes can't be undone, so even a stolen admin session can only do so much per window
   adminWritePerUser: createRateLimiter({name: 'admin-write-user', windowMs: 15 * MINUTE, limit: 30, key: userKey}),
   // a bcrypt compare, like sign-in: only wrong passwords count

@@ -24,7 +24,7 @@ async function assertLimit(limit: number, send: (attempt: number) => Promise<{st
 describe('per-IP limits', () => {
   test('sign-up: 10 per hour', async () => {
     const client = new Client(baseUrl)
-    await assertLimit(10, () => client.post('/auth/sign-up', {}))
+    await assertLimit(10, attempt => client.post('/auth/sign-up', {email: `nobody${attempt}@ckauth.test`}))
   })
 
   test('forgot-password: 10 per hour', async () => {
@@ -40,6 +40,16 @@ describe('per-IP limits', () => {
   test('reset-password: 20 per 15 minutes', async () => {
     const client = new Client(baseUrl)
     await assertLimit(20, () => client.post(`/auth/reset-password/${BAD_TOKEN}`, {newPassword: 'secret123'}))
+  })
+
+  test('resend-verification: 10 per hour', async () => {
+    const client = new Client(baseUrl)
+    await assertLimit(10, attempt => client.post('/auth/resend-verification', {email: `nobody${attempt}@ckauth.test`}))
+  })
+
+  test('confirm-email: 20 per 15 minutes', async () => {
+    const client = new Client(baseUrl)
+    await assertLimit(20, () => client.post(`/auth/confirm-email/${BAD_TOKEN}`))
   })
 
   test('refresh: 60 per minute', async () => {
@@ -66,6 +76,17 @@ describe('per-email limits', () => {
     }
   })
 
+  test('sign-up: 5 per hour, so one inbox can\'t be flooded from many IPs', async () => {
+    await assertLimit(5, () => new Client(baseUrl).post('/auth/sign-up', {firstName: 'Ada', email: 'flood@ckauth.test', password: 'secret123'}))
+  })
+
+  test('resend-verification: 3 per hour, the same for an email with no account (no enumeration)', async () => {
+    const user = await createUser({verified: false})
+    for(const email of [user.email, 'nobody@ckauth.test']) {
+      await assertLimit(3, () => new Client(baseUrl).post('/auth/resend-verification', {email}))
+    }
+  })
+
   test('sign-in: case and spaces don\'t get around the per-email count', async () => {
     const user = await createUser({email: 'case@ckauth.test'})
     for(const email of ['case@ckauth.test', 'CASE@ckauth.test', ' Case@ckauth.test ', 'case@CKAUTH.test', 'CASE@CKAUTH.TEST']) {
@@ -80,6 +101,25 @@ describe('per-user limits', () => {
     const user = await createUser()
     const client = await signIn(baseUrl, user)
     await assertLimit(5, () => client.post('/auth/change-password', {currentPassword: 'wrong-password', newPassword: 'brand-new-password'}))
+  })
+
+  test('delete-account: 5 wrong passwords per 15 minutes', async () => {
+    const client = await signIn(baseUrl, await createUser())
+    await assertLimit(5, () => client.request('DELETE', '/auth/me', {password: 'wrong-password'}))
+  })
+
+  test('change-email: 5 per hour, right password or not', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    await assertLimit(5, attempt => client.post('/auth/change-email', {newEmail: `new${attempt}@ckauth.test`, password: user.password}))
+  })
+
+  test('upload-avatar: 10 per hour, shared with removing the avatar', async () => {
+    const client = await signIn(baseUrl, await createUser())
+    for(let attempt = 0; attempt < 5; attempt++) {
+      await client.delete('/auth/avatar')
+    }
+    await assertLimit(5, () => client.post('/auth/upload-avatar', {}))
   })
 
   test('upload-avatar: 10 per hour', async () => {

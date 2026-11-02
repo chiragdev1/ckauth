@@ -82,13 +82,17 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Out-of-band.** Done through a separate channel from the normal one. CKAuth makes and removes admins with a script on the server, out-of-band from the website, so a stolen session can't do it.
 
-**Session.** The period during which a user stays signed in without re-entering their password.
+**Session.** The period during which a user stays signed in without re-entering their password. CKAuth keeps one row per signed-in device in its `sessions` table, so each device can be signed out on its own, and up to 10 at a time per user.
 
 **JWT (JSON Web Token).** A signed token that carries facts such as a user ID. The server can check the signature, so it can tell if anyone changed the token.
 
 **Claim.** One fact stored inside a JWT, such as the user ID (`sub`), the expiry time (`exp`) or a unique token ID (`jti`).
 
 **Access token.** A short-lived JWT (about 15 minutes) sent with each request to prove who the user is.
+
+**User agent.** A header the browser sends with every request describing itself, such as `Mozilla/5.0 (Windows NT 10.0; …) Chrome/130…`. CKAuth stores it per session so the device list can say "Chrome on Windows". The browser can send anything here, so it's a hint, not proof.
+
+**Lightbox.** A view that opens an image full size over the page, dimming what's behind it, and closes with Escape or a click. CKAuth's avatars open in one.
 
 **Refresh token.** A longer-lived token whose only job is to get a new access token when the old one expires.
 

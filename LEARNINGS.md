@@ -32,6 +32,10 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   → One shared `cookieOptions`, with `SameSite=Lax`, `Secure` in production, and the expiry taken from the token (`ca53b11`).
   **Rule:** define cookie options in one place. Default to `httpOnly` + `SameSite=Lax` + `Secure` in production. Use `None` only for genuine cross-site setups, and only together with `Secure`.
 
+- **One refresh token per user meant one device.** `users.refresh_token` held a single session, so every sign-in silently ended the last one, and logout couldn't stop an access token that was already issued.
+  → A `sessions` table, and the access token carries its session ID, which `authenticateToken` checks on every request.
+  **Rule:** model sessions as rows, not a column on the user. If the access token names its session, ending the session ends the token.
+
 ## Account enumeration (revealing who has an account)
 
 - **Sign-in revealed which emails exist.** It returned 404 for an unknown user and 403 for a wrong password (`2623376`), so anyone could test an email list against it.
@@ -122,6 +126,27 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 
 ## Testing
 
+- **A dev-only page shipped to production.** The route was gated on `LAB_ENABLED`, imported from `design-lab.tsx`. Vite replaces `import.meta.env` values only where they're written, and the bundler didn't fold the imported constant, so the page was bundled and the home page went over its JavaScript budget.
+  → Write `import.meta.env.DEV || …` in place at the gate, and `check-dist.js` fails any build that contains the page.
+  **Rule:** gate dev-only code on `import.meta.env` written in place, and add a build check that proves it's gone.
+- **A dark-mode preview that wasn't dark.** Setting `color-scheme: dark` on an iframe didn't change `prefers-color-scheme` inside it, so the "dark" emails rendered light. Opening one email directly with dark mode emulated showed the CSS itself was fine.
+  → The preview rewrites the email's `@media (prefers-color-scheme: dark)` to `@media all`.
+  **Rule:** when a preview disagrees with expectations, test the thing being previewed on its own before trusting the harness.
+
+- **A raw subquery in Drizzle matched against the wrong table.** `sql\`… where ${sessionsTable.userId} = ${usersTable.id}\`` printed bare column names, so `id` meant `sessions.id` and every admin row showed 0 devices. A second bug hid behind it: decoding the zone-less `timestamp` with `new Date(value)` read it as local time, 5½ hours off in India.
+  → Hand-qualified names (`s.user_id = "users"."id"`) and `.mapWith(sessionsTable.lastUsedAt)` to reuse the column's own decoding.
+  **Rule:** in raw SQL that mentions two tables, qualify every column yourself, and decode values with the column they came from.
+- **State read once in a component that never unmounts.** The account-deleted notice read `location.state` in a `useState` initialiser inside the layout, which stays mounted across pages, so it read the state on the dashboard and never again. Behind it, clearing the user before navigating let `RequireAuth` redirect to sign-in first.
+  → Watch the state in an effect, and navigate away before clearing the user.
+  **Rule:** anything in a layout must react to navigation, not read it at mount; and leave a guarded page before removing what its guard checks.
+- **Revoking an object URL in cleanup failed the image it was loading.** In development, React's strict mode runs effects twice: the first run's cleanup revoked the URL mid-load, its `onerror` fired, and the cropper said every photo "can't be opened".
+  → Each effect run ignores its own events once cleaned up.
+  **Rule:** async callbacks started in an effect must check that the effect is still current before setting state.
+
+- **Cancel buttons needed a second click.** Pressing Cancel first blurred the focused, still-empty field; `useForm` shows a field's error on blur, the error pushed the button down, and the click landed beside it. Only a real browser run caught it.
+  → Cancel buttons keep focus where it is on mouse down (`keepFocus` in `dashboard.tsx`); keyboard users still tab to them as normal.
+  **Rule:** a button that sits below a field validated on blur must not move when the field blurs; either keep focus on press, or reserve the error's space.
+
 - **The admin API could create admins it couldn't remove.** Removing an admin was deliberately server-only, but `POST /admin/users` accepted `role: "admin"`, so a stolen session could plant extra admins.
   → Invites are always `user`, and the payload is `.strict()`.
   **Rule:** guard granting a power at least as strongly as revoking it.
@@ -138,6 +163,9 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 - **"Fails open" hid a 5-second stall.** With Redis unreachable, the limiter did let requests through, but node-redis queued each command first, so every sign-in waited about 5 s.
   → `disableOfflineQueue: true`, and `test/redis-down.test.ts` asserts the request is fast as well as successful.
   **Rule:** when testing a fallback, assert how long it takes, not only that it works.
+- **A new limiter broke an old test through its fallback key.** Adding a per-email limit to sign-up made "10 sign-ups per IP" fail at the 6th: the test sent empty bodies, and with no valid email `emailKey` falls back to the IP, so the per-email limit (5) counted them first.
+  → The per-IP test sends a different valid email each time, like the forgot-password one.
+  **Rule:** when two limiters guard one route, test each with input only it counts, and remember what a key falls back to.
 - **A check that can't fail proves nothing.** → Every new test and check here was proven by breaking the code once on purpose: deleting the admin-role condition, removing `/admin` from the Caddyfile.
   **Rule:** before trusting a new test or check, make it fail once.
 

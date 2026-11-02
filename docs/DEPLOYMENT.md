@@ -480,6 +480,8 @@ This skips the build and deploys the existing image for that SHA. Only that one 
 
 > ⚠️ **Rollbacks don't undo database migrations.** An older API has to work with the newer database. That's why migrations must stay backwards-compatible ([see below](#database-changes-migrations)).
 
+> **Sessions (2 Nov 2026):** the API before the `sessions` table kept the session in `users.refresh_token`. Deploying the sessions release signs everyone out once, because the old tokens carry no session ID. Rolling back past it signs everyone out once more; nothing else breaks.
+
 Then fix forward: revert or fix the bad commit on `main`, and the next push deploys it normally.
 
 ### Changing a setting
