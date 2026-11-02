@@ -74,6 +74,147 @@ export async function sendAccountExistsMail(
   return await sendEmail(to, "You already have an account", htmlContent, textContent);
 }
 
+// sent when an admin invites someone: the link sets their first password, which also confirms the email
+export async function sendInviteMail(to: string, firstName: string, setPasswordUrl: string, expiresInHours: number) {
+  const appName = process.env.APP_NAME || "CKAuth"
+  const mail = {
+    title: `You're invited to ${appName}`,
+    preheader: `Choose a password to finish setting up your ${appName} account.`,
+    greeting: `Hi ${firstName},`,
+    paragraphs: [`An administrator created a ${appName} account for you with this email address. Choose a password to start using it.`],
+    button: {label: 'Choose a password', url: setPasswordUrl},
+    note: `This link expires in ${expiresInHours} hours and can be used once. If it expires, use "Forgot password" on the sign-in page to get a new one.`,
+    footnote: `Not expecting this? You can ignore this email: nobody can sign in to the account until a password is chosen from this link.`,
+  }
+  return await sendEmail(to, mail.title, renderNoticeHtml(mail), renderNoticeText(mail))
+}
+
+// sent after an admin deletes an account, so the person isn't left wondering why they can't sign in
+export async function sendAccountDeletedMail(to: string, firstName: string, contactUrl: string) {
+  const appName = process.env.APP_NAME || "CKAuth"
+  const mail = {
+    title: `Your ${appName} account was deleted`,
+    preheader: `Your ${appName} account and its data have been deleted.`,
+    greeting: `Hi ${firstName},`,
+    paragraphs: [
+      `An administrator deleted your ${appName} account. Your profile, password and sessions have been removed, and you've been signed out everywhere.`,
+      `If you think this was a mistake, contact us using the details at ${contactUrl}. You can also create a new account at any time.`,
+    ],
+    footnote: `You're receiving this because this email address belonged to a ${appName} account.`,
+  }
+  return await sendEmail(to, mail.title, renderNoticeHtml(mail), renderNoticeText(mail))
+}
+
+type NoticeMail = {
+  title: string
+  preheader: string
+  greeting: string
+  paragraphs: string[]
+  button?: {label: string, url: string}
+  note?: string
+  footnote: string
+}
+
+// one layout for the shorter notices, in the same style as the templates below
+function renderNoticeHtml(mail: NoticeMail): string {
+  const name = escapeHtml(process.env.APP_NAME || "CKAuth")
+  const font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+  const year = new Date().getFullYear()
+  const paragraphs = mail.paragraphs.map(text => `<p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#374151;">${escapeHtml(text)}</p>`).join('\n')
+  const button = mail.button ? `
+                <tr>
+                  <td class="px" align="left" style="padding:0 48px 28px 48px;">
+                    <a href="${escapeHtml(mail.button.url)}" target="_blank" rel="noopener noreferrer"
+                       style="display:inline-block; padding:14px 28px; font-family:${font}; font-size:16px; font-weight:600; line-height:20px; color:#ffffff; text-decoration:none; border-radius:8px; background-color:#4f46e5;">
+                      ${escapeHtml(mail.button.label)}
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="px" style="padding:0 48px 32px 48px; font-family:${font};">
+                    ${mail.note ? `<p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#6b7280;">${escapeHtml(mail.note)}</p>` : ''}
+                    <p style="margin:0 0 8px 0; font-size:14px; line-height:22px; color:#6b7280;">If the button doesn't work, copy and paste this link into your browser:</p>
+                    <p style="margin:0; font-size:13px; line-height:20px; word-break:break-all;"><a href="${escapeHtml(mail.button.url)}" target="_blank" rel="noopener noreferrer" style="color:#4f46e5; text-decoration:underline;">${escapeHtml(mail.button.url)}</a></p>
+                  </td>
+                </tr>` : ''
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light only" />
+  <title>${escapeHtml(mail.title)}</title>
+  <style>
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    a { color: #4f46e5; }
+    @media screen and (max-width: 600px) {
+      .container { width: 100% !important; }
+      .px { padding-left: 24px !important; padding-right: 24px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f5f7;">
+  <div style="display:none; max-height:0; overflow:hidden; font-size:1px; line-height:1px; color:#f4f5f7; opacity:0;">${escapeHtml(mail.preheader)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f5f7;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" class="container" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px; max-width:560px;">
+          <tr>
+            <td align="center" style="padding-bottom:24px; font-family:${font}; font-size:20px; font-weight:700; color:#111827;">${name}</td>
+          </tr>
+          <tr>
+            <td style="background-color:#ffffff; border:1px solid #e5e7eb; border-radius:12px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="px" style="padding:40px 48px 12px 48px; font-family:${font};">
+                    <h1 style="margin:0 0 16px 0; font-size:24px; line-height:32px; font-weight:700; color:#111827;">${escapeHtml(mail.title)}</h1>
+                    <p style="margin:0 0 16px 0; font-size:16px; line-height:24px; color:#374151;">${escapeHtml(mail.greeting)}</p>
+                    ${paragraphs}
+                  </td>
+                </tr>${button}
+                <tr>
+                  <td class="px" style="padding:0 48px;"><div style="height:1px; line-height:1px; font-size:1px; background-color:#e5e7eb;">&nbsp;</div></td>
+                </tr>
+                <tr>
+                  <td class="px" style="padding:24px 48px 40px 48px; font-family:${font};">
+                    <p style="margin:0; font-size:13px; line-height:20px; color:#9ca3af;">${escapeHtml(mail.footnote)}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 16px 0 16px; font-family:${font}; font-size:12px; line-height:18px; color:#9ca3af;">
+              This is an automated message, please do not reply.<br />&copy; ${year} ${name}. All rights reserved.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
+function renderNoticeText(mail: NoticeMail): string {
+  const appName = process.env.APP_NAME || "CKAuth"
+  return [
+    mail.title,
+    ``,
+    mail.greeting,
+    ``,
+    ...mail.paragraphs.flatMap(text => [text, ``]),
+    ...(mail.button ? [`${mail.button.label}:`, mail.button.url, ``] : []),
+    ...(mail.note ? [mail.note, ``] : []),
+    mail.footnote,
+    ``,
+    `---`,
+    `This is an automated message, please do not reply.`,
+    `© ${new Date().getFullYear()} ${appName}. All rights reserved.`,
+  ].join("\n")
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")

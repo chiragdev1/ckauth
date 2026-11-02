@@ -2,10 +2,14 @@ import type {Response} from 'express'
 
 export class ApiError extends Error {
   statusCode: number
+  // a stable, machine-readable reason for the few errors a client must handle specially (e.g. REAUTH_REQUIRED);
+  // messages are for people and may change
+  code: string | undefined
 
-  constructor(statusCode: number , message: string = "something went wrong") {
+  constructor(statusCode: number , message: string = "something went wrong", code?: string) {
     super(message)
     this.statusCode = statusCode
+    this.code = code
     Error.captureStackTrace(this, this.constructor)
   }
 

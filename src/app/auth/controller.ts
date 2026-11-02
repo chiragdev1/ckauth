@@ -10,12 +10,10 @@ import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { generateAccessToken, generateRefreshToken, getTokenExpiry, verifyRefreshToken } from './utils/jwt-token.js';
 import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../utils/api-response.js';
-import { cookieOptions, getFrontendUrl } from './utils/constants.js';
+import { cookieOptions, getFrontendUrl, PASSWORD_HASH_ROUNDS } from './utils/constants.js';
 import { sendAccountExistsMail, sendEmailVerificationMail, sendResetPasswordMail, sendWelcomeMail } from '../../utils/mail.js';
 import { deleteImage, uploadImage } from '../../utils/imagekit.js';
 
-// one cost for every hash, so the dummy compare below takes exactly as long as a real one
-const PASSWORD_HASH_ROUNDS = 10
 // hash of a random value nobody knows, made once at startup; compared against when an email has no account
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), PASSWORD_HASH_ROUNDS)
 
@@ -261,7 +259,8 @@ export class AuthController {
     // revoke the refreshToken in db; matching on the hash means only the owner of this token can revoke it
     if(refreshToken) {
       const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex')
-      await db.update(usersTable).set({refreshToken: null}).where(eq(usersTable.refreshToken, hashedRefreshToken))
+      // also ends admin sudo mode, so a confirmed password doesn't outlive the session it was confirmed in
+      await db.update(usersTable).set({refreshToken: null, reauthenticatedAt: null}).where(eq(usersTable.refreshToken, hashedRefreshToken))
     }
 
     // always clear both accessToken and refreshToken cookies
@@ -405,8 +404,20 @@ export class AuthController {
     // hash the new password
     const hashedNewPassword = await bcrypt.hash(newPassword, PASSWORD_HASH_ROUNDS)
 
-    // if valid, update the password, remove the reset token fields, and clear the refreshToken so existing sessions are signed out
-    const [result] = await db.update(usersTable).set({password: hashedNewPassword, resetPasswordToken: null, resetPasswordTokenExpiry: null, refreshToken: null}).where(eq(usersTable.id, userInDb.id)).returning({id: usersTable.id})
+    // if valid, update the password, remove the reset token fields, and clear the refreshToken so existing sessions are signed out.
+    // the link was opened from the inbox, which proves the email just as verification does, so it also verifies the account:
+    // that is how an invited user (no password yet, see admin invites) finishes setting up. any pending verification link is
+    // cancelled with it, and admin sudo mode ends, since the password it confirmed has changed
+    const [result] = await db.update(usersTable).set({
+      password: hashedNewPassword,
+      resetPasswordToken: null,
+      resetPasswordTokenExpiry: null,
+      refreshToken: null,
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationTokenExpiry: null,
+      reauthenticatedAt: null,
+    }).where(eq(usersTable.id, userInDb.id)).returning({id: usersTable.id})
 
     // if no row returned, send 500 error
     if(!result) {
@@ -518,7 +529,7 @@ export class AuthController {
 
 }
 
-async function createTempToken() {
+export async function createTempToken() {
   
   const token = crypto.randomBytes(32).toString('hex')
   const hashedToken = crypto.createHash('sha256').update(token).digest('hex')

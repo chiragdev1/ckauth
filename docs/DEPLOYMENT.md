@@ -21,7 +21,7 @@ This guide takes you from an empty Hostinger VPS to CKAuth running at **`https:/
   8. [First deploy](#step-8-first-deploy)
   9. [Check everything works](#step-9-check-everything-works)
   10. [Turn on backups](#step-10-turn-on-backups)
-- **[Part C: Everyday operations](#part-c-everyday-operations)**: deploying, rolling back, settings, **changing the email domain**, secrets, migrations, logs, restoring, other sites, **resource budget and capacity**, server updates
+- **[Part C: Everyday operations](#part-c-everyday-operations)**: deploying, rolling back, settings, **changing the email domain**, secrets, migrations, **admins**, logs, restoring, other sites, **resource budget and capacity**, server updates
 - [Part D: Troubleshooting](#part-d-troubleshooting)
 - [Part E: Reference](#part-e-reference)
 
@@ -544,6 +544,32 @@ Rules that keep rollbacks safe:
 - **Add before you use.** Ship a new column (nullable or with a default) in one release, and start relying on it in the next.
 - **Stop using before you remove.** Remove a column only after a release that no longer reads it.
 - **Renames are an add plus a remove,** spread over two releases.
+
+### Admins
+
+Every account has a **role**: `user` (the default) or `admin`. Admins can open `/admin` on the site to search, invite and delete users (after confirming their password). On purpose, the website **can't** make anyone an admin, demote an admin or delete one. Those changes happen here, on the server, with the `manage-users` script that ships in the API image. Someone who steals an admin's session cookie still can't lock the real admins out, because that would take SSH access to the VPS.
+
+**Become the first admin.** Sign up on the site and verify your email first. An unverified account can't sign in at all. Then, on the VPS, from any folder:
+
+```bash
+docker exec ckauth-api-1 node dist/scripts/manage-users.js role you@example.com admin
+```
+
+`docker exec` runs a command inside a container that is already running. The script runs inside the live API container, so it uses the production database and settings. `compose.yml` sets the project name to `ckauth`, so the API container is always called `ckauth-api-1` (check with `docker ps --filter name=ckauth-api`).
+
+> **Which folder is which.** The running stack lives in `/opt/ckauth`, where each deploy copies `compose.yml`. `~/Authentication` is only a git clone of the code ([VPS-ACCESS.md](VPS-ACCESS.md#25-clone)). Don't run `docker compose …` for production inside `~/Authentication`: there it reads the repo's development `docker-compose.yml` instead. `docker exec ckauth-api-1 …` works from anywhere, and so does `cd /opt/ckauth && docker compose exec api …`.
+
+Sign in again (or reload the page), and an **Admin** link appears in the account menu. The role is read from the database on every request, so the change takes effect at once.
+
+**Other commands:**
+
+```bash
+docker exec ckauth-api-1 node dist/scripts/manage-users.js admins                       # list every admin
+docker exec ckauth-api-1 node dist/scripts/manage-users.js role someone@example.com user  # demote an admin
+docker exec ckauth-api-1 node dist/scripts/manage-users.js delete someone@example.com     # delete any account, admins included
+```
+
+Locally it's the same script: `pnpm build`, then `pnpm admin role you@example.com admin`.
 
 ### Logs and status
 

@@ -128,6 +128,14 @@ export function RequireAuth() {
   return <Outlet />
 }
 
+// sits inside RequireAuth, so the session check is done; the server is still the real gate (authorizeRoles)
+export function RequireAdmin() {
+  const { user } = useAuth()
+
+  if(user?.role !== 'admin') return <Navigate to="/dashboard" replace />
+  return <Outlet />
+}
+
 // signed-in users have no reason to see sign-in or sign-up
 // the form shows straight away instead of waiting on the session check (two round trips for a signed-out visitor)
 export function GuestOnly() {

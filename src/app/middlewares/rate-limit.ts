@@ -88,4 +88,8 @@ export const rateLimits = {
   refreshPerIp: createRateLimiter({name: 'refresh-ip', windowMs: MINUTE, limit: 60}),
   changePasswordPerUser: createRateLimiter({name: 'change-password-user', windowMs: 15 * MINUTE, limit: 5, key: userKey}),
   uploadAvatarPerUser: createRateLimiter({name: 'upload-avatar-user', windowMs: HOUR, limit: 10, key: userKey}),
+  // invites send mail and deletes can't be undone, so even a stolen admin session can only do so much per window
+  adminWritePerUser: createRateLimiter({name: 'admin-write-user', windowMs: 15 * MINUTE, limit: 30, key: userKey}),
+  // a bcrypt compare, like sign-in: only wrong passwords count
+  adminReauthPerUser: createRateLimiter({name: 'admin-reauth-user', windowMs: 15 * MINUTE, limit: 5, key: userKey, failuresOnly: true}),
 }

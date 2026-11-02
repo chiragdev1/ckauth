@@ -1,4 +1,5 @@
 import {z} from 'zod'
+import { availableUserRoles } from './utils/constants.js'
 
 // normalize before validating so " John@Gmail.com " and "john@gmail.com" map to the same account
 // 254 is the max length of a valid email address (RFC 5321)
@@ -36,6 +37,7 @@ export const reqUserModel = z.object({
   age: z.number().int().positive().optional().nullable(),
   email: z.email(),
   emailVerified: z.boolean(),
+  role: z.enum(availableUserRoles),
   avatarUrl: z.string().nullable()
 })
 

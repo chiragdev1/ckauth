@@ -72,6 +72,16 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Authorization.** Deciding *what* that person may do. Failure is a `403`.
 
+**Role.** A label on an account that decides what it may do. CKAuth has two: `user` (everyone) and `admin` (can see, add and delete users).
+
+**RBAC (role-based access control).** Granting permissions to roles rather than to individual people, then checking the role on each request. CKAuth's `authorizeRoles('admin')` middleware is a small example.
+
+**Re-authentication / sudo mode.** Asking for the password again before a dangerous action, even in a valid session, and trusting it for a short while afterwards. CKAuth's admins confirm their password before inviting or deleting users, and it stays confirmed for 15 minutes. GitHub uses the same pattern.
+
+**Invite.** Creating an account for someone else without choosing their password: they get a link to set it themselves, so only they ever know it.
+
+**Out-of-band.** Done through a separate channel from the normal one. CKAuth makes and removes admins with a script on the server, out-of-band from the website, so a stolen session can't do it.
+
 **Session.** The period during which a user stays signed in without re-entering their password.
 
 **JWT (JSON Web Token).** A signed token that carries facts such as a user ID. The server can check the signature, so it can tell if anyone changed the token.
@@ -145,6 +155,10 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 **Conditional UPDATE.** An `UPDATE … WHERE …` that changes a row only if a condition still holds, and reports whether it did. The database itself decides which request wins.
 
 **Row lock (`SELECT … FOR UPDATE`).** Locking a row inside a transaction, so other requests wait until you're done with it.
+
+**Enum (enumerated type).** A type that allows only a fixed list of values. The `role` column is a Postgres enum (`user_role`), so the database itself rejects any other role.
+
+**Pagination.** Returning a long list one page at a time (`?page=2&limit=20`), so a single request never has to load every row.
 
 **`onConflictDoNothing`.** Drizzle's way of saying "insert this row, but if it breaks a unique constraint, skip it quietly".
 

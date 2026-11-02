@@ -19,6 +19,7 @@ The repo also contains the **CKAuth web app** in [`frontend/`](frontend/) (React
 - **Email verification** with single-use links that expire after 15 minutes, sent through [Resend](https://resend.com).
 - **Session handling** with short-lived access tokens and refresh tokens that are replaced on every use, both stored in `httpOnly` cookies.
 - **Password management:** forgot password, reset password and change password.
+- **Roles and an admin panel:** every account is a `user` or an `admin`. Admins can search, invite and delete users at `/admin`, after confirming their password. Invited people choose their own password from an emailed link. Admins themselves are made and removed only from the server (`pnpm admin`), never through the website.
 - **Avatar uploads** to [ImageKit](https://imagekit.io). The real file type is checked from the file's contents, and old images are cleaned up automatically.
 - **Built with security in mind:**
   - Every token is stored hashed.
@@ -132,6 +133,7 @@ Open `http://localhost:3000`. The Vite dev server proxies `/api/*` to the API on
 | `pnpm db:generate` | Creates a new migration after you change `src/db/schema.ts`. |
 | `pnpm db:migrate` | Applies pending migrations to the database. |
 | `pnpm db:migrate:prod` | Applies migrations with Drizzle's runtime migrator (`dist/db/migrate.js`); used by deploys. |
+| `pnpm admin <command>` | Manages roles from the command line, after `pnpm build`: `role <email> <user\|admin>`, `delete <email>`, `admins`. Use `pnpm admin role you@example.com admin` to make yourself an admin. |
 | `pnpm drizzle:studio` | Opens Drizzle Studio to browse the database. |
 | `pnpm docs:artifact` | Bundles every doc into one searchable page (`.docs-artifact/ckauth-docs.html`) and warns about broken links between docs. |
 
@@ -150,11 +152,15 @@ src/
 │   │   ├── routes.ts           # Endpoint → middleware → controller wiring
 │   │   ├── controller.ts       # Request handlers (AuthController)
 │   │   ├── models.ts           # Zod schemas for request bodies
-│   │   ├── middleware.ts       # authenticateToken: reads the access token cookie
-│   │   └── utils/              # JWT helpers, cookie options, frontend URL
+│   │   ├── middleware.ts       # authenticateToken (reads the access token cookie), authorizeRoles
+│   │   └── utils/              # JWT helpers, cookie options, frontend URL, user roles
+│   ├── admin/                  # /admin endpoints: stats, list, add and delete users (admins only)
 │   └── middlewares/
 │       ├── error-handler.ts    # Turns errors into JSON responses
+│       ├── rate-limit.ts       # Rate limiters, shared through Redis
 │       └── upload-multer.ts    # Avatar upload parsing and validation
+├── scripts/
+│   └── manage-users.ts         # `pnpm admin`: make, demote or delete admins from the server
 ├── db/
 │   ├── index.ts                # Drizzle database client
 │   ├── migrate.ts              # Runtime migrator used in production

@@ -245,6 +245,16 @@ New entries go at the bottom, under a dated heading.
 - **It checks links between docs.** Every relative link and `#anchor` is resolved with GitHub's heading rules, and its first run found two problems: VPS-ACCESS linked to a DEPLOYMENT heading that no longer exists, and a paragraph had split DEPLOYMENT's "Who logs in" table. Both are fixed.
 - **OpenID Connect plan** (a separate page): CKAuth as an OpenID Provider for other apps (authorization code + PKCE on `oidc-provider`), plus Google and GitHub sign-in for CKAuth itself, with account-linking rules, schema, endpoints, build order and five open decisions. Nothing is built yet.
 
+## 2 Nov 2026 · Roles and an admin panel
+**In short:** every account now has a role, `user` or `admin`. Admins get a `/admin` page to see, add and delete users, and admins themselves are managed only from the server.
+
+- **A `role` column** on `users`, a Postgres enum (`user_role`: `user`, `admin`) with default `user`. The values live once in `userRolesEnum` (`src/app/auth/utils/constants.ts`); the enum, the Zod models and the script all read them from there. The migration only adds a column with a default, so a rollback is safe.
+- **`authorizeRoles(...roles)`** (`auth/middleware.ts`) runs after `authenticateToken`. That middleware already loads the user from the database on each request, so the role is always current and a demoted admin loses access immediately, not when their token expires. `/auth/me` now returns `role`.
+- **Admin API** (`src/app/admin/`, mounted at `/admin`, every route behind both middlewares): `GET /stats` (four counts in one query), `GET /users` (paginated, newest first, safe fields only), `POST /users` (creates an already-verified account with a chosen role; a clear `409` on a taken email, since admins can see every account anyway) and `DELETE /users/:id` (also removes the avatar from ImageKit, after the delete). Writes share a per-admin rate limit, because creating a user runs bcrypt.
+- **Admins can't delete themselves or each other through the API.** The "not an admin" condition is part of the `DELETE … WHERE`, so a user promoted between a check and the delete can't slip through. Making, demoting and deleting admins is done **out-of-band** with `src/scripts/manage-users.ts`, which ships in the API image (`docker exec ckauth-api-1 node dist/scripts/manage-users.js role you@x.com admin`, from any folder on the VPS). A stolen admin cookie can't lock the real admins out. No `owner`/`superadmin` role for now; if a second admin needs limits, the plan is a rank per role ("act only on lower ranks") rather than special cases.
+- **`/admin` page** (`pages/admin.tsx` + `lib/admin.ts`): stat tiles, one card per user with pages, an "add a user" card that opens the form (with a role switch), and a two-click delete. Admin cards are marked "Protected". It's lazy-loaded, behind `RequireAdmin`, and linked from the account menu and the dashboard for admins only. Three layouts were compared in the design lab (a wide table, a side rail, cards); cards won and the other two were deleted.
+- The Privacy Policy now lists the account role among stored data.
+
 ---
 
 ## Lessons
@@ -253,6 +263,7 @@ Mistakes and the rules learned from them are kept topic by topic in [LEARNINGS.m
 ## Next up
 Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md).
 
+- **Admin panel:** after the next API deploy, make yourself admin on the VPS with `docker exec ckauth-api-1 …` (DEPLOYMENT.md, "Admins"). The production stack is in `/opt/ckauth`, not the `~/Authentication` clone.
 - **SEO phase 1:**
   - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].
   - Have a lawyer review the Privacy Policy and Terms, and confirm the operator and Grievance Officer name, the ₹1,000 liability cap, and a city for "Governing law" (it says only "the courts of India").
@@ -292,6 +303,7 @@ Larger directions beyond Next up, roughly in order of value. Each one says what 
 - **Revoking access tokens at once.** Closes a known gap: today a signed-out access token keeps working until it expires (up to 15 minutes). A per-user session version checked by `authenticateToken` would end it immediately.
 - **Change email.** Verify the new address before switching, and tell the old one. Today the email is fixed once the account exists.
 - **Edit profile, delete account, export data.** Today the name only changes at sign-up and the avatar only through upload. Deletion and a JSON export cover the basics of GDPR, the EU's data-protection law (deletion must remove the ImageKit avatar too).
+- **Admin tools.** Filters on `/admin`, editing a user, resending an invite, and MFA for admins. A role rank (`user` < `admin` < `owner`) once more than one person administers CKAuth. Browser end-to-end tests (Playwright) of sign-up → verify → dashboard.
 - **Security emails.** "New sign-in from …", "Your password was changed", "Your email was verified": sent in the background, like the existing emails.
 
 **Stronger sign-in**

@@ -5,7 +5,7 @@ import { AuthProvider } from './lib/auth.tsx'
 import { ThemeProvider } from './lib/theme.tsx'
 import { LookProvider } from './lib/design-lab.tsx'
 import { LanguageProvider } from './lib/language.tsx'
-import { GuestOnly, Layout, RequireAuth } from './components/layout.tsx'
+import { GuestOnly, Layout, RequireAdmin, RequireAuth } from './components/layout.tsx'
 import { Home } from './pages/home.tsx'
 import { NotFound } from './pages/not-found.tsx'
 import { RouteError } from './pages/route-error.tsx'
@@ -18,6 +18,7 @@ const SignIn = lazy(() => import('./pages/sign-in.tsx').then(module => ({ defaul
 const VerifyEmail = lazy(() => import('./pages/verify-email.tsx').then(module => ({ default: module.VerifyEmail })))
 const ForgotPassword = lazy(() => import('./pages/forgot-password.tsx').then(module => ({ default: module.ForgotPassword })))
 const ResetPassword = lazy(() => import('./pages/reset-password.tsx').then(module => ({ default: module.ResetPassword })))
+const Admin = lazy(() => import('./pages/admin.tsx').then(module => ({ default: module.Admin })))
 const Dashboard = lazy(() => import('./pages/dashboard.tsx').then(module => ({ default: module.Dashboard })))
 const PrivacyPolicy = lazy(() => import('./pages/legal.tsx').then(module => ({ default: module.PrivacyPolicy })))
 const Terms = lazy(() => import('./pages/legal.tsx').then(module => ({ default: module.Terms })))
@@ -47,7 +48,13 @@ export const routes: RouteObject[] = [
           { path: '/terms', element: <Terms /> },
           {
             element: <RequireAuth />,
-            children: [{ path: '/dashboard', element: <Dashboard /> }],
+            children: [
+              { path: '/dashboard', element: <Dashboard /> },
+              {
+                element: <RequireAdmin />,
+                children: [{ path: '/admin', element: <Admin /> }],
+              },
+            ],
           },
           { path: '*', element: <NotFound /> },
         ],

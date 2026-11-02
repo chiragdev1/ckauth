@@ -3,14 +3,18 @@ type ApiEnvelope<T> = {
   success: boolean
   message: string
   data: T
+  // only on the few errors a client handles specially, e.g. REAUTH_REQUIRED
+  code?: string
 }
 
 export class ApiRequestError extends Error {
   status: number
+  code: string | undefined
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -21,11 +25,12 @@ export type User = {
   age: number | null
   email: string
   emailVerified: boolean
+  role: 'user' | 'admin'
   avatarUrl: string | null
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST'
+  method?: 'GET' | 'POST' | 'DELETE'
   body?: unknown
   // only protected endpoints refresh on 401; on sign-in or verify-email a 401 means wrong password
   authed?: boolean
@@ -44,7 +49,7 @@ async function rawRequest<T>(path: string, { method = 'GET', body }: RequestOpti
   // caddy or a crashed api can return html or nothing, so don't assume json
   const payload = await response.json().catch(() => null) as ApiEnvelope<T> | null
   if(!response.ok || !payload) {
-    throw new ApiRequestError(response.status, payload?.message ?? 'Something went wrong, please try again')
+    throw new ApiRequestError(response.status, payload?.message ?? 'Something went wrong, please try again', payload?.code)
   }
   return payload
 }
