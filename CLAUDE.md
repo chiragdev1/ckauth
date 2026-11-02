@@ -40,7 +40,7 @@ For anything the suite can't cover (real emails, ImageKit, the browser), also ru
 - `src/app/auth/controller.ts`: `AuthController` class, one `handleX` method per endpoint
 - `src/app/auth/models.ts`: Zod schemas named `<thing>PayloadModel`
 - `src/app/auth/middleware.ts`: `authenticateToken` (sets `req.user`, including `role`, and `req.sessionId`, read from the database on every request; 401 once the token's session row is gone; rejects unverified users) and `authorizeRoles(...roles)` (403 unless `req.user.role` is listed; always after `authenticateToken`)
-- `src/app/auth/utils/sessions.ts`: `startSession(executor, userId, req)` is the only way to start a session (one `sessions` row per device, max 10 per user, the access token carries its `sid`); `setSessionCookies`/`clearSessionCookies`. Ending a session = deleting its row. `users.refresh_token`/`reauthenticated_at` are unused leftovers kept for rollbacks; sudo mode lives on `sessions.reauthenticated_at`
+- `src/app/auth/utils/sessions.ts`: `startSession(executor, userId, req)` is the only way to start a session (one `sessions` row per device, max 10 per user, the access token carries its `sid`); `setSessionCookies`/`clearSessionCookies`. Ending a session = deleting its row. `user-columns.ts`'s `safeUserColumns` is the one list of user fields a client may see (`req.user`, profile edits, the admin list); select through it, never by hand. `users.refresh_token`/`reauthenticated_at` are unused leftovers kept for rollbacks; sudo mode lives on `sessions.reauthenticated_at`
 - `src/app/auth/utils/constants.ts`: `userRolesEnum` (`user`, `admin`) is the single source of the role values; `schema.ts`'s `user_role` Postgres enum and the Zod models are built from it. `PASSWORD_HASH_ROUNDS` lives here too
 - `src/app/admin/`: same layout as `auth/` (routes, controller, models, `middleware.ts` with `requireRecentReauth`), mounted at `/admin`; `router.use(authenticateToken, authorizeRoles('admin'))` guards every route. Endpoints: stats, users (paged, `?search=`), `reauth` (sudo mode), invite (`POST /users`, a 72-hour set-password link through the reset flow) and delete (emails a verified user). Admins can't delete themselves or other admins through the API. Admin actions aren't recorded yet: that's the upcoming logs feature
 - `src/scripts/manage-users.ts` (`pnpm admin …` locally, `docker exec ckauth-api-1 node dist/scripts/manage-users.js …` on the VPS, from any folder; `~/Authentication` there is only a git clone, the stack is `/opt/ckauth`): the only way to make, demote or delete an admin, on purpose (see `docs/DEPLOYMENT.md`, "Admins")
@@ -72,11 +72,10 @@ For anything the suite can't cover (real emails, ImageKit, the browser), also ru
 **Handlers.** Express 5 forwards rejected promises, so handlers `throw` instead of calling `next(err)`. Follow the existing order: validate → query → check → act → respond.
 
 ```ts
-const validationResult = await somePayloadModel.safeParseAsync(req.body)
-if(!validationResult.success) {
-  throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
-}
+const {email, password} = await parseOrThrow(somePayloadModel, req.body)
 ```
+
+`parseOrThrow` (`src/utils/validate.ts`) is the only place that formats a validation error. The frontend's `parseInvalidFields` (`frontend/src/lib/validation.ts`) reads its `Invalid input fields: field: message, …` format to put each error on its field, so change the two together. Build new models from the shared field models in `models.ts` (`emailModel`, `firstNameModel`, `lastNameModel`, `existingPasswordModel`) rather than retyping the rules.
 
 - **Errors:** `throw ApiError.badRequest/unauthorized/forbidden/notFound/conflict/internal(msg)`, or `new ApiError(status, msg)` for other codes (413, 502). Never `res.status().json()` an error directly.
 - **Success:** `return ApiResponse.ok(res, message, data)` / `ApiResponse.created(...)`.
@@ -87,7 +86,7 @@ if(!validationResult.success) {
 
 ## Security rules (do not regress)
 
-- **Hash every token before storing it:** `crypto.createHash('sha256')` for random tokens (refresh, verification, reset), and bcrypt for passwords. Use native `bcrypt` (thread pool), never `bcryptjs`: on the main thread, each hash stalls every other request. Use `createTempToken()` (bottom of `controller.ts`) for new tokens.
+- **Hash every token before storing it:** `crypto.createHash('sha256')` for random tokens (refresh, verification, reset), and bcrypt for passwords. Use native `bcrypt` (thread pool), never `bcryptjs`: on the main thread, each hash stalls every other request. Use `createTempToken()` and `hashToken()` (`src/app/auth/utils/tokens.ts`) for new tokens.
 - **No account enumeration.** Sign-up, sign-in and forgot-password return the same response whether or not the account exists. Explain differences by email, never in the response.
 - **Unverified users get no session:** sign-in, `/refresh` and `authenticateToken` return 403. Verifying requires the signup password. A password reset also verifies (the link proves the inbox), which is how admin invites finish; it never starts a session.
 - **Admins are made only out-of-band.** The API can't create, demote or delete an admin (invites are always `user`; `inviteUserPayloadModel` is `.strict()`); only `manage-users` on the server can. Admin writes need sudo mode (`requireRecentReauth`, password confirmed within 15 minutes). Granting a power must be at least as hard as taking it away.

@@ -1,5 +1,5 @@
 import {z} from 'zod'
-import { emailModel, signupPayloadModel } from '../auth/models.js'
+import { emailModel, existingPasswordModel, firstNameModel, lastNameModel } from '../auth/models.js'
 
 // query strings are always text, so coerce the numbers; limit is capped so one request can't read the whole table
 const pageQueryModel = z.object({
@@ -15,13 +15,13 @@ export const listUsersQueryModel = pageQueryModel.extend({
 // an invite carries no password (the person chooses it from the emailed link) and no role: admins are made only on the server.
 // strict, so a client sending password or role gets a 400 instead of having it silently ignored
 export const inviteUserPayloadModel = z.object({
-  firstName: signupPayloadModel.shape.firstName,
-  lastName: signupPayloadModel.shape.lastName,
+  firstName: firstNameModel,
+  lastName: lastNameModel,
   email: emailModel,
 }).strict()
 
 export const reauthPayloadModel = z.object({
-  password: z.string().min(1).max(72)
+  password: existingPasswordModel
 })
 
 export const userIdParamsModel = z.object({

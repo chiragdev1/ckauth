@@ -7,7 +7,7 @@ import { useForm } from '@/lib/use-form.ts'
 import { describeError, validateConfirmation, validateEmail, validateExistingPassword, validateFirstName, validateLastName, validateNewPassword } from '@/lib/validation.ts'
 import { describeDevice } from '@/lib/device.ts'
 import { timeAgo } from '@/lib/time.ts'
-import { FormAlert, PasswordField, TextField } from '@/components/form.tsx'
+import { FormAlert, PasswordField, TextField, UsernameHint } from '@/components/form.tsx'
 import { AvatarLightbox } from '@/components/avatar-lightbox.tsx'
 import { AvatarCropper } from '@/components/avatar-cropper.tsx'
 import { Spinner } from '@/components/brand.tsx'
@@ -262,7 +262,7 @@ function ChangeEmailForm({ onDone }: { onDone: (sentTo: string | null) => void }
 
   return (
     <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="space-y-4 rounded-xl border border-border p-4">
-      <input type="email" name="username" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
+      <UsernameHint email={user?.email} />
       {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="New email" type="email" inputMode="email" autoComplete="off" autoFocus error={form.errors.newEmail} {...form.register('newEmail')} />
@@ -304,12 +304,11 @@ function SessionsCard({ devices }: { devices: ReturnType<typeof useSessions> }) 
   const { sessions, error, setError, load } = devices
   const [busy, setBusy] = useState<string | null>(null)
 
-  // one session, or every other one in a single request
-  async function revoke(ids: string[] | 'others', key: string) {
-    setBusy(key)
+  // one session by id, or every other one in a single request
+  async function revoke(target: string) {
+    setBusy(target)
     try {
-      if(ids === 'others') await api('/auth/sessions', { method: 'DELETE', authed: true })
-      else await Promise.all(ids.map(id => api(`/auth/sessions/${id}`, { method: 'DELETE', authed: true })))
+      await api(target === 'others' ? '/auth/sessions' : `/auth/sessions/${target}`, { method: 'DELETE', authed: true })
       await load()
     } catch (caught) {
       setError(describeError(caught).formError ?? 'Could not sign that device out')
@@ -334,7 +333,7 @@ function SessionsCard({ devices }: { devices: ReturnType<typeof useSessions> }) 
         {!sessions && !error && <Spinner />}
         {sessions && <RecentSessions {...list} />}
         {others.length > 1 && (
-          <Button variant="outline" onClick={() => revoke('others', 'others')} disabled={busy !== null}>
+          <Button variant="outline" onClick={() => revoke('others')} disabled={busy !== null}>
             <LogOut />{busy === 'others' ? 'Signing out…' : `Sign out the other ${others.length} devices`}
           </Button>
         )}
@@ -343,7 +342,7 @@ function SessionsCard({ devices }: { devices: ReturnType<typeof useSessions> }) 
   )
 }
 
-type SessionListProps = { sessions: Session[], busy: string | null, revoke: (ids: string[] | 'others', key: string) => void }
+type SessionListProps = { sessions: Session[], busy: string | null, revoke: (target: string) => void }
 
 // how many rows show before "Show all": this device plus the most recently used others
 const RECENT_SESSIONS = 4
@@ -361,7 +360,7 @@ function RecentSessions({ sessions, busy, revoke }: SessionListProps) {
         {shown.map(session => (
           <li key={session.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
             <SessionDetails session={session} />
-            {!session.current && <SignOutButton session={session} busy={busy} onClick={() => revoke([session.id], session.id)} />}
+            {!session.current && <SignOutButton session={session} busy={busy} onClick={() => revoke(session.id)} />}
           </li>
         ))}
       </ul>
@@ -445,7 +444,7 @@ function DeleteAccountCard() {
           <Button variant="outline" onClick={() => setConfirming(true)} className="border-destructive/40 text-destructive hover:text-destructive"><Trash2 />Delete my account</Button>
         ) : (
           <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="max-w-md space-y-4">
-            <input type="email" name="username" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
+            <UsernameHint email={user?.email} />
             {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
             <PasswordField label="Type your password to confirm" autoComplete="current-password" autoFocus error={form.errors.password} {...form.register('password')} />
             <div className="flex gap-2">
@@ -536,8 +535,7 @@ function ChangePasswordCard({ onChanged }: { onChanged: () => void }) {
       {open && (
         <CardContent>
           <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="max-w-md space-y-5">
-            {/* password managers file the new password under this username; without it they guess, or ask */}
-            <input type="email" name="username" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
+            <UsernameHint email={user?.email} />
             {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
             <PasswordField label="Current password" autoComplete="current-password" autoFocus error={form.errors.currentPassword} {...form.register('currentPassword')} />
             <PasswordField label="New password" autoComplete="new-password" showStrength error={form.errors.newPassword} {...form.register('newPassword')} />

@@ -116,6 +116,11 @@ function PasswordStrength({ id, password }: { id: string, password: string }) {
   )
 }
 
+// password managers file a password under this username; on a form that asks only for the password they'd guess, or ask
+export function UsernameHint({ email }: { email: string | undefined }) {
+  return <input type="email" name="username" autoComplete="username" value={email ?? ''} readOnly hidden />
+}
+
 const alertIcons = { error: AlertTriangle, success: CheckCircle2, info: Info }
 const alertStyles = {
   error: 'border-destructive/40 bg-destructive/8 text-destructive',
