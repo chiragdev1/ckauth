@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt'
 
 import { inviteUserPayloadModel, listUsersQueryModel, reauthPayloadModel, userIdParamsModel } from './models.js';
 import { db } from '../../db/index.js';
-import { usersTable } from '../../db/schema.js';
+import { sessionsTable, usersTable } from '../../db/schema.js';
 import { and, count, desc, eq, gte, ilike, ne, or, sql } from 'drizzle-orm';
 import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../utils/api-response.js';
@@ -24,6 +24,12 @@ const adminUserFields = {
   role: usersTable.role,
   avatarUrl: usersTable.avatarUrl,
   createdAt: usersTable.createdAt,
+  // from the user's live sessions, one subquery each per row on a page of at most 100; the sessions_user_id_idx index serves them.
+  // the times only, never the browser or ip: an admin needs to know an account is in use, not where from
+  // table-qualified by hand: drizzle prints bare column names in a raw subquery, and a bare "id" there means sessions.id,
+  // which matched no user at all. mapWith(column) reuses the column's decoding, which reads the zone-less timestamp as utc
+  lastActiveAt: sql<Date | null>`(select max(s.last_used_at) from sessions s where s.user_id = "users"."id" and s.expires_at > now())`.mapWith(sessionsTable.lastUsedAt),
+  deviceCount: sql<number>`(select count(*) from sessions s where s.user_id = "users"."id" and s.expires_at > now())`.mapWith(Number),
 }
 
 // % and _ are wildcards in LIKE; escaped, so a search for "a_b" finds "a_b" and not "axb"
@@ -89,7 +95,7 @@ export class AdminController {
     }
 
     const now = new Date()
-    await db.update(usersTable).set({reauthenticatedAt: now}).where(eq(usersTable.id, userId))
+    await db.update(sessionsTable).set({reauthenticatedAt: now}).where(eq(sessionsTable.id, req.sessionId!))
 
     return ApiResponse.ok(res, 'Password confirmed', {expiresAt: new Date(now.getTime() + ADMIN_REAUTH_WINDOW_MS)})
   }

@@ -3,19 +3,30 @@ import type {Request, Response} from 'express'
 import bcrypt from 'bcrypt'
 import crypto from 'crypto'
 
-import { changePasswordPayloadModel, forgotPasswordPayloadModel, resetPasswordPayloadModel, signinPayloadModel, signupPayloadModel, verifyEmailPayloadModel } from './models.js';
+import { changeEmailPayloadModel, changePasswordPayloadModel, confirmEmailChangePayloadModel, deleteAccountPayloadModel, forgotPasswordPayloadModel, resendVerificationPayloadModel, resetPasswordPayloadModel, signinPayloadModel, signupPayloadModel, sessionIdParamsModel, updateProfilePayloadModel, verifyEmailPayloadModel } from './models.js';
 import { db } from '../../db/index.js';
-import { usersTable } from '../../db/schema.js';
-import { and, eq, isNull, lt, or } from 'drizzle-orm';
+import { sessionsTable, usersTable } from '../../db/schema.js';
+import { and, desc, eq, gt, isNotNull, isNull, lt, ne, or } from 'drizzle-orm';
 import { generateAccessToken, generateRefreshToken, getTokenExpiry, verifyRefreshToken } from './utils/jwt-token.js';
+import { clearSessionCookies, describeClient, hashRefreshToken, setSessionCookies, startSession } from './utils/sessions.js';
 import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../utils/api-response.js';
-import { cookieOptions, getFrontendUrl, PASSWORD_HASH_ROUNDS } from './utils/constants.js';
-import { sendAccountExistsMail, sendEmailVerificationMail, sendResetPasswordMail, sendWelcomeMail } from '../../utils/mail.js';
+import { getFrontendUrl, PASSWORD_HASH_ROUNDS, userRolesEnum } from './utils/constants.js';
+import { sendAccountDeletedMail, sendAccountExistsMail, sendConfirmEmailChangeMail, sendEmailChangedMail, sendEmailChangeRequestedMail, sendEmailTakenMail, sendNewSignInMail, sendEmailVerificationMail, sendResetPasswordMail, sendWelcomeMail } from '../../utils/mail.js';
 import { deleteImage, uploadImage } from '../../utils/imagekit.js';
+import { describeDevice } from '../../utils/device.js';
 
 // hash of a random value nobody knows, made once at startup; compared against when an email has no account
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), PASSWORD_HASH_ROUNDS)
+
+// how long a verification link works; the same for sign-up, sign-in and resend
+const VERIFICATION_LINK_MS = 15 * 60 * 1000
+
+// longer than the 15-minute links: the new inbox may be one the person checks less often
+const EMAIL_CHANGE_LINK_MS = 60 * 60 * 1000
+
+// how long after a verification mail before resend sends another; the frontend counts down the same 60 seconds
+const RESEND_COOLDOWN_MS = 60 * 1000
 
 export class AuthController {
 
@@ -39,7 +50,7 @@ export class AuthController {
     const hash = await bcrypt.hash(password, PASSWORD_HASH_ROUNDS)
 
     const {token: emailVerificationToken, hashedToken: hashedEmailVerificationToken} = await createTempToken()
-    const emailVerificationTokenExpiry = new Date(Date.now() + (15*60*1000)) // 15 minutes from now
+    const emailVerificationTokenExpiry = new Date(Date.now() + VERIFICATION_LINK_MS)
     const verificationUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`
 
     // save the fields to the user; the unique email constraint decides if the account is new, so two signups at once can't both create it
@@ -68,7 +79,7 @@ export class AuthController {
 
     // not verified yet: whoever controls the inbox hasn't claimed it, so the latest signup replaces the details and gets a new link.
     // only once the last link has expired, so a signup can't swap the password under a link that is still in the owner's inbox.
-    // clearing the refreshToken signs out anyone who signed in with the old password before verifying
+    // an unverified account never has a session (sign-in refuses it), so there is nobody to sign out
     const [unverifiedUser] = await db.update(usersTable).set({
       firstName,
       lastName: lastName ?? null,
@@ -76,7 +87,6 @@ export class AuthController {
       password: hash,
       emailVerificationToken: hashedEmailVerificationToken,
       emailVerificationTokenExpiry,
-      refreshToken: null
     })
     .where(and(
       eq(usersTable.email, email),
@@ -146,7 +156,7 @@ export class AuthController {
     // no session until the email is verified, so nobody can get into an account before the inbox owner has claimed it
     if(!userInDb.emailVerified) {
       const {token: emailVerificationToken, hashedToken: hashedEmailVerificationToken} = await createTempToken()
-      const emailVerificationTokenExpiry = new Date(Date.now() + (15*60*1000)) // 15 minutes from now
+      const emailVerificationTokenExpiry = new Date(Date.now() + VERIFICATION_LINK_MS)
 
       // send a new link only if the last one has expired, so signing in repeatedly doesn't send a new mail every time;
       // the check and the update are one query, so parallel sign ins can't both send it
@@ -168,23 +178,25 @@ export class AuthController {
       throw ApiError.forbidden('Please verify your email before signing in, check your inbox for the verification link')
     }
 
-    // generate and assign tokens
-    const accessToken = generateAccessToken({userId: userInDb.id})
-    const refreshToken = generateRefreshToken({userId: userInDb.id})
+    // a browser with no live session on this account is worth telling the owner about; signing in again on the same laptop isn't
+    const client = describeClient(req)
+    const [knownBrowser] = await db.select({id: sessionsTable.id}).from(sessionsTable)
+      .where(and(
+        eq(sessionsTable.userId, userInDb.id),
+        client.userAgent ? eq(sessionsTable.userAgent, client.userAgent) : isNull(sessionsTable.userAgent),
+        gt(sessionsTable.expiresAt, new Date()),
+      ))
+      .limit(1)
 
-    // hash the refreshToken before saving it in db
-    const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    // a new session for this device; sessions on other devices carry on
+    const tokens = await startSession(db, userInDb.id, req)
+    setSessionCookies(res, tokens)
 
-    // save the hashed refreshToken in db
-    const [result] = await db.update(usersTable).set({refreshToken: hashedRefreshToken}).where(eq(usersTable.id, userInDb.id)).returning({id: usersTable.id})
-
-    if(!result) {
-      throw ApiError.internal('Could not save refresh token in db')
+    if(!knownBrowser) {
+      sendNewSignInMail(userInDb.email, userInDb.firstName, describeDevice(client.userAgent), client.ipAddress, `${getFrontendUrl()}/dashboard#devices`, `${getFrontendUrl()}/forgot-password`).catch((error) => {
+        console.error(`Failed to send new sign-in mail to ${userInDb.email}:`, error)
+      })
     }
-
-    // save the tokens in cookies/response data object
-    res.cookie('access_token', accessToken, {...cookieOptions, expires: getTokenExpiry(accessToken)})
-    res.cookie('refresh_token', refreshToken, {...cookieOptions, expires: getTokenExpiry(refreshToken)})
 
     // send the response
     return ApiResponse.ok(res, 'User signed in successfully', {id: userInDb.id})
@@ -221,51 +233,47 @@ export class AuthController {
       throw ApiError.unauthorized('Incorrect password, this verification link has been cancelled. Sign up again or sign in to get a new link')
     }
 
-    // the link and the password together prove both inbox and account, the same proof sign-in asks for, so verifying also starts a session
-    const accessToken = generateAccessToken({userId: userInDb.id})
-    const refreshToken = generateRefreshToken({userId: userInDb.id})
-    const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex')
-
+    // the link and the password together prove both inbox and account, the same proof sign-in asks for, so verifying also starts a session.
     // mark the email verified and remove the token; matching on the token means a signup that replaced the details in the meantime
-    // (and so the password just checked) makes this update do nothing.
-    // replacing the refreshToken signs out any session started before the email was verified, and saves the new one in the same write
-    const [updateRes] = await db
-      .update(usersTable)
-      .set({emailVerified: true, emailVerificationToken: null, emailVerificationTokenExpiry: null, refreshToken: hashedRefreshToken})
-      .where(and(eq(usersTable.id, userInDb.id), eq(usersTable.emailVerificationToken, hashedToken)))
-      .returning({id: usersTable.id})
+    // (and so the password just checked) makes this update do nothing. one transaction, so a verified account always has its session
+    const verified = await db.transaction(async (tx) => {
+      const [updateRes] = await tx
+        .update(usersTable)
+        .set({emailVerified: true, emailVerificationToken: null, emailVerificationTokenExpiry: null})
+        .where(and(eq(usersTable.id, userInDb.id), eq(usersTable.emailVerificationToken, hashedToken)))
+        .returning({id: usersTable.id})
 
-    // no row returned means the token was used or replaced since it was read
-    if(!updateRes) {
-      throw ApiError.notFound('Invalid or expired email token')
-    }
+      // no row returned means the token was used or replaced since it was read
+      if(!updateRes) {
+        throw ApiError.notFound('Invalid or expired email token')
+      }
 
-    // cookies only once the update succeeded, so a lost race never hands out a session
-    res.cookie('access_token', accessToken, {...cookieOptions, expires: getTokenExpiry(accessToken)})
-    res.cookie('refresh_token', refreshToken, {...cookieOptions, expires: getTokenExpiry(refreshToken)})
+      return {id: updateRes.id, tokens: await startSession(tx, updateRes.id, req)}
+    })
+
+    // cookies only once the transaction committed, so a lost race never hands out a session
+    setSessionCookies(res, verified.tokens)
 
     // send welcome mail now that signup is complete; a mail failure shouldn't fail verification
     sendWelcomeMail(userInDb.email, userInDb.firstName).catch((error) => {
       console.error(`Failed to send welcome mail to ${userInDb.email}:`, error)
     })
 
-    return ApiResponse.ok(res, 'Email verified successfully', {id: updateRes.id})
+    return ApiResponse.ok(res, 'Email verified successfully', {id: verified.id})
   }
 
   public async handleLogout(req: Request, res: Response) {
     // no auth middleware here, so logout still works after the access token has expired
     const refreshToken = req.cookies?.refresh_token
 
-    // revoke the refreshToken in db; matching on the hash means only the owner of this token can revoke it
+    // end this device's session; matching on the hash means only the owner of this token can end it. the access token
+    // carries the session id, so it stops working at once, and sudo mode (stored on the session) ends with it
     if(refreshToken) {
-      const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex')
-      // also ends admin sudo mode, so a confirmed password doesn't outlive the session it was confirmed in
-      await db.update(usersTable).set({refreshToken: null, reauthenticatedAt: null}).where(eq(usersTable.refreshToken, hashedRefreshToken))
+      await db.delete(sessionsTable).where(eq(sessionsTable.refreshTokenHash, hashRefreshToken(refreshToken)))
     }
 
     // always clear both accessToken and refreshToken cookies
-    res.clearCookie('access_token', cookieOptions)
-    res.clearCookie('refresh_token', cookieOptions)
+    clearSessionCookies(res)
 
     // send response
     return ApiResponse.ok(res, 'User logged out successfully')
@@ -280,54 +288,109 @@ export class AuthController {
     return ApiResponse.ok(res, 'User details fetched successfully', safeUser)
   }
 
+  public async handleListSessions(req: Request, res: Response) {
+    const userId = (req.user as any)?.id
+
+    // the hash and sudo time stay on the server; the rest is what the device list needs
+    const sessions = await db.select({
+      id: sessionsTable.id,
+      userAgent: sessionsTable.userAgent,
+      ipAddress: sessionsTable.ipAddress,
+      createdAt: sessionsTable.createdAt,
+      lastUsedAt: sessionsTable.lastUsedAt,
+      expiresAt: sessionsTable.expiresAt,
+    }).from(sessionsTable)
+      .where(and(eq(sessionsTable.userId, userId), gt(sessionsTable.expiresAt, new Date())))
+      .orderBy(desc(sessionsTable.lastUsedAt))
+
+    return ApiResponse.ok(res, 'Sessions fetched successfully', sessions.map(session => ({...session, current: session.id === req.sessionId})))
+  }
+
+  public async handleRevokeSession(req: Request, res: Response) {
+    const validationResult = await sessionIdParamsModel.safeParseAsync(req.params)
+
+    if(!validationResult.success) {
+      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
+    }
+
+    const userId = (req.user as any)?.id
+    const {id} = validationResult.data
+
+    // matching on the user too means nobody can end someone else's session, and a guessed id answers like a missing one
+    const [revoked] = await db.delete(sessionsTable).where(and(eq(sessionsTable.id, id), eq(sessionsTable.userId, userId))).returning({id: sessionsTable.id})
+
+    if(!revoked) {
+      throw ApiError.notFound('Session not found')
+    }
+
+    // ending this device's own session is a sign out, so its cookies go too
+    if(revoked.id === req.sessionId) {
+      clearSessionCookies(res)
+    }
+
+    return ApiResponse.ok(res, 'Session ended successfully', {id: revoked.id})
+  }
+
+  public async handleRevokeOtherSessions(req: Request, res: Response) {
+    const userId = (req.user as any)?.id
+
+    const revoked = await db.delete(sessionsTable).where(and(eq(sessionsTable.userId, userId), ne(sessionsTable.id, req.sessionId!))).returning({id: sessionsTable.id})
+
+    return ApiResponse.ok(res, 'Other sessions ended successfully', {count: revoked.length})
+  }
+
   public async handleRefresh(req: Request, res: Response) {
     // get the tokens from the cookies
     const refreshToken = req.cookies?.refresh_token
     
     if(!refreshToken) {
-      throw ApiError.unauthorized("Refresh token not provided")
+      // the code tells a client "never signed in" apart from "signed in, but the session ended", without parsing the message
+      throw new ApiError(401, "Refresh token not provided", 'NO_SESSION')
     }
 
     // validate the refreshToken and extract the userId from it
     const {userId} = verifyRefreshToken(refreshToken)
 
-    // hash the refreshToken before searching it in db
-    const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    const hashedRefreshToken = hashRefreshToken(refreshToken)
 
-    // search the db for the hashed token
-    const [userInDb] = await db.select().from(usersTable).where(eq(usersTable.refreshToken, hashedRefreshToken))
+    // the session and its user in one read
+    const [found] = await db.select({session: sessionsTable, emailVerified: usersTable.emailVerified})
+      .from(sessionsTable)
+      .innerJoin(usersTable, eq(usersTable.id, sessionsTable.userId))
+      .where(eq(sessionsTable.refreshTokenHash, hashedRefreshToken))
 
-    // for double checking check if the userId from the token matches the userId from the db
-    if(!userInDb || userInDb.id !== userId) {
+    // for double checking check if the userId from the token matches the session's user
+    if(!found || found.session.userId !== userId || found.session.expiresAt < new Date()) {
       throw ApiError.unauthorized("Invalid or expired refresh token")
     }
 
     // sessions from before sign in required a verified email can't be renewed
-    if(!userInDb.emailVerified) {
+    if(!found.emailVerified) {
       throw ApiError.forbidden("Please verify your email before signing in")
     }
 
-    // if refreshTOken match then generate new accessToken and refreshToken
-    const newAccessToken = generateAccessToken({userId: userInDb.id})
-    const newRefreshToken = generateRefreshToken({userId: userInDb.id})
+    // rotate: the old refresh token stops working the moment this one is issued
+    const newRefreshToken = generateRefreshToken({userId})
+    const newAccessToken = generateAccessToken({userId, sid: found.session.id})
 
-    // hash the new refreshToken before saving it in db
-    const newHashedRefreshToken = crypto.createHash('sha256').update(newRefreshToken).digest('hex')
+    // matching on the old hash means two refreshes racing with the same token can't both win
+    const [result] = await db.update(sessionsTable).set({
+      refreshTokenHash: hashRefreshToken(newRefreshToken),
+      expiresAt: getTokenExpiry(newRefreshToken),
+      lastUsedAt: new Date(),
+      ...describeClient(req),
+    })
+    .where(and(eq(sessionsTable.id, found.session.id), eq(sessionsTable.refreshTokenHash, hashedRefreshToken)))
+    .returning({id: sessionsTable.id})
 
-    // save the new refreshToken in db
-    const [result] = await db.update(usersTable).set({refreshToken: newHashedRefreshToken}).where(eq(usersTable.id, userInDb.id)).returning({id: usersTable.id})
-    
-    // send error if the db update failed
     if(!result) {
-      throw ApiError.internal("Could not update refresh token in db")
+      throw ApiError.unauthorized("Invalid or expired refresh token")
     }
 
-    // set the tokens in cookies
-    res.cookie('access_token', newAccessToken, {...cookieOptions, expires: getTokenExpiry(newAccessToken)})
-    res.cookie('refresh_token', newRefreshToken, {...cookieOptions, expires: getTokenExpiry(newRefreshToken)})
+    setSessionCookies(res, {accessToken: newAccessToken, refreshToken: newRefreshToken})
 
     // send response
-    return ApiResponse.ok(res, 'Refresh token validated successfully', {id: userInDb.id})
+    return ApiResponse.ok(res, 'Refresh token validated successfully', {id: userId})
   }
 
   public async handleForgotPassword(req: Request, res: Response) {
@@ -404,24 +467,31 @@ export class AuthController {
     // hash the new password
     const hashedNewPassword = await bcrypt.hash(newPassword, PASSWORD_HASH_ROUNDS)
 
-    // if valid, update the password, remove the reset token fields, and clear the refreshToken so existing sessions are signed out.
+    // if valid, update the password, remove the reset token fields, and end every session, so every device is signed out.
     // the link was opened from the inbox, which proves the email just as verification does, so it also verifies the account:
     // that is how an invited user (no password yet, see admin invites) finishes setting up. any pending verification link is
-    // cancelled with it, and admin sudo mode ends, since the password it confirmed has changed
-    const [result] = await db.update(usersTable).set({
-      password: hashedNewPassword,
-      resetPasswordToken: null,
-      resetPasswordTokenExpiry: null,
-      refreshToken: null,
-      emailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiry: null,
-      reauthenticatedAt: null,
-    }).where(eq(usersTable.id, userInDb.id)).returning({id: usersTable.id})
+    // cancelled with it, and admin sudo mode ends with the sessions it was stored on. matching on the token means two uses of
+    // the same link can't both succeed
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(usersTable).set({
+        password: hashedNewPassword,
+        resetPasswordToken: null,
+        resetPasswordTokenExpiry: null,
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiry: null,
+      }).where(and(eq(usersTable.id, userInDb.id), eq(usersTable.resetPasswordToken, hashedToken))).returning({id: usersTable.id})
+
+      if(updated) {
+        await tx.delete(sessionsTable).where(eq(sessionsTable.userId, updated.id))
+      }
+      return updated
+    })
 
     // if no row returned, send 500 error
+    // no row means the link was used in the meantime
     if(!result) {
-      throw ApiError.internal('Could not update password in db')
+      throw ApiError.notFound('Invalid or expired reset password token')
     }
 
     // send response
@@ -458,21 +528,21 @@ export class AuthController {
     // hash the newPassword
     const hashedNewPassword = await bcrypt.hash(newPassword, PASSWORD_HASH_ROUNDS)
 
-    // rotate the refreshToken so sessions on other devices are signed out, while this one stays signed in
-    const accessToken = generateAccessToken({userId: userInDb.id})
-    const refreshToken = generateRefreshToken({userId: userInDb.id})
-    const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex')
+    // end every session, then start a fresh one here, so other devices are signed out while this one stays signed in.
+    // a fresh session also ends sudo mode, since the password it confirmed has changed
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(usersTable).set({password: hashedNewPassword}).where(eq(usersTable.id, userInDb.id)).returning({id: usersTable.id})
 
-    // update the password and refreshToken in db
-    const [result] = await db.update(usersTable).set({password: hashedNewPassword, refreshToken: hashedRefreshToken}).where(eq(usersTable.id, userInDb.id)).returning({id: usersTable.id})
+      if(!updated) {
+        throw ApiError.internal('Could not update password in db')
+      }
 
-    if(!result) {
-      throw ApiError.internal('Could not update password in db')
-    }
+      await tx.delete(sessionsTable).where(eq(sessionsTable.userId, updated.id))
+      return {id: updated.id, tokens: await startSession(tx, updated.id, req)}
+    })
 
     // set the new tokens in cookies
-    res.cookie('access_token', accessToken, {...cookieOptions, expires: getTokenExpiry(accessToken)})
-    res.cookie('refresh_token', refreshToken, {...cookieOptions, expires: getTokenExpiry(refreshToken)})
+    setSessionCookies(res, result.tokens)
 
     // send response
     return ApiResponse.ok(res, 'Password changed successfully', {id: result.id})
@@ -525,6 +595,285 @@ export class AuthController {
 
     // send response
     return ApiResponse.ok(res, 'Avatar uploaded successfully', {avatarUrl: uploadedAvatar.url})
+  }
+
+  public async handleDeleteAvatar(req: Request, res: Response) {
+    const userId = (req.user as any)?.id
+
+    // lock the row, like upload does, so a removal racing an upload can't leave a file nobody points at
+    const previousAvatarFileId = await db.transaction(async (tx) => {
+      const [userInDb] = await tx.select({avatarFileId: usersTable.avatarFileId}).from(usersTable).where(eq(usersTable.id, userId)).for('update')
+
+      if(!userInDb) {
+        throw ApiError.unauthorized('User not found')
+      }
+
+      await tx.update(usersTable).set({avatarUrl: null, avatarFileId: null}).where(eq(usersTable.id, userId))
+
+      return userInDb.avatarFileId
+    })
+
+    // the db no longer points at the file, so a failed delete leaves only an unused file, never a broken avatar
+    if(previousAvatarFileId) {
+      deleteImage(previousAvatarFileId).catch((error) => {
+        console.error(`Failed to delete removed avatar ${previousAvatarFileId} from ImageKit:`, error)
+      })
+    }
+
+    // removing an avatar that's already gone is still a success, so a double click or a retry isn't an error
+    return ApiResponse.ok(res, 'Avatar removed successfully', {avatarUrl: null})
+  }
+
+  public async handleUpdateProfile(req: Request, res: Response) {
+    const userId = (req.user as any)?.id
+
+    const validationResult = await updateProfilePayloadModel.safeParseAsync(req.body)
+
+    if(!validationResult.success) {
+      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
+    }
+
+    // only the fields that were sent change; an empty last name means "remove it", like null
+    const {firstName, lastName, age} = validationResult.data
+    const changes = {
+      ...(firstName !== undefined && {firstName}),
+      ...(lastName !== undefined && {lastName: lastName || null}),
+      ...(age !== undefined && {age}),
+    }
+
+    const [updatedUser] = await db.update(usersTable).set(changes).where(eq(usersTable.id, userId)).returning({
+      id: usersTable.id,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      age: usersTable.age,
+      email: usersTable.email,
+      emailVerified: usersTable.emailVerified,
+      role: usersTable.role,
+      avatarUrl: usersTable.avatarUrl,
+      createdAt: usersTable.createdAt,
+    })
+
+    if(!updatedUser) {
+      throw ApiError.internal('Could not update profile in db')
+    }
+
+    return ApiResponse.ok(res, 'Profile updated successfully', updatedUser)
+  }
+
+  public async handleDeleteAccount(req: Request, res: Response) {
+    const userId = (req.user as any)?.id
+
+    const validationResult = await deleteAccountPayloadModel.safeParseAsync(req.body)
+
+    if(!validationResult.success) {
+      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
+    }
+
+    const {password} = validationResult.data
+
+    const [userInDb] = await db.select().from(usersTable).where(eq(usersTable.id, userId))
+
+    if(!userInDb || !userInDb.password) {
+      throw ApiError.unauthorized('User not found')
+    }
+
+    // admins are only removed on the server (src/scripts/manage-users.ts), so a stolen admin session can't take the admin away
+    if(userInDb.role === userRolesEnum.ADMIN) {
+      throw ApiError.forbidden('Admin accounts can only be deleted on the server')
+    }
+
+    // 400, not 401: the session is fine, and a 401 would make the frontend try a refresh
+    const isPasswordValid = await bcrypt.compare(password, userInDb.password)
+
+    if(!isPasswordValid) {
+      throw ApiError.badRequest('Password is incorrect')
+    }
+
+    // the role check is part of the delete, so a promotion between the read above and this write can't slip through.
+    // deleting the row deletes every session with it, so every device is signed out at once
+    const [deletedUser] = await db.delete(usersTable)
+      .where(and(eq(usersTable.id, userId), ne(usersTable.role, userRolesEnum.ADMIN)))
+      .returning({id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, avatarFileId: usersTable.avatarFileId})
+
+    if(!deletedUser) {
+      throw ApiError.forbidden('Admin accounts can only be deleted on the server')
+    }
+
+    // the sessions went with the row (on delete cascade); the cookies go too
+    clearSessionCookies(res)
+
+    // the account is already gone, so a failure to remove the photo or send the mail shouldn't fail the request
+    if(deletedUser.avatarFileId) {
+      deleteImage(deletedUser.avatarFileId).catch((error) => {
+        console.error(`Failed to delete avatar ${deletedUser.avatarFileId} from ImageKit:`, error)
+      })
+    }
+
+    // authenticateToken only lets verified users through, so this address is known to be theirs
+    sendAccountDeletedMail(deletedUser.email, deletedUser.firstName, `${getFrontendUrl()}/privacy`, 'user').catch((error) => {
+      console.error(`Failed to send account deleted mail to ${deletedUser.email}:`, error)
+    })
+
+    return ApiResponse.ok(res, 'Account deleted successfully', {id: deletedUser.id})
+  }
+
+  public async handleChangeEmail(req: Request, res: Response) {
+    const userId = (req.user as any)?.id
+
+    const validationResult = await changeEmailPayloadModel.safeParseAsync(req.body)
+
+    if(!validationResult.success) {
+      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
+    }
+
+    const {newEmail, password} = validationResult.data
+
+    const [userInDb] = await db.select().from(usersTable).where(eq(usersTable.id, userId))
+
+    if(!userInDb || !userInDb.password) {
+      throw ApiError.unauthorized('User not found')
+    }
+
+    // 400, not 401: the session is fine, and a 401 would make the frontend try a refresh
+    const isPasswordValid = await bcrypt.compare(password, userInDb.password)
+
+    if(!isPasswordValid) {
+      throw ApiError.badRequest('Password is incorrect')
+    }
+
+    if(newEmail === userInDb.email) {
+      throw ApiError.badRequest('That is already your email')
+    }
+
+    // the same answer whether or not the new address has an account, so this can't be used to check who's registered;
+    // an address that's taken gets a notice instead of a link, and the unique constraint is checked again on confirm
+    const genericMessage = `Check ${newEmail} for a link to confirm it`
+
+    const [taken] = await db.select({id: usersTable.id}).from(usersTable).where(eq(usersTable.email, newEmail))
+
+    if(taken) {
+      sendEmailTakenMail(newEmail).catch((error) => {
+        console.error(`Failed to send email taken mail to ${newEmail}:`, error)
+      })
+      return ApiResponse.ok(res, genericMessage)
+    }
+
+    // a new request replaces any earlier one, so only the latest link works
+    const {token, hashedToken} = await createTempToken()
+    const [saved] = await db.update(usersTable).set({
+      pendingEmail: newEmail,
+      emailChangeToken: hashedToken,
+      emailChangeTokenExpiry: new Date(Date.now() + EMAIL_CHANGE_LINK_MS),
+    }).where(eq(usersTable.id, userId)).returning({id: usersTable.id})
+
+    if(!saved) {
+      throw ApiError.internal('Could not save email change in db')
+    }
+
+    sendConfirmEmailChangeMail(newEmail, userInDb.firstName, `${getFrontendUrl()}/confirm-email?token=${token}`, EMAIL_CHANGE_LINK_MS / 60_000).catch((error) => {
+      console.error(`Failed to send confirm email change mail to ${newEmail}:`, error)
+    })
+    // the current address hears about it at once, before anything can change
+    sendEmailChangeRequestedMail(userInDb.email, userInDb.firstName, newEmail, `${getFrontendUrl()}/forgot-password`).catch((error) => {
+      console.error(`Failed to send email change requested mail to ${userInDb.email}:`, error)
+    })
+
+    return ApiResponse.ok(res, genericMessage)
+  }
+
+  public async handleConfirmEmailChange(req: Request, res: Response) {
+    // no auth: the link may be opened on another device, and the token itself identifies the user
+    const validationResult = await confirmEmailChangePayloadModel.safeParseAsync({token: req.params.token})
+
+    if(!validationResult.success) {
+      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(validationResult.data.token).digest('hex')
+
+    const [userInDb] = await db.select({id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, pendingEmail: usersTable.pendingEmail})
+      .from(usersTable)
+      .where(and(eq(usersTable.emailChangeToken, hashedToken), gt(usersTable.emailChangeTokenExpiry, new Date())))
+
+    if(!userInDb || !userInDb.pendingEmail) {
+      throw ApiError.notFound('Invalid or expired email change link')
+    }
+
+    // matching on the token makes the link single-use even when opened twice at once. the unique constraint on email
+    // decides the race with someone signing up with the same address in the meantime. a reset link still in the old
+    // inbox is cancelled: people often move because they lost that inbox, and its link would hand the account back
+    let updated: {id: string} | undefined
+    try {
+      [updated] = await db.update(usersTable).set({
+        email: userInDb.pendingEmail,
+        pendingEmail: null,
+        emailChangeToken: null,
+        emailChangeTokenExpiry: null,
+        resetPasswordToken: null,
+        resetPasswordTokenExpiry: null,
+      })
+      .where(and(eq(usersTable.id, userInDb.id), eq(usersTable.emailChangeToken, hashedToken)))
+      .returning({id: usersTable.id})
+    } catch (error) {
+      if((error as {cause?: {code?: string}})?.cause?.code === '23505') {
+        await db.update(usersTable).set({pendingEmail: null, emailChangeToken: null, emailChangeTokenExpiry: null}).where(eq(usersTable.id, userInDb.id))
+        throw ApiError.conflict('That email now belongs to another account, so it could not be used')
+      }
+      throw error
+    }
+
+    if(!updated) {
+      throw ApiError.notFound('Invalid or expired email change link')
+    }
+
+    sendEmailChangedMail(userInDb.email, userInDb.firstName, userInDb.pendingEmail, `${getFrontendUrl()}/privacy`).catch((error) => {
+      console.error(`Failed to send email changed mail to ${userInDb.email}:`, error)
+    })
+
+    return ApiResponse.ok(res, 'Email changed successfully', {email: userInDb.pendingEmail})
+  }
+
+  public async handleResendVerification(req: Request, res: Response) {
+    const validationResult = await resendVerificationPayloadModel.safeParseAsync(req.body)
+
+    if(!validationResult.success) {
+      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
+    }
+
+    const {email} = validationResult.data
+
+    // same response for no account, a verified one and an unverified one, so this can't be used to check who signed up
+    const genericMessage = 'If this email is waiting to be confirmed, a new link has been sent'
+
+    const {token: emailVerificationToken, hashedToken: hashedEmailVerificationToken} = await createTempToken()
+    const emailVerificationTokenExpiry = new Date(Date.now() + VERIFICATION_LINK_MS)
+
+    // a cooldown with no new column: every link lives VERIFICATION_LINK_MS, so its expiry says when it was sent. a link sent
+    // under RESEND_COOLDOWN_MS ago is left alone (and no mail goes out), which stops the button from flooding the inbox
+    // while it still works within a minute, when people actually press it. a null expiry is a link cancelled by a wrong password
+    const sentBefore = new Date(Date.now() + VERIFICATION_LINK_MS - RESEND_COOLDOWN_MS)
+    const canReplaceLink = or(isNull(usersTable.emailVerificationTokenExpiry), lt(usersTable.emailVerificationTokenExpiry, sentBefore))
+
+    // one conditional update decides everything, so two resends at once can't both send a mail.
+    // invited users have no password yet and finish through their reset link, so a verification link (which asks for
+    // the password) would be no use to them
+    const [linkRenewed] = await db.update(usersTable).set({emailVerificationToken: hashedEmailVerificationToken, emailVerificationTokenExpiry})
+    .where(and(
+      eq(usersTable.email, email),
+      eq(usersTable.emailVerified, false),
+      isNotNull(usersTable.password),
+      canReplaceLink,
+    ))
+    .returning({id: usersTable.id})
+
+    if(linkRenewed) {
+      const verificationUrl = `${getFrontendUrl()}/verify-email?token=${emailVerificationToken}`
+      sendEmailVerificationMail(email, verificationUrl).catch((error) => {
+        console.error(`Failed to send verification mail to ${email}:`, error)
+      })
+    }
+
+    return ApiResponse.ok(res, genericMessage)
   }
 
 }

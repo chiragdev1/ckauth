@@ -15,7 +15,9 @@ Everything a client needs in order to use the Authentication API. New to some of
 - [Frontend pages the emails link to](#frontend-pages-the-emails-link-to)
 - **Endpoints**
   - [Sign up](#post-authsign-up) · [Verify email](#post-authverify-emailtoken) · [Sign in](#post-authsign-in) · [Refresh](#post-authrefresh) · [Log out](#post-authlogout)
-  - [Get current user](#get-authme) · [Upload avatar](#post-authupload-avatar)
+  - [Resend verification email](#post-authresend-verification)
+  - [Get current user](#get-authme) · [Edit profile](#patch-authme) · [Change email](#post-authchange-email) · [Confirm new email](#post-authconfirm-emailtoken) · [Upload avatar](#post-authupload-avatar) · [Remove avatar](#delete-authavatar) · [Delete account](#delete-authme)
+  - [List devices](#get-authsessions) · [Sign out a device](#delete-authsessionsid) · [Sign out other devices](#delete-authsessions)
   - [Forgot password](#post-authforgot-password) · [Reset password](#post-authreset-passwordtoken) · [Change password](#post-authchange-password)
 - [Admin endpoints](#admin-endpoints): [stats](#get-adminstats) · [list users](#get-adminusers) · [confirm password](#post-adminreauth) · [invite user](#post-adminusers) · [delete user](#delete-adminusersid)
 - [Typical flows](#typical-flows)
@@ -69,7 +71,8 @@ What this means for a browser client:
 - Send cookies with every request: `fetch(url, { credentials: 'include' })`, or `axios` with `withCredentials: true`.
 - When a protected endpoint returns **`401`**, call [`POST /auth/refresh`](#post-authrefresh) once, then retry the original request. If refresh also fails, send the user to sign in.
 - **In production, the frontend and API must be on the same site.** The cookies are `SameSite=Lax`, so browsers won't send them from a different site. CKAuth uses one origin (`ckauth.chiragdev.com` + `/api`), so no CORS is involved. Locally, `localhost:3000` → `localhost:8080` works, because ports don't count as different sites.
-- **"Signed out" takes effect gradually.** When a session is ended (logout, password reset or change), its refresh token stops working immediately. An access token that was already issued keeps working until it expires (`ACCESS_TOKEN_EXPIRY`, e.g. up to 15 min).
+- **Every device has its own session.** Signing in on a phone doesn't sign out the laptop. A user can have up to **10** sessions; an 11th sign-in ends the one used least recently. [`GET /auth/sessions`](#get-authsessions) lists them.
+- **"Signed out" takes effect at once.** Each access token names its session, and every protected request checks that the session still exists. When a session ends (logout, signing out a device, a password reset or change, a deleted account), both of its tokens stop working on the next request.
 
 Endpoints marked **🔒 Auth required** need a valid `access_token` cookie, and the user's email must be verified.
 
@@ -112,13 +115,19 @@ Every response from a limited endpoint carries the standard `RateLimit-Policy` a
 | `POST /auth/sign-in` | 100 per 15 min | IP address |
 | `POST /auth/sign-in` | 5 **failed** attempts per 15 min | Email address. Successful sign-ins don't count; any failure does (`401` wrong password, `403` unverified). |
 | `POST /auth/sign-up` | 10 per hour | IP address |
+| `POST /auth/sign-up` | 5 per hour | Email address. Stops one inbox being flooded from many IPs. |
+| `POST /auth/resend-verification` | 10 per hour | IP address |
+| `POST /auth/resend-verification` | 3 per hour | Email address |
 | `POST /auth/forgot-password` | 10 per hour | IP address |
 | `POST /auth/forgot-password` | 3 per hour | Email address |
 | `POST /auth/verify-email/:token` | 20 per 15 min | IP address |
 | `POST /auth/reset-password/:token` | 20 per 15 min | IP address |
 | `POST /auth/refresh` | 60 per minute | IP address |
 | `POST /auth/change-password` | 5 per 15 min | Signed-in user |
-| `POST /auth/upload-avatar` | 10 per hour | Signed-in user |
+| `POST /auth/upload-avatar` and `DELETE /auth/avatar` | 10 per hour, shared | Signed-in user |
+| `DELETE /auth/me` | 5 **wrong passwords** per 15 min | Signed-in user |
+| `POST /auth/change-email` | 5 per hour, right password or not | Signed-in user |
+| `POST /auth/confirm-email/:token` | 20 per 15 min | IP address |
 | `POST /admin/users` and `DELETE /admin/users/:id` | 30 per 15 min, shared | Signed-in admin |
 | `POST /admin/reauth` | 5 **wrong passwords** per 15 min | Signed-in admin |
 
@@ -137,7 +146,9 @@ The API sends emails with links to **your frontend** (`FRONTEND_URL`), not to th
 | `/verify-email?token=…` | Verification email | Ask for the user's password, then call [Verify email](#post-authverify-emailtoken). |
 | `/reset-password?token=…` | Password reset email | Ask for a new password, then call [Reset password](#post-authreset-passwordtoken). |
 | `/sign-in` | "Account already exists" email | Your sign-in page. |
-| `/forgot-password` | "Account already exists" email | Your forgot-password page. |
+| `/forgot-password` | "Account already exists", "new sign-in" and "email change requested" emails | Your forgot-password page. |
+| `/confirm-email?token=…` | "Confirm your new email" email | Show a button that calls [Confirm new email](#post-authconfirm-emailtoken). Don't call it on page load: mail scanners open links to check them. |
+| `/dashboard#devices` | "New sign-in" email | The device list, where the user can sign the new device out. |
 
 ---
 
@@ -231,7 +242,9 @@ Signs the user in and sets the session cookies.
 |---|---|---|
 | `400` | `Invalid input fields: …` | Fix the form. |
 | `401` | `Invalid email or password` | Same message for an unknown email or a wrong password. |
-| `403` | `Please verify your email before signing in, check your inbox for the verification link` | The email isn't verified. If the last link had expired, a new one has just been sent. |
+| `403` | `Please verify your email before signing in, check your inbox for the verification link` | The email isn't verified. If the last link had expired, a new one has just been sent. Offer [Resend verification email](#post-authresend-verification) too. |
+
+> **New-device email.** When the browser signing in has no other live session on this account (judged by its user agent), the owner is emailed "New sign-in to your account", naming the browser and IP with a link to the device list. Signing in again on the same browser sends nothing.
 
 ---
 
@@ -251,8 +264,10 @@ Gets a new access token using the `refresh_token` cookie. **Both cookies are rep
 
 | Status | Message |
 |---|---|
-| `401` | `Refresh token not provided` / `Invalid or expired refresh token` / `Invalid refresh token payload`. Send the user to sign in. |
+| `401` | `Refresh token not provided` (with `"code": "NO_SESSION"`: this browser was never signed in) / `Invalid or expired refresh token` / `Invalid refresh token payload` (the session existed but has ended: say "you've been signed out"). Send the user to sign in. |
 | `403` | `Please verify your email before signing in` |
+
+> Only this device's session is renewed; other devices are untouched. The session's "last active" time, browser and IP address are updated.
 
 > **Frontend:** if two refresh calls run at the same time, the second one fails because the first has already replaced the token. Make sure only one refresh runs at a time, and have other requests wait for it.
 
@@ -260,7 +275,7 @@ Gets a new access token using the `refresh_token` cookie. **Both cookies are rep
 
 ### `POST /auth/logout`
 
-Ends the current session and clears both cookies. Works even after the access token has expired.
+Ends this device's session and clears both cookies. Other devices stay signed in. Works even after the access token has expired.
 
 **Body:** none.
 
@@ -290,19 +305,190 @@ Ends the current session and clears both cookies. Works even after the access to
     "email": "ada@example.com",
     "emailVerified": true,
     "role": "user",
-    "avatarUrl": "https://ik.imagekit.io/…/avatars/….png"
+    "avatarUrl": "https://ik.imagekit.io/…/avatars/….png",
+    "createdAt": "2026-10-21T09:12:00.000Z"
   }
 }
 ```
 
-`lastName`, `age` and `avatarUrl` can be `null`. `role` is `user` or `admin`; a UI can use it to show admin links, but the API checks it again on every admin request.
+`lastName`, `age` and `avatarUrl` can be `null`. `createdAt` is when the account was made ("member since"). `role` is `user` or `admin`; a UI can use it to show admin links, but the API checks it again on every admin request.
 
 **Errors**
 
 | Status | Message |
 |---|---|
-| `401` | `Token not provided` / `Invalid or expired token` / `Invalid token payload` / `User not found`. Try [refresh](#post-authrefresh). |
+| `401` | `Token not provided` / `Invalid or expired token` / `Invalid token payload` / `Session has ended`. Try [refresh](#post-authrefresh). |
 | `403` | `Please verify your email before signing in` |
+
+`Session has ended` means this device was signed out, or the account was deleted. A refresh will fail too, so send the user to sign in.
+
+---
+
+### `PATCH /auth/me`
+
+🔒 **Auth required.** Edits the signed-in user's profile. Only the fields you send change.
+
+**Body** (at least one field)
+
+| Field | Type | Rules |
+|---|---|---|
+| `firstName` | string | 2–45 characters |
+| `lastName` | string \| null | Up to 45 characters. `null` or `""` removes it. |
+| `age` | integer \| null | Positive. `null` removes it. |
+
+Any other field (`email`, `role`, …) is refused with `400`, so a profile edit can't change who the user is or what they can do.
+
+**Response: `200`**: the updated user, in the same shape as [`GET /auth/me`](#get-authme).
+
+```json
+{ "success": true, "message": "Profile updated successfully", "data": { "id": "7a95b874-…", "firstName": "Ada", "lastName": "Lovelace", "…": "…" } }
+```
+
+**Errors**
+
+| Status | Message |
+|---|---|
+| `400` | `Invalid input fields: …` (an unknown field, a name that's too short, or an empty body) |
+| `401` / `403` | Same as [`GET /auth/me`](#get-authme) |
+
+---
+
+### `DELETE /auth/me`
+
+🔒 **Auth required.** Deletes the signed-in user's account for good: their profile, photo and every session. They're signed out on every device at once, and sent a short "your account was deleted" email. Backups forget the account within 14 days.
+
+**Body**
+
+| Field | Type | Rules |
+|---|---|---|
+| `password` | string | Required. Asked again because there is no undo, so a stolen session alone can't delete the account. |
+
+**Response: `200`** (clears both cookies)
+
+```json
+{ "success": true, "message": "Account deleted successfully", "data": { "id": "7a95b874-…" } }
+```
+
+**Errors**
+
+| Status | Message |
+|---|---|
+| `400` | `Invalid input fields: …` / `Password is incorrect` (a `400`, not a `401`, so a client doesn't try to refresh) |
+| `403` | `Admin accounts can only be deleted on the server` (see [Admin endpoints](#admin-endpoints)) |
+| `429` | 5 wrong passwords in 15 minutes |
+| `401` / `403` | Same as [`GET /auth/me`](#get-authme) |
+
+---
+
+### `POST /auth/change-email`
+
+🔒 **Auth required.** Starts changing the account's email. Nothing changes until the link sent to the **new** address is opened; the **current** address is told at once.
+
+**Body**
+
+| Field | Type | Rules |
+|---|---|---|
+| `newEmail` | string | Required, valid email, not the current one. Trimmed and lowercased like sign-up. |
+| `password` | string | Required. Asked again, so a stolen session alone can't move the account to another inbox. |
+
+**Response: `200`**
+
+```json
+{ "success": true, "message": "Check new@example.com for a link to confirm it", "data": null }
+```
+
+> **No enumeration.** If the new address already has an account, the response is the same; that address gets a "this email already has an account" notice instead of a link, and nothing changes. A new request replaces an earlier one, so only the latest link works. Links last **60 minutes**.
+
+**Errors**
+
+| Status | Message |
+|---|---|
+| `400` | `Invalid input fields: …` / `Password is incorrect` / `That is already your email` |
+| `429` | 5 requests in an hour |
+| `401` / `403` | Same as [`GET /auth/me`](#get-authme) |
+
+---
+
+### `POST /auth/confirm-email/:token`
+
+Finishes an email change. `:token` comes from the `?token=` in the link sent to the new address. No auth needed: the link may be opened on another device.
+
+**Body:** none.
+
+**Response: `200`**
+
+```json
+{ "success": true, "message": "Email changed successfully", "data": { "email": "new@example.com" } }
+```
+
+The user signs in with the new address from then on. Sessions stay signed in. The **old** address is emailed that the change happened, and any password reset link still in the old inbox stops working.
+
+**Errors**
+
+| Status | Message |
+|---|---|
+| `404` | `Invalid or expired email change link` (expired, already used, or replaced by a newer request) |
+| `409` | `That email now belongs to another account, so it could not be used` (someone signed up with it after the request; the request is cancelled) |
+| `429` | See [Rate limits](#rate-limits) |
+
+---
+
+### `GET /auth/sessions`
+
+🔒 **Auth required.** Every device signed in to this account, most recently active first.
+
+**Response: `200`**
+
+```json
+{
+  "success": true,
+  "message": "Sessions fetched successfully",
+  "data": [
+    {
+      "id": "0f3c…",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) … Chrome/130.0.0.0 Safari/537.36",
+      "ipAddress": "203.0.113.7",
+      "createdAt": "2026-11-01T09:12:00.000Z",
+      "lastUsedAt": "2026-11-02T08:01:00.000Z",
+      "expiresAt": "2026-11-03T08:01:00.000Z",
+      "current": true
+    }
+  ]
+}
+```
+
+`current` marks the device making the request. `userAgent` is whatever the browser sent, so treat it as a hint ("Chrome on Windows"), not proof. `userAgent` and `ipAddress` can be `null`. The browser and IP are updated each time the session is refreshed.
+
+---
+
+### `DELETE /auth/sessions/:id`
+
+🔒 **Auth required.** Signs one device out. Its access and refresh tokens stop working on its next request. Ending this device's own session also clears its cookies, like [log out](#post-authlogout).
+
+**Response: `200`**
+
+```json
+{ "success": true, "message": "Session ended successfully", "data": { "id": "0f3c…" } }
+```
+
+**Errors**
+
+| Status | Message |
+|---|---|
+| `400` | `Invalid input fields: id: …` (not a UUID) |
+| `404` | `Session not found`. Also the answer for another user's session, so session IDs can't be probed. |
+
+---
+
+### `DELETE /auth/sessions`
+
+🔒 **Auth required.** Signs out **every other device**; this one stays signed in.
+
+**Response: `200`**
+
+```json
+{ "success": true, "message": "Other sessions ended successfully", "data": { "count": 2 } }
+```
 
 ---
 
@@ -344,6 +530,44 @@ The previous avatar is deleted automatically.
 | `413` | `Avatar must be at most 2 MB` |
 | `401` / `403` | Same as [`GET /auth/me`](#get-authme) |
 | `502` | `Failed to upload image`. The image service is unavailable; try again. |
+
+---
+
+### `DELETE /auth/avatar`
+
+🔒 **Auth required.** Removes the profile picture; the UI goes back to showing initials. Removing it when there is none is still a `200`, so a retry is safe.
+
+**Response: `200`**
+
+```json
+{ "success": true, "message": "Avatar removed successfully", "data": { "avatarUrl": null } }
+```
+
+**Errors:** `401` / `403` as for [`GET /auth/me`](#get-authme), and `429` (shared with upload, see [Rate limits](#rate-limits)).
+
+---
+
+### `POST /auth/resend-verification`
+
+Sends a new verification link to an account that signed up but hasn't confirmed its email yet. The newest link replaces the old one.
+
+**Body**
+
+| Field | Type | Rules |
+|---|---|---|
+| `email` | string | Required, valid email |
+
+**Response: `200`**
+
+```json
+{ "success": true, "message": "If this email is waiting to be confirmed, a new link has been sent", "data": null }
+```
+
+> The response is the same for an unconfirmed account, a confirmed one and no account at all, so it can't reveal who has signed up. Only an unconfirmed sign-up gets a mail. Invited users don't: they finish with the link in their invite.
+
+> **60-second cooldown.** If the last link was sent less than a minute ago, nothing is sent (with the same response), and that link keeps working. After that, a new link replaces the old one even if it hasn't expired. A link cancelled by a wrong password can be replaced straight away. Show a countdown on the button rather than letting it be pressed again at once.
+
+**Errors:** `400` for invalid input, `429` (see [Rate limits](#rate-limits)).
 
 ---
 
@@ -488,7 +712,9 @@ One page of users, newest first, optionally filtered by a search.
         "emailVerified": true,
         "role": "user",
         "avatarUrl": null,
-        "createdAt": "2026-11-02T06:00:00.000Z"
+        "createdAt": "2026-11-02T06:00:00.000Z",
+        "lastActiveAt": "2026-11-02T09:41:00.000Z",
+        "deviceCount": 2
       }
     ],
     "pagination": { "page": 1, "limit": 20, "total": 42 }
@@ -496,13 +722,15 @@ One page of users, newest first, optionally filtered by a search.
 }
 ```
 
+`lastActiveAt` is when any of the user's live sessions was last used, and `deviceCount` how many live sessions they have; `null` and `0` mean they aren't signed in anywhere. The device list itself (browser, IP) stays private to the user.
+
 Passwords, token hashes and internal file IDs are never returned. A `page` past the end returns an empty `users` list.
 
 ---
 
 ### `POST /admin/reauth`
 
-Confirms the signed-in admin's password, which allows invites and deletes for the next **15 minutes**. Signing out, or resetting the password, ends it early.
+Confirms the signed-in admin's password, which allows invites and deletes for the next **15 minutes**, **on this device only**: it's stored on the session, so another signed-in device has to confirm its own. Signing out, or changing or resetting the password, ends it early.
 
 **Body**
 
@@ -556,7 +784,7 @@ Any other field, such as `role` or `password`, is refused with a `400`: invited 
 
 ### `DELETE /admin/users/:id`
 
-Deletes a user and their profile picture. Their sessions end at once: the next request with their access token gets `401 User not found`. If their email was verified, they're sent a short "your account was deleted" email; an unverified address may belong to someone else, so it gets nothing. The delete is permanent: there is no soft delete, because the Privacy Policy promises deletion.
+Deletes a user and their profile picture. Their sessions end at once: the next request with their access token gets `401 Session has ended`. If their email was verified, they're sent a short "your account was deleted" email; an unverified address may belong to someone else, so it gets nothing. The delete is permanent: there is no soft delete, because the Privacy Policy promises deletion.
 
 🔑 Needs a recent password confirmation (`REAUTH_REQUIRED` otherwise).
 

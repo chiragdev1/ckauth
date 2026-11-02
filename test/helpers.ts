@@ -8,7 +8,7 @@ import { eq, sql } from 'drizzle-orm'
 
 import { createExpressApplication } from '../src/app/index.js'
 import { db } from '../src/db/index.js'
-import { usersTable } from '../src/db/schema.js'
+import { sessionsTable, usersTable } from '../src/db/schema.js'
 import { outbox } from '../src/utils/mail.js'
 import type { UserRole } from '../src/app/auth/utils/constants.js'
 
@@ -32,7 +32,7 @@ export async function startApp() {
 // a fresh slate for every test: no users, no mails. every table is named, and no CASCADE on purpose: if the database
 // holds tables this schema doesn't know (someone else's test database), postgres refuses instead of emptying them
 export async function resetDatabase() {
-  await db.execute(sql`truncate table ${usersTable}`)
+  await db.execute(sql`truncate table ${sessionsTable}, ${usersTable}`)
   outbox.length = 0
 }
 
@@ -46,6 +46,8 @@ let clientCount = 0
 export class Client {
   private cookies = new Map<string, string>()
   readonly ip: string
+  // what the "browser" calls itself; fetch's default is "node"
+  userAgent: string | undefined
 
   constructor(private baseUrl: string, ip?: string) {
     clientCount += 1
@@ -65,6 +67,9 @@ export class Client {
 
   async request(method: string, path: string, body?: unknown): Promise<ApiResult> {
     const headers: Record<string, string> = {'x-forwarded-for': this.ip}
+    if(this.userAgent) {
+      headers['user-agent'] = this.userAgent
+    }
     // FormData (uploads) sets its own multipart content type, with the boundary; anything else is sent as JSON
     const isForm = body instanceof FormData
     if(this.cookies.size > 0) {
@@ -105,8 +110,12 @@ export class Client {
     return this.request('POST', path, body)
   }
 
-  delete(path: string) {
-    return this.request('DELETE', path)
+  patch(path: string, body?: unknown) {
+    return this.request('PATCH', path, body)
+  }
+
+  delete(path: string, body?: unknown) {
+    return this.request('DELETE', path, body)
   }
 }
 
@@ -167,6 +176,11 @@ export async function signUp(baseUrl: string, email: string, password = 'secret1
 
 export function sha256(value: string) {
   return createHash('sha256').update(value).digest('hex')
+}
+
+// every session row of a user, newest first, to check what the database holds for each device
+export async function sessionsOf(userId: string) {
+  return db.select().from(sessionsTable).where(eq(sessionsTable.userId, userId)).orderBy(sql`${sessionsTable.createdAt} desc`)
 }
 
 export function mailsTo(email: string) {

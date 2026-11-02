@@ -38,7 +38,8 @@ export const reqUserModel = z.object({
   email: z.email(),
   emailVerified: z.boolean(),
   role: z.enum(availableUserRoles),
-  avatarUrl: z.string().nullable()
+  avatarUrl: z.string().nullable(),
+  createdAt: z.date()
 })
 
 export const forgotPasswordPayloadModel = z.object({
@@ -57,4 +58,36 @@ export const changePasswordPayloadModel = z.object({
 }).refine(data => data.currentPassword !== data.newPassword, {
   message: 'New password must be different from the current password',
   path: ['newPassword']
+})
+
+export const resendVerificationPayloadModel = z.object({
+  email: emailModel
+})
+
+// strict, so a client can't slip email, role or anything else into a profile edit; the email has its own (future) flow
+export const updateProfilePayloadModel = z.object({
+  firstName: z.string().trim().min(2).max(45).optional(),
+  lastName: z.string().trim().max(45).nullable().optional(),
+  age: z.number().int().positive().nullable().optional(),
+}).strict().refine(data => Object.keys(data).length > 0, {
+  message: 'Send at least one field to change'
+})
+
+// deleting can't be undone, so a stolen session alone isn't enough: the password must be typed again
+export const deleteAccountPayloadModel = z.object({
+  password: z.string().min(1).max(72)
+})
+
+export const sessionIdParamsModel = z.object({
+  id: z.uuid()
+})
+
+// the password again, like deleting: a stolen session alone mustn't be able to move the account to another inbox
+export const changeEmailPayloadModel = z.object({
+  newEmail: emailModel,
+  password: z.string().min(1).max(72)
+})
+
+export const confirmEmailChangePayloadModel = z.object({
+  token: z.string().min(1).max(100)
 })

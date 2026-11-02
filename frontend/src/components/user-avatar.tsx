@@ -1,7 +1,7 @@
 import type { User } from '@/lib/api.ts'
 import { cn } from '@/lib/utils.ts'
 
-export function UserAvatar({ user, className }: { user: User, className?: string }) {
+export function UserAvatar({ user, className }: { user: Pick<User, 'firstName' | 'lastName' | 'avatarUrl'>, className?: string }) {
   const initials = `${user.firstName[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
 
   return user.avatarUrl ? (

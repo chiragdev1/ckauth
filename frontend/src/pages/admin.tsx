@@ -7,10 +7,11 @@ import { useAdminData, type AdminStats, type AdminUser } from '@/lib/admin.ts'
 import { useForm } from '@/lib/use-form.ts'
 import { describeError, validateEmail, validateExistingPassword, validateFirstName, validateLastName } from '@/lib/validation.ts'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
+import { timeAgo } from '@/lib/time.ts'
 import { cn } from '@/lib/utils.ts'
 import { FormAlert, PasswordField, TextField } from '@/components/form.tsx'
 import { Spinner } from '@/components/brand.tsx'
-import { UserAvatar } from '@/components/user-avatar.tsx'
+import { AvatarLightbox } from '@/components/avatar-lightbox.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx'
@@ -78,7 +79,7 @@ function UsersSection({ data }: { data: AdminData }) {
               <Card className="h-full">
                 <CardContent className="flex h-full flex-col gap-4">
                   <div className="flex items-center gap-3">
-                    <UserAvatar user={user} className="size-12" />
+                    <AvatarLightbox user={user} className="size-12" />
                     <div className="min-w-0">
                       <p className="truncate font-medium">{fullName(user)}</p>
                       <p className="truncate text-sm text-muted-foreground">{user.email}</p>
@@ -87,7 +88,11 @@ function UsersSection({ data }: { data: AdminData }) {
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <UserBadges user={user} />
-                      <span className="text-xs text-muted-foreground">Joined {formatDate(user.createdAt)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Joined {formatDate(user.createdAt)} · {user.lastActiveAt
+                          ? <>active <time dateTime={user.lastActiveAt} title={new Date(user.lastActiveAt).toLocaleString()}>{timeAgo(user.lastActiveAt)}</time> on {user.deviceCount} {user.deviceCount === 1 ? 'device' : 'devices'}</>
+                          : 'not signed in'}
+                      </span>
                     </div>
                     <DeleteUserButton user={user} onDeleted={data.reload} />
                   </div>

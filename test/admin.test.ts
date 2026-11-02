@@ -4,7 +4,7 @@ import pg from 'pg'
 import { eq } from 'drizzle-orm'
 
 import { db } from '../src/db/index.js'
-import { usersTable } from '../src/db/schema.js'
+import { sessionsTable, usersTable } from '../src/db/schema.js'
 import { Client, createUser, findUser, lastMailTo, mailsTo, resetDatabase, sha256, signIn, startApp, tokenFrom } from './helpers.js'
 
 const MISSING_ID = '00000000-0000-4000-8000-000000000000'
@@ -87,17 +87,19 @@ describe('sudo mode (POST /admin/reauth)', () => {
 
   test('the confirmation expires after 15 minutes', async () => {
     const {admin, client} = await adminSession()
-    await db.update(usersTable).set({reauthenticatedAt: new Date(Date.now() - 16 * 60_000)}).where(eq(usersTable.id, admin.id))
+    await db.update(sessionsTable).set({reauthenticatedAt: new Date(Date.now() - 16 * 60_000)}).where(eq(sessionsTable.userId, admin.id))
 
     assert.equal((await client.delete(`/admin/users/${MISSING_ID}`)).body.code, 'REAUTH_REQUIRED')
   })
 
-  test('signing out ends it', async () => {
-    const {admin} = await adminSession()
-    const client = await signIn(baseUrl, admin)
-    await client.post('/auth/logout')
+  test('it belongs to one session: a new sign-in, after signing out or on another device, has to confirm again', async () => {
+    const {admin, client} = await adminSession()
+    const otherDevice = await signIn(baseUrl, admin)
+    assert.equal((await otherDevice.delete(`/admin/users/${MISSING_ID}`)).body.code, 'REAUTH_REQUIRED')
 
-    assert.equal((await findUser(admin.email))?.reauthenticatedAt, null)
+    await client.post('/auth/logout')
+    const again = await signIn(baseUrl, admin)
+    assert.equal((await again.delete(`/admin/users/${MISSING_ID}`)).body.code, 'REAUTH_REQUIRED')
   })
 
   test('five wrong passwords lock it, like sign-in', async () => {
@@ -133,8 +135,24 @@ describe('GET /admin/users', () => {
     const users = response.body.data.users
     assert.equal(users[0].id, newest.id)
     for(const user of users) {
-      assert.deepEqual(Object.keys(user).sort(), ['age', 'avatarUrl', 'createdAt', 'email', 'emailVerified', 'firstName', 'id', 'lastName', 'role'])
+      assert.deepEqual(Object.keys(user).sort(), ['age', 'avatarUrl', 'createdAt', 'deviceCount', 'email', 'emailVerified', 'firstName', 'id', 'lastActiveAt', 'lastName', 'role'])
     }
+  })
+
+  test('shows when each user was last active and on how many devices, never the devices themselves', async () => {
+    const {client} = await adminSession()
+    const busy = await createUser()
+    await signIn(baseUrl, busy)
+    await signIn(baseUrl, busy)
+    const idle = await createUser()
+
+    const users = (await client.get('/admin/users')).body.data.users
+    const busyRow = users.find((user: {id: string}) => user.id === busy.id)
+    const idleRow = users.find((user: {id: string}) => user.id === idle.id)
+    assert.equal(busyRow.deviceCount, 2)
+    assert.ok(Date.now() - Date.parse(busyRow.lastActiveAt) < 60_000)
+    assert.equal(idleRow.deviceCount, 0)
+    assert.equal(idleRow.lastActiveAt, null)
   })
 
   test('pages never overlap, and a page past the end is empty', async () => {

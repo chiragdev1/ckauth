@@ -49,7 +49,8 @@ for(const file of apiSources) {
 }
 
 // the web Caddyfile's @app list must match the routes in app.tsx, or a route gets a 404 (or a noindex goes missing)
-const routes = [...readFileSync('frontend/src/app.tsx', 'utf8').matchAll(/path: '(\/[^']+)'/g)].map(match => match[1]).sort()
+// /dev/… pages are development only (frontend/scripts/check-dist.js fails a build that ships one), so caddy never serves them
+const routes = [...readFileSync('frontend/src/app.tsx', 'utf8').matchAll(/path: '(\/[^']+)'/g)].map(match => match[1]).filter(route => !route.startsWith('/dev/')).sort()
 const caddyLine = readFileSync('frontend/Caddyfile', 'utf8').match(/@app path ([^\n]+)/)
 const caddyRoutes = (caddyLine?.[1] ?? '').split(/\s+/).filter(path => path && path !== '/app.html').sort()
 if(routes.join(' ') !== caddyRoutes.join(' ')) {
