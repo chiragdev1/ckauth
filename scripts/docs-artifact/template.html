@@ -1,0 +1,610 @@
+<title>CKAuth Docs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* layout: sticky sidebar (docs, views, search) beside one reading column; CKAuth's slate + ember tokens */
+:root {
+  --bg: #f7f8fb;
+  --panel: #ffffff;
+  --fg: #0f172a;
+  --muted: #4b5568;
+  --line: #d5dbe5;
+  --line-soft: #e2e6ee;
+  --accent: #c2410c;
+  --accent-text: #9a3412;
+  --accent-soft: #fdeee4;
+  --ok: #2f6b3e;
+  --ok-soft: #e6f2e9;
+  --code-bg: #eef1f6;
+  --mark: #fde6c8;
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0f1c; --panel: #111827; --fg: #e8ecf4; --muted: #9aa6ba; --line: #2a3750; --line-soft: #1f2a3d;
+    --accent: #fb7a3c; --accent-text: #fb9a66; --accent-soft: #2a1608; --ok: #6fcf8f; --ok-soft: #0f2416;
+    --code-bg: #131c2e; --mark: #5a2a0c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0f1c; --panel: #111827; --fg: #e8ecf4; --muted: #9aa6ba; --line: #2a3750; --line-soft: #1f2a3d;
+  --accent: #fb7a3c; --accent-text: #fb9a66; --accent-soft: #2a1608; --ok: #6fcf8f; --ok-soft: #0f2416;
+  --code-bg: #131c2e; --mark: #5a2a0c; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent-text); }
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, kbd { font-family: var(--mono); font-size: 0.86em; }
+
+.shell {
+  display: grid; grid-template-columns: 272px minmax(0, 1fr); gap: 48px;
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* sidebar */
+.side {
+  position: sticky; top: env(safe-area-inset-top, 0px); align-self: start;
+  max-height: 100vh; overflow-y: auto; padding-block: 28px 32px;
+  display: grid; gap: 18px; align-content: start;
+}
+.brand { display: grid; gap: 4px; }
+.brand .name { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.brand .name span { color: var(--accent-text); }
+.stamp { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.stamp a { color: var(--muted); }
+.search { position: relative; }
+.search input {
+  width: 100%; font: inherit; font-size: 14.5px; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+}
+.search input::placeholder { color: var(--muted); }
+details.navbox > summary { display: none; }
+.navgroups { display: grid; gap: 16px; }
+.navgroup { display: grid; gap: 2px; }
+.navgroup h2 { margin: 0 0 4px; font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.navlink {
+  display: block; padding: 5px 10px; border-radius: 6px; color: var(--fg); text-decoration: none; font-size: 14.5px;
+}
+.navlink:hover { background: var(--code-bg); }
+.navlink[aria-current="page"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.navlink small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.outline { margin: 4px 0 6px 10px; padding-left: 10px; border-left: 1px solid var(--line); display: grid; gap: 1px; }
+.outline a { font-size: 13px; color: var(--muted); text-decoration: none; padding: 2px 0; line-height: 1.4; }
+.outline a:hover { color: var(--accent-text); }
+.outline a.h3 { padding-left: 12px; font-size: 12.5px; }
+.ext a { display: block; padding: 5px 10px; font-size: 14px; color: var(--fg); text-decoration: none; border-radius: 6px; }
+.ext a:hover { background: var(--code-bg); }
+.ext a small { display: block; font-size: 12px; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .side { position: static; max-height: none; overflow: visible; padding-block: 20px 16px; border-bottom: 1px solid var(--line-soft); }
+  details.navbox > summary {
+    display: flex; justify-content: space-between; cursor: pointer; list-style: none;
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 14.5px; font-weight: 500;
+  }
+  details.navbox > summary::-webkit-details-marker { display: none; }
+  details.navbox > summary::after { content: "▾"; color: var(--muted); }
+  details.navbox[open] > summary { margin-bottom: 14px; }
+}
+
+/* main column */
+main { min-width: 0; padding-block: 32px 96px; }
+.view { max-width: 780px; min-width: 0; }
+.loading { color: var(--muted); padding-top: 40px; }
+.dochead { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.dochead .grp { color: var(--accent-text); letter-spacing: 0.08em; text-transform: uppercase; }
+.dochead a { color: var(--muted); }
+
+/* rendered markdown */
+.md { overflow-wrap: break-word; }
+.md > :first-child { margin-top: 0; }
+.md h1, .md h2, .md h3, .md h4 { line-height: 1.25; text-wrap: balance; scroll-margin-top: 16px; }
+.md h1 { font-size: 34px; letter-spacing: -0.02em; margin: 0 0 16px; }
+.md h2 { font-size: 24px; letter-spacing: -0.01em; margin: 44px 0 12px; padding-top: 20px; border-top: 1px solid var(--line-soft); }
+.md h3 { font-size: 18.5px; margin: 30px 0 8px; }
+.md h4 { font-size: 16px; margin: 24px 0 6px; }
+.md p, .md ul, .md ol, .md blockquote, .md pre, .md .table-wrap { margin: 0 0 14px; }
+.md ul, .md ol { padding-left: 22px; }
+.md li { margin: 4px 0; }
+.md li > ul, .md li > ol { margin: 4px 0 0; }
+.md hr { border: 0; border-top: 1px solid var(--line-soft); margin: 32px 0; }
+.md blockquote { border-left: 3px solid var(--accent); margin-left: 0; padding: 2px 0 2px 16px; color: var(--fg); }
+.md blockquote p:last-child { margin-bottom: 0; }
+.md :not(pre) > code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.md pre { background: var(--code-bg); border-radius: 8px; padding: 12px 14px; overflow-x: auto; line-height: 1.5; }
+.md pre code { font-size: 12.5px; }
+.md .table-wrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--panel); }
+.md table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+.md th, .md td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); }
+.md tr:last-child td { border-bottom: 0; }
+.md th { font-weight: 600; background: var(--bg); font-size: 13.5px; }
+.md img { max-width: 100%; }
+.flash { animation: flash 1.6s ease-out; border-radius: 4px; }
+@keyframes flash { from { background: var(--mark); } to { background: transparent; } }
+
+/* search */
+.results h1 { font-size: 22px; margin: 0 0 14px; }
+.results ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.results li a {
+  display: grid; gap: 2px; padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: 8px;
+  background: var(--panel); color: var(--fg); text-decoration: none;
+}
+.results li a:hover { border-color: var(--accent); }
+.results .where { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.results .snip { font-size: 14.5px; }
+.results mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+.empty { color: var(--muted); }
+
+/* shared view chrome */
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-text); }
+.vtitle { font-size: 34px; letter-spacing: -0.02em; margin: 4px 0 8px; line-height: 1.2; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0 0 24px; max-width: 62ch; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 32px; }
+.stat { background: var(--panel); border: 1px solid var(--line-soft); border-radius: 10px; padding: 12px 14px; }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+
+/* journey timeline */
+.timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+.timeline::before { content: ""; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+.timeline li { position: relative; padding: 0 0 26px 34px; }
+.timeline li::before {
+  content: ""; position: absolute; left: 1px; top: 6px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--accent);
+}
+.timeline li.breaking::before { background: var(--accent); }
+.timeline .date { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.timeline h3 { margin: 2px 0 4px; font-size: 17px; line-height: 1.35; }
+.timeline h3 a { color: var(--fg); text-decoration: none; }
+.timeline h3 a:hover { color: var(--accent-text); text-decoration: underline; }
+.timeline p { margin: 0; color: var(--muted); font-size: 15px; max-width: 64ch; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 0 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); margin-left: 6px; vertical-align: 2px; }
+
+/* practice cards */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.chips button {
+  font: inherit; font-size: 13px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+}
+.chips button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; display: grid; gap: 12px; }
+.card .meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.card .known { color: var(--ok); }
+.card h3 { margin: 0; font-size: 20px; line-height: 1.3; text-wrap: balance; }
+.card .problem { margin: 0; }
+.card .answer { display: grid; gap: 10px; border-top: 1px dashed var(--line); padding-top: 14px; }
+.card .answer p { margin: 0; }
+.card .answer b { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; font-weight: 500; }
+.card .rule { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; }
+.card .rule b { color: var(--accent-text); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.btn {
+  font: inherit; font-size: 14px; font-weight: 500; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.good { border-color: var(--ok); color: var(--ok); }
+.btn:hover { filter: brightness(0.97); }
+.progress { height: 4px; background: var(--line-soft); border-radius: 2px; overflow: hidden; margin: 18px 0 6px; }
+.progress div { height: 100%; background: var(--ok); width: 0; transition: width 0.2s; }
+.hint { font-size: 13px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } .progress div { transition: none; } }
+</style>
+
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="name">CK<span>Auth</span> Docs</div>
+      <div class="stamp" id="stamp"></div>
+    </div>
+    <div class="search">
+      <label for="q" class="stamp" style="display:block;margin-bottom:4px">Search every doc</label>
+      <input id="q" type="search" placeholder="bcrypt, rate limit, rollback…" autocomplete="off">
+    </div>
+    <details class="navbox" id="navbox" open>
+      <summary>Browse docs</summary>
+      <nav class="navgroups" id="nav" aria-label="Docs"></nav>
+    </details>
+  </aside>
+
+  <main id="main">
+    <p class="loading" id="loading">Loading docs…</p>
+    <section class="view results" id="results" hidden aria-live="polite"></section>
+    <section class="view" data-view="journey" id="view-journey" hidden></section>
+    <section class="view" data-view="practice" id="view-practice" hidden></section>
+  </main>
+</div>
+
+<script id="docs-data" type="application/json">__DOCS_DATA__</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script>
+/*__SLUGIFY__*/
+
+const data = JSON.parse(document.getElementById('docs-data').textContent)
+const byKey = new Map(data.docs.map(d => [d.key, d]))
+const byPath = new Map(data.docs.map(d => [d.path, d]))
+const main = document.getElementById('main')
+const views = { journey: document.getElementById('view-journey'), practice: document.getElementById('view-practice') }
+const results = document.getElementById('results')
+const searchInput = document.getElementById('q')
+const navbox = document.getElementById('navbox')
+const narrow = window.matchMedia('(max-width: 900px)')
+const articles = new Map()
+const searchIndex = []
+let current = null
+
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag)
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null) continue
+    if (k === 'class') node.className = v
+    else if (k === 'dataset') Object.assign(node.dataset, v)
+    else node.setAttribute(k, v)
+  }
+  for (const child of children.flat()) if (child != null) node.append(child)
+  return node
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso)
+  return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// --- build stamp ---
+const stamp = document.getElementById('stamp')
+const short = (data.commit || '').slice(0, 7)
+stamp.append(
+  'Built ', fmtDate(data.builtAt), ' from ',
+  short ? el('a', { href: `${data.repoUrl}/commit/${data.commit}`, target: '_blank', rel: 'noopener' }, short) : 'an unknown commit',
+  data.uncommitted ? ' + local changes' : '',
+  data.branch && data.branch !== 'main' ? ` on ${data.branch}` : ''
+)
+
+// --- render docs ---
+function rewriteLink(a, doc) {
+  const href = a.getAttribute('href')
+  if (!href) return
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+    a.target = '_blank'
+    a.rel = 'noopener'
+    return
+  }
+  const [path, anchor] = href.split('#')
+  const target = path ? decodeURIComponent(new URL(path, 'https://docs.invalid/' + doc.path).pathname.slice(1)) : doc.path
+  const targetDoc = byPath.get(target)
+  if (targetDoc) {
+    const token = anchor ? `${targetDoc.key}--${anchor}` : targetDoc.key
+    a.setAttribute('href', '#' + token)
+    a.dataset.go = token
+    return
+  }
+  a.href = `${data.repoUrl}/blob/main/${target}${anchor ? '#' + anchor : ''}`
+  a.target = '_blank'
+  a.rel = 'noopener'
+}
+
+function renderDoc(doc) {
+  const body = el('div', { class: 'md' })
+  if (window.marked) {
+    body.innerHTML = marked.parse(doc.markdown, { gfm: true })
+  } else {
+    // the CDN didn't load: still show the words
+    body.append(el('pre', {}, doc.markdown))
+  }
+  const seen = new Map()
+  body.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
+    const base = slugify(h.textContent)
+    const count = seen.get(base) ?? 0
+    seen.set(base, count + 1)
+    h.id = `${doc.key}--${count ? `${base}-${count}` : base}`
+  })
+  body.querySelectorAll('table').forEach(table => {
+    const wrap = el('div', { class: 'table-wrap' })
+    table.replaceWith(wrap)
+    wrap.append(table)
+  })
+  body.querySelectorAll('a[href]').forEach(a => rewriteLink(a, doc))
+
+  const article = el('article', { class: 'view', dataset: { view: doc.key, doc: doc.key }, hidden: '' },
+    el('div', { class: 'dochead' },
+      el('span', { class: 'grp' }, doc.group),
+      el('a', { href: `${data.repoUrl}/blob/main/${doc.path}`, target: '_blank', rel: 'noopener' }, doc.path)
+    ),
+    body
+  )
+  main.append(article)
+  articles.set(doc.key, article)
+
+  // search index: every readable block, remembering the heading above it
+  let heading = doc.title
+  body.querySelectorAll('h1, h2, h3, h4, p, li, td, pre').forEach(node => {
+    if (/^H\d$/.test(node.tagName)) heading = node.textContent
+    if (node.tagName === 'LI' && node.querySelector('p, li')) return
+    const text = node.textContent.replace(/\s+/g, ' ').trim()
+    if (text) searchIndex.push({ node, text, lower: text.toLowerCase(), doc, heading })
+  })
+}
+
+// --- navigation ---
+function buildNav() {
+  const nav = document.getElementById('nav')
+  const groups = new Map()
+  for (const doc of data.docs) {
+    if (!groups.has(doc.group)) groups.set(doc.group, [])
+    groups.get(doc.group).push(doc)
+  }
+  for (const [group, docs] of groups) {
+    const box = el('div', { class: 'navgroup' }, el('h2', {}, group))
+    for (const doc of docs) {
+      box.append(el('a', { class: 'navlink', href: '#' + doc.key, dataset: { go: doc.key, nav: doc.key } }, doc.title, el('small', {}, doc.blurb)))
+      box.append(el('div', { class: 'outline', dataset: { outline: doc.key }, hidden: '' }))
+      if (doc.key === 'learnings') {
+        box.append(el('a', { class: 'navlink', href: '#journey', dataset: { go: 'journey', nav: 'journey' } }, 'Journey', el('small', {}, 'The build as a timeline')))
+        box.append(el('a', { class: 'navlink', href: '#practice', dataset: { go: 'practice', nav: 'practice' } }, 'Practice', el('small', {}, 'Recall cards from the learnings')))
+      }
+    }
+    nav.append(box)
+  }
+  if (data.links.length) {
+    const box = el('div', { class: 'navgroup ext' }, el('h2', {}, 'Plans and reports'))
+    for (const link of data.links) box.append(el('a', { href: link.url, target: '_blank', rel: 'noopener' }, link.title + ' ↗', el('small', {}, link.note)))
+    nav.append(box)
+  }
+}
+
+function fillOutline(key) {
+  document.querySelectorAll('[data-outline]').forEach(box => { box.hidden = true })
+  const box = document.querySelector(`[data-outline="${key}"]`)
+  const article = articles.get(key)
+  if (!box || !article) return
+  if (!box.childElementCount) {
+    article.querySelectorAll('.md h2, .md h3').forEach(h => {
+      box.append(el('a', { href: '#' + h.id, class: h.tagName === 'H3' ? 'h3' : null, dataset: { go: h.id } }, h.textContent))
+    })
+  }
+  box.hidden = !box.childElementCount
+}
+
+function show(key) {
+  results.hidden = true
+  for (const view of main.querySelectorAll('[data-view]')) view.hidden = view.dataset.view !== key
+  current = key
+  document.querySelectorAll('[data-nav]').forEach(a => {
+    if (a.dataset.nav === key) a.setAttribute('aria-current', 'page')
+    else a.removeAttribute('aria-current')
+  })
+  fillOutline(key)
+  const doc = byKey.get(key)
+  document.title = doc ? `${doc.title} · CKAuth Docs` : key === 'journey' ? 'Journey · CKAuth Docs' : key === 'practice' ? 'Practice · CKAuth Docs' : 'CKAuth Docs'
+}
+
+function go(token) {
+  if (!token) token = 'readme'
+  if (searchInput.value) { searchInput.value = '' }
+  if (views[token] || byKey.has(token)) {
+    show(token)
+    window.scrollTo(0, 0)
+  } else {
+    const target = document.getElementById(token)
+    const view = target && target.closest('[data-view]')
+    if (!view) return go('readme')
+    show(view.dataset.view)
+    target.scrollIntoView({ block: 'start' })
+    target.classList.remove('flash')
+    void target.offsetWidth
+    target.classList.add('flash')
+  }
+  try { history.replaceState(null, '', '#' + token) } catch {}
+  if (narrow.matches) navbox.open = false
+}
+
+document.addEventListener('click', event => {
+  const link = event.target.closest('a[data-go]')
+  if (!link) return
+  event.preventDefault()
+  go(link.dataset.go)
+})
+window.addEventListener('hashchange', () => go(decodeURIComponent(location.hash.slice(1))))
+
+// --- search ---
+function snippet(text, query) {
+  const at = text.toLowerCase().indexOf(query)
+  const start = Math.max(0, at - 60)
+  const end = Math.min(text.length, at + query.length + 100)
+  return el('span', { class: 'snip' },
+    start > 0 ? '…' : '', text.slice(start, at), el('mark', {}, text.slice(at, at + query.length)),
+    text.slice(at + query.length, end), end < text.length ? '…' : '')
+}
+
+searchInput.addEventListener('input', () => {
+  const query = searchInput.value.trim().toLowerCase()
+  if (query.length < 2) {
+    results.hidden = true
+    if (current) show(current)
+    return
+  }
+  const hits = searchIndex.filter(item => item.lower.includes(query))
+  results.replaceChildren(el('h1', {}, hits.length ? `${hits.length} match${hits.length === 1 ? '' : 'es'} for “${searchInput.value.trim()}”` : `No matches for “${searchInput.value.trim()}”`))
+  if (!hits.length) results.append(el('p', { class: 'empty' }, 'Try a shorter word, or a term from the glossary.'))
+  const list = el('ol')
+  hits.slice(0, 60).forEach(hit => {
+    const link = el('a', { href: '#' }, el('span', { class: 'where' }, `${hit.doc.title} › ${hit.heading}`), snippet(hit.text, query))
+    link.addEventListener('click', event => {
+      event.preventDefault()
+      searchInput.value = ''
+      show(hit.doc.key)
+      hit.node.scrollIntoView({ block: 'center' })
+      hit.node.classList.remove('flash')
+      void hit.node.offsetWidth
+      hit.node.classList.add('flash')
+    })
+    list.append(el('li', {}, link))
+  })
+  results.append(list)
+  for (const view of main.querySelectorAll('[data-view]')) view.hidden = true
+  results.hidden = false
+})
+
+// --- journey: the dev log's dated entries as a timeline ---
+function buildJourney(cards) {
+  const devlog = byKey.get('devlog')
+  const entries = []
+  let entry = null
+  for (const line of devlog.markdown.split('\n')) {
+    const heading = line.match(/^## (.+)$/)
+    if (heading) {
+      if (!heading[1].includes(' · ')) { if (entries.length) break; continue }
+      const [date, ...rest] = heading[1].split(' · ')
+      entry = { date, title: rest.join(' · '), heading: heading[1], short: '' }
+      entries.push(entry)
+      continue
+    }
+    const short = line.match(/^\*\*In short:\*\*\s*(.+)$/)
+    if (short && entry && !entry.short) entry.short = short[1].replace(/\*\*|`/g, '')
+  }
+  const first = entries[0]
+  const last = entries[entries.length - 1]
+  const view = views.journey
+  view.append(
+    el('div', { class: 'eyebrow' }, 'From the dev log'),
+    el('h1', { class: 'vtitle' }, 'The build so far'),
+    el('p', { class: 'lede' }, 'Every dated entry in DEVLOG.md, oldest first. Each links to the full entry; mistakes from the same work are in Learnings and Practice.'),
+    el('div', { class: 'stats' },
+      el('div', { class: 'stat' }, el('b', {}, String(entries.length)), el('span', {}, 'dev-log entries')),
+      el('div', { class: 'stat' }, el('b', {}, first ? first.date : '–'), el('span', {}, 'first entry')),
+      el('div', { class: 'stat' }, el('b', {}, last ? last.date : '–'), el('span', {}, 'latest entry')),
+      el('div', { class: 'stat' }, el('b', {}, String(cards.length)), el('span', {}, 'lessons recorded'))
+    )
+  )
+  const list = el('ol', { class: 'timeline' })
+  for (const item of entries) {
+    const id = `devlog--${slugify(item.heading)}`
+    const breaking = /breaking/i.test(item.title)
+    list.append(el('li', { class: breaking ? 'breaking' : null },
+      el('div', { class: 'date' }, item.date),
+      el('h3', {}, el('a', { href: '#' + id, dataset: { go: id } }, item.title.replace(/\s*\(BREAKING CHANGE\)/i, '')), breaking ? el('span', { class: 'tag' }, 'breaking change') : null),
+      item.short ? el('p', {}, item.short) : null
+    ))
+  }
+  view.append(list)
+}
+
+// --- practice: each learning becomes a recall card ---
+function collectCards() {
+  const article = articles.get('learnings')
+  const cards = []
+  if (!article) return cards
+  article.querySelectorAll('.md h2').forEach(h2 => {
+    const topic = h2.textContent.trim()
+    const topicCards = []
+    for (let node = h2.nextElementSibling; node && node.tagName !== 'H2'; node = node.nextElementSibling) {
+      if (node.tagName !== 'UL') continue
+      for (const li of node.children) {
+        const strong = li.firstElementChild && li.firstElementChild.tagName === 'STRONG' ? li.firstElementChild : (li.querySelector(':scope > p > strong:first-child'))
+        const text = li.textContent.replace(/\s+/g, ' ').trim()
+        let title = strong ? strong.textContent.trim().replace(/\.$/, '') : text.split('. ')[0]
+        let rest = strong ? text.slice(text.indexOf(strong.textContent) + strong.textContent.length) : text.slice(title.length + 1)
+        let rule = ''
+        const ruleAt = rest.indexOf('Rule:')
+        if (ruleAt >= 0) { rule = rest.slice(ruleAt + 5).trim(); rest = rest.slice(0, ruleAt) }
+        const [problem, fix = ''] = rest.split('→')
+        li.id = li.id || `learnings--card-${cards.length + topicCards.length}`
+        topicCards.push({ id: slugify(topic + ' ' + title), topic, title, problem: problem.trim(), fix: fix.trim(), rule, anchor: li.id })
+      }
+    }
+    // a rule written once after a group of entries covers the whole group
+    for (let i = topicCards.length - 2; i >= 0; i--) if (!topicCards[i].rule) topicCards[i].rule = topicCards[i + 1].rule
+    cards.push(...topicCards)
+  })
+  return cards
+}
+
+function buildPractice(cards) {
+  const view = views.practice
+  const storeKey = 'ckauth-docs-practice'
+  let known = new Set()
+  try { known = new Set(JSON.parse(localStorage.getItem(storeKey) || '[]')) } catch {}
+  const save = () => { try { localStorage.setItem(storeKey, JSON.stringify([...known])) } catch {} }
+  const topics = ['All', ...new Set(cards.map(c => c.topic))]
+  let topic = 'All'
+  let index = 0
+  let revealed = false
+
+  const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'Topic' })
+  const slot = el('div')
+  const bar = el('div')
+  const progress = el('div', { class: 'progress' }, bar)
+  const counter = el('p', { class: 'hint' })
+
+  view.append(
+    el('div', { class: 'eyebrow' }, 'From LEARNINGS.md'),
+    el('h1', { class: 'vtitle' }, 'Practice the rules'),
+    el('p', { class: 'lede' }, 'Each card is a real mistake from building CKAuth. Read what went wrong, say the rule out loud, then check it. Cards you mark as known are remembered in this browser only.'),
+    chips, slot, progress, counter
+  )
+
+  const deck = () => topic === 'All' ? cards : cards.filter(c => c.topic === topic)
+
+  function drawChips() {
+    chips.replaceChildren(...topics.map(name => {
+      const button = el('button', { type: 'button', 'aria-pressed': String(name === topic) }, name)
+      button.addEventListener('click', () => { topic = name; index = 0; revealed = false; drawChips(); draw() })
+      return button
+    }))
+  }
+
+  function draw() {
+    const list = deck()
+    if (!list.length) { slot.replaceChildren(el('p', { class: 'empty' }, 'No cards in this topic.')); return }
+    index = (index + list.length) % list.length
+    const card = list[index]
+    const answer = el('div', { class: 'answer', hidden: revealed ? null : '' },
+      card.fix ? el('p', {}, el('b', {}, 'Fix'), card.fix) : null,
+      card.rule ? el('p', { class: 'rule' }, el('b', {}, 'Rule'), card.rule) : null,
+      el('p', {}, el('a', { href: '#' + card.anchor, dataset: { go: card.anchor } }, 'Read it in Learnings'))
+    )
+    const reveal = el('button', { type: 'button', class: 'btn primary' }, 'Show the rule')
+    reveal.addEventListener('click', () => { revealed = true; draw() })
+    const knewIt = el('button', { type: 'button', class: 'btn good' }, 'I knew it')
+    knewIt.addEventListener('click', () => { known.add(card.id); save(); next() })
+    const again = el('button', { type: 'button', class: 'btn' }, 'Review again')
+    again.addEventListener('click', () => { known.delete(card.id); save(); next() })
+    const skip = el('button', { type: 'button', class: 'btn' }, 'Next card')
+    skip.addEventListener('click', next)
+    slot.replaceChildren(el('div', { class: 'card' },
+      el('div', { class: 'meta' }, el('span', {}, `${card.topic} · ${index + 1} of ${list.length}`), known.has(card.id) ? el('span', { class: 'known' }, '✓ known') : el('span', {}, '')),
+      el('h3', {}, card.title),
+      card.problem ? el('p', { class: 'problem' }, card.problem) : null,
+      answer,
+      el('div', { class: 'actions' }, revealed ? [knewIt, again] : [reveal, skip])
+    ))
+    const knownHere = list.filter(c => known.has(c.id)).length
+    bar.style.width = `${Math.round((knownHere / list.length) * 100)}%`
+    counter.textContent = `${knownHere} of ${list.length} known${topic === 'All' ? '' : ` in ${topic}`}.`
+  }
+
+  function next() { index += 1; revealed = false; draw() }
+
+  drawChips()
+  draw()
+}
+
+// --- start ---
+document.getElementById('loading').remove()
+buildNav()
+data.docs.forEach(renderDoc)
+const cards = collectCards()
+buildJourney(cards)
+buildPractice(cards)
+navbox.open = !narrow.matches
+go(decodeURIComponent(location.hash.slice(1)))
+</script>

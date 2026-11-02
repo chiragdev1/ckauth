@@ -23,6 +23,7 @@ pnpm db:up          # start Postgres and Redis in Docker
 pnpm db:generate    # create a migration after editing src/db/schema.ts
 pnpm db:migrate     # apply migrations
 cd frontend && pnpm build   # frontend type check + build (also run before every commit if frontend/ changed)
+pnpm docs:artifact  # bundle the Markdown docs into .docs-artifact/ckauth-docs.html and warn about broken doc links
 ```
 
 `src/utils/mail.ts` creates the Resend client at import, so the server won't start without `RESEND_API_KEY` or `EMAIL_FROM`. No mail domain is hard-coded anywhere; it's always `EMAIL_FROM`. `imagekit.ts` creates its client on first use, so a missing ImageKit key only breaks avatar uploads.
@@ -88,6 +89,7 @@ if(!validationResult.success) {
 - **Deploys:** migrations run automatically before the new API starts, and rollbacks don't undo them, so keep migrations backwards-compatible. New env vars go in `deploy/api.env.sample` and `docs/DEPLOYMENT.md`, and must be added to `/opt/ckauth/api.env` on the VPS before the deploy that needs them. VPS users: `chirag` (admin, sudo) and `deploy` (CI only, no sudo); root SSH is off. `/opt/ckauth` and `/opt/edge` are setgid folders owned by the `deploy` group, which `chirag` belongs to, so scripts must work whichever of the two owns a file (rename into place, don't `chmod` or `chown`). Settings changes need `docker compose up -d api`, not `restart`. `deploy/backup.sh` is the nightly dump. Containers run as non-root with `cap_drop: [ALL]`, `no-new-privileges` and read-only filesystems where possible, so keep it that way when adding services. The production database has no public port and isn't on the `edge` network. Security headers belong in `deploy/ckauth.caddy`, not in the web container. Breaking changes need a `BREAKING CHANGE:` footer in the commit.
 - **Commits:** Conventional Commits (`feat(auth): …`, `fix(auth): …`), with a body explaining *why* for any behaviour or security change. Only commit when the user asks.
 - **Search copy:** when a user-visible feature ships (or one is removed), update the search title and description in `frontend/index.html` (and `og:title`/`og:description`; the JSON-LD description is copied from the meta description at build time). Keep the title 50–60 characters with the topic words first, the description 140–160 with a call to action, and both true to what the live site does today. If the headline changes, update `og-image.svg` and re-render `public/og.png` too.
+- **Docs page:** the docs are also published as one page, the "CKAuth Docs" artifact, built by `scripts/docs-artifact/` (Journey and Practice views are generated from DEVLOG and LEARNINGS). After every major commit and before every PR, run `pnpm docs:artifact`, fix any broken link it reports, and republish the page to the same URL. A new doc goes in the `docs` list in `build.js`.
 - **After notable changes:** add a dated entry to `DEVLOG.md` (above the `---` before "Lessons") and update its "Next up" (short-term to-dos) and "Future scope" (larger product directions). Add any mistake or lesson to `LEARNINGS.md` under its topic, in the format *what went wrong → fix → **Rule:***.
 
 ## Known gaps

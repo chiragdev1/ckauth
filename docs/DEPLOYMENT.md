@@ -105,9 +105,9 @@ Because the app and the API share **one address**, the session cookies just work
 |---|---|---|
 | `chirag` | You | `sudo` (asks for your password), Docker |
 | `deploy` | GitHub Actions only | Docker, `/opt/ckauth`, `/opt/edge`. **No `sudo`.** |
+| `root` | Nobody | SSH login is turned off |
 
 `/opt/ckauth` and `/opt/edge` belong to the **`deploy` group**, and `chirag` is a member. Both of you can edit the files there, and nobody else can read them.
-| `root` | Nobody | SSH login is turned off |
 
 ---
 

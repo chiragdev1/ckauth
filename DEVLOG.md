@@ -235,6 +235,16 @@ New entries go at the bottom, under a dated heading.
 - **Motion:** the reduced-motion rule also sets `animation-iteration-count: 1` (the ticker used to flicker under it), and the ticker pauses on hover or with its own button.
 - **Smaller fixes:** pricing highlights Free ("Available now") instead of the unavailable yearly plan; feature cards no longer lift on hover (they aren't links); the dashboard's "Service record" card is now "Profile"; the change-password form carries a hidden username field, so password managers save the new password to the right account.
 
+## 29 Oct 2026 · The docs as one page, and an OpenID Connect plan
+**In short:** every doc can now be read, searched and practised from one page, rebuilt from the Markdown after each major change; and the plan for OpenID Connect is written up.
+
+- **`pnpm docs:artifact`** (`scripts/docs-artifact/`) bundles README, API, Conventions (CLAUDE.md), Deployment, VPS access, Glossary, SEO audit, DEVLOG and LEARNINGS into one HTML page with a sidebar, per-doc outlines and search across every doc. It has no dependencies: the Markdown is embedded as JSON and rendered in the browser.
+  - **Journey** is a timeline of DEVLOG's dated entries and their "In short" lines.
+  - **Practice** turns each LEARNINGS entry into a recall card (what went wrong → fix → rule), filterable by topic.
+  - Both are generated from the docs, so they can't drift from them.
+- **It checks links between docs.** Every relative link and `#anchor` is resolved with GitHub's heading rules, and its first run found two problems: VPS-ACCESS linked to a DEPLOYMENT heading that no longer exists, and a paragraph had split DEPLOYMENT's "Who logs in" table. Both are fixed.
+- **OpenID Connect plan** (a separate page): CKAuth as an OpenID Provider for other apps (authorization code + PKCE on `oidc-provider`), plus Google and GitHub sign-in for CKAuth itself, with account-linking rules, schema, endpoints, build order and five open decisions. Nothing is built yet.
+
 ---
 
 ## Lessons
