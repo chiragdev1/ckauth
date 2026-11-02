@@ -255,6 +255,46 @@ New entries go at the bottom, under a dated heading.
 - **`/admin` page** (`pages/admin.tsx` + `lib/admin.ts`): stat tiles, one card per user with pages, an "add a user" card that opens the form (with a role switch), and a two-click delete. Admin cards are marked "Protected". It's lazy-loaded, behind `RequireAdmin`, and linked from the account menu and the dashboard for admins only. Three layouts were compared in the design lab (a wide table, a side rail, cards); cards won and the other two were deleted.
 - The Privacy Policy now lists the account role among stored data.
 
+## 2 Nov 2026 · A test suite, and the pre-PR checks back
+**In short:** 78 tests now cover every endpoint, and `pnpm check:pr` runs twelve checks before a pull request. Restoring the checks turned up four vulnerable dependencies, now updated.
+
+- **The test suite** (`test/`) uses Node's built-in runner (`node:test`) through `tsx`, so it adds no test framework. Integration tests drive the real app over HTTP against a separate `ckauth_test` database, which the global setup creates and migrates on every run. Unit tests cover the Zod models, the JWT helpers and the error handler.
+  - **No real email:** `MAIL_TRANSPORT=memory` makes `mail.ts` keep mails in an in-memory outbox. Tests read the verification and reset links from it, the way a user would click them.
+  - **Real rate limits:** each test client sends its own IP, so per-IP limits behave as they would for separate visitors.
+  - What it checks includes the security rules: no account enumeration (same response either way), only hashes stored, single-use links, token rotation, two sign-ups or deletes at once leaving one result, and the admin rules. Breaking the admin delete rule on purpose made exactly one test fail.
+  - An unmerged `tests` branch from 8 Oct had a Vitest suite. The cases that still match today's behaviour were ported, so that branch can be deleted.
+- **`pnpm check:pr`** (`scripts/check-pr.js`) runs everything and lists all failures at once: both builds, knip (dead code) for the API and the web app, `pnpm audit` for both, the test type check and the tests, the built site's SEO, speed and security rules (`frontend/scripts/check-dist.js`), the repo rules (`scripts/check-repo.js`: secrets, security rules from CLAUDE.md, the Caddyfile route list, files that must change together), docs links, and leftover `TODO(human)` placeholders.
+  - The site and repo checks, and the knip configs, were written on 23 Oct but never committed. They survived only in a stash, and are now restored.
+  - **Fixed what they found:**
+    - four vulnerable packages: `zod` 4.6.7, `multer` 2.5.0, and through Express 5.3.0, `body-parser` 2.4.0 and `qs` 6.17.1;
+    - an unused export (`errorMessage`), an unused import, and a `main` field pointing at a file that doesn't exist;
+    - `noUnusedLocals` is now on.
+  - **Two site checks had gone stale** while they sat in the stash: the title rule still asked for "authentication" (the landing page targets "sign-in" since 27 Oct), and `main` had grown to 127.0 KiB of home-page JavaScript against a 125 KiB budget. The budget is now 127, with the reason written next to it.
+
+## 2 Nov 2026 · Admin hardening, and the test gaps closed
+**In short:** checking the admin panel and the tests against industry practice (OWASP's access-control and admin guidance) found seven admin gaps and eight testing gaps. Five admin gaps are fixed here, the audit log is left to the upcoming logs feature, and soft delete was decided against.
+
+- **The API can no longer create admins.** It used to accept `role: "admin"`, so a stolen admin session could create new admins that only the server could remove. Invites are always `user`, and any extra field is a `400`.
+- **Invites instead of admin-chosen passwords.** The admin enters a name and email. The person gets a 72-hour link through the existing reset flow, and choosing a password there also verifies the email (a reset link proves the inbox the same way). The admin never knows the password, and nobody can sign in to the account before it's set.
+- **Sudo mode.** Inviting and deleting need the admin's password confirmed in the last 15 minutes (`POST /admin/reauth`, limited to 5 wrong tries). A `403` with `"code": "REAUTH_REQUIRED"` makes the page ask for the password and retry. `ApiError` and the error handler gained that optional `code`.
+- **Deleted users are told**, by email, if their address was verified.
+- **Search** by name or email, with `%` and `_` treated as plain characters.
+- **Not done, on purpose:**
+  - **Soft delete:** the Privacy Policy promises deletion, and sudo mode makes a mistaken delete much harder.
+  - **MFA:** a feature of its own, still in Future scope.
+  - **The audit log:** built, then removed, because the logs feature covers it.
+- **Tests (103, plus 5 `test.todo`s, one per known gap):**
+  - **Coverage minimum:** `pnpm test:coverage` fails below 95% lines, 83% branches and 85% functions. Today it's 97.7 / 85.9 / 87.6.
+  - **Tests now run in CI:** `api.yml` runs them against a temporary Postgres before any image is built, and `web.yml` runs the frontend tests.
+  - **New areas:** uploads (authenticate before parsing, magic bytes, 413), every rate limit, and the frontend's refresh-on-401 logic.
+- **A race test that can fail.** The old "two deletes at once" test would have passed even without the role check. The new one holds a promotion's row lock from a second connection while the delete waits. It fails against a check-then-delete version of the code and passes against the real one.
+- **Redis down no longer stalls requests.** The new test found that with Redis unreachable, every rate-limited request waited about 5 s, because node-redis queued the command, before failing open. `disableOfflineQueue: true` brings that to under 100 ms.
+- **Security headers are checked after every deploy** (`scripts/check-live-headers.js`, on both `/` and `/api/`). Today's live site passes all of them.
+- **Broken links between docs now fail `check:pr`** (`DOCS_STRICT=1`), while `pnpm docs:artifact` on its own still only warns.
+- **Checked in a real browser** (headless Chromium through Playwright, against the real app with the in-memory outbox). A 21-step walkthrough passed in light, dark and at phone width: search, the invite and its password prompt (wrong password, cancel with Escape), delete, opening the invite link, choosing a password, signing in, and a non-admin being turned away. It found two problems, both fixed:
+  - **The search box was cramped on phones**, so its placeholder was cut off. It now gets its own row.
+  - **The password prompt wasn't a real modal:** Tab could reach the page behind it, and nothing hid that page from screen readers. It's now a Radix `Dialog`.
+
 ---
 
 ## Lessons
@@ -263,6 +303,8 @@ Mistakes and the rules learned from them are kept topic by topic in [LEARNINGS.m
 ## Next up
 Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md).
 
+- **Logs feature** (next): record admin actions (invites, deletes, role changes from `manage-users`) with who, whom, when and from where, kept for a stated period. Remove its `test.todo` in `test/known-gaps.test.ts` when it lands.
+- Delete the old `tests` branch and the 23 Oct stash, now that both are folded in. Watch the first CI run with the Postgres service.
 - **Admin panel:** after the next API deploy, make yourself admin on the VPS with `docker exec ckauth-api-1 …` (DEPLOYMENT.md, "Admins"). The production stack is in `/opt/ckauth`, not the `~/Authentication` clone.
 - **SEO phase 1:**
   - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].

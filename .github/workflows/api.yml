@@ -4,6 +4,7 @@ on:
   pull_request:
     paths: &api-paths
       - src/**
+      - test/**
       - drizzle/**
       - Dockerfile
       - .dockerignore
@@ -33,6 +34,21 @@ jobs:
   check:
     if: ${{ !inputs.tag }}
     runs-on: ubuntu-latest
+    # a throwaway postgres for the tests, reached on localhost; the suite creates and migrates its own database in it
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/ckauth_test
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -42,6 +58,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm test:types
+      # a failing test or a coverage drop stops here, before an image is built or deployed
+      - run: pnpm test:coverage
 
   image:
     needs: check

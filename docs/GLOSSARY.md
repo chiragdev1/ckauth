@@ -168,6 +168,24 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Node.js.** The JavaScript runtime the API runs on.
 
+**Unit test.** A test of one function on its own, with no server or database, such as "the email is lower-cased".
+
+**Integration test.** A test that runs several parts together: CKAuth's send real HTTP requests to the app, which talks to a real (test) database.
+
+**Test runner.** The program that finds the tests, runs them and reports what failed. CKAuth uses the one built into Node (`node:test`).
+
+**Code coverage.** How much of the code the tests actually run, as a percentage of lines, branches (each side of an `if`) and functions. CKAuth's checks fail if it drops below a set minimum.
+
+**Fail open / fail closed.** What a safety check does when it can't work: let requests through (open) or refuse them (closed). CKAuth's rate limits fail open if Redis is down, so an outage doesn't stop everyone signing in.
+
+**Regression.** Something that used to work and broke after a change. Tests exist mostly to catch these.
+
+**Dead code.** Files, exports or dependencies nothing uses any more. `knip` finds them, and `pnpm check:pr` fails until they're removed.
+
+**Dependency audit.** Checking the libraries a project uses against a list of known security holes (`pnpm audit`), so a vulnerable version gets updated.
+
+**Performance budget.** A size limit, such as "the home page's JavaScript stays under 127 KiB", that fails the checks when a change goes over it, so the site can't get slower unnoticed.
+
 **Main thread / event loop.** Node runs your JavaScript on one thread. Anything slow on that thread, like a long calculation, makes every other request wait.
 
 **Thread pool (libuv).** A few background threads Node uses for slow work such as file access, DNS lookups and native bcrypt. Work there doesn't block the main thread.

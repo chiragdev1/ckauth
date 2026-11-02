@@ -1,5 +1,3 @@
-import type {Response} from 'express'
-
 export class ApiError extends Error {
   statusCode: number
   // a stable, machine-readable reason for the few errors a client must handle specially (e.g. REAUTH_REQUIRED);

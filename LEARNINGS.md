@@ -110,6 +110,37 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   → `RUN setcap -r /usr/bin/caddy` in `frontend/Dockerfile` (port 8080 needs no capability), and `uid=65534,gid=65534` on the tmpfs mounts.
   **Rule:** run an image once with its production `cap_drop`, `user` and `read_only` settings before the first deploy, and check the main program of any image you drop capabilities from with `getcap`.
 
+- **The pre-PR checks were never committed.** They were written on 23 Oct, then stashed with "discarded work" and forgotten. For ten days nothing checked the site, and both its title rule and its JavaScript budget went stale before anyone noticed.
+  → Restored from the stash, the stale rules updated, all of it committed.
+  **Rule:** commit tooling (checks, scripts, configs) on its own as soon as it works, separately from the feature work around it. A stash is not storage.
+- **`tsx` was in the lockfile but not installed.** `node_modules` had drifted from `pnpm-lock.yaml`, so the first test run failed with "Cannot find package 'tsx'".
+  → `pnpm install --frozen-lockfile`.
+  **Rule:** when a package that's in the lockfile can't be found, sync `node_modules` before you suspect the code.
+- **`pnpm update` left two vulnerable packages.** `body-parser` and `qs` come in through Express, and `pnpm update <name>` only moves direct dependencies.
+  → `pnpm update --depth Infinity body-parser qs`, then `pnpm audit` again.
+  **Rule:** after updating for an audit, run the audit again. Indirect packages need `--depth Infinity`.
+
+## Testing
+
+- **The admin API could create admins it couldn't remove.** Removing an admin was deliberately server-only, but `POST /admin/users` accepted `role: "admin"`, so a stolen session could plant extra admins.
+  → Invites are always `user`, and the payload is `.strict()`.
+  **Rule:** guard granting a power at least as strongly as revoking it.
+
+- **The test database's name clashed with another branch's.** The suite first used `<dev database>_test`, which another branch's tests already owned with a different schema. The run applied this branch's `role` migration to it, before a `TRUNCATE` without `CASCADE` stopped it from emptying that database's tables.
+  → The suite uses its own fixed name, `ckauth_test`, and keeps `TRUNCATE` without `CASCADE` as a guard.
+  **Rule:** give each suite a database name nobody else derives, and never point a migrator at a database you didn't create.
+- **Every test failed on "Cannot use a pool after calling end".** `startApp()` registered its `after()` cleanup while running inside a `before()` hook, and `node:test` attaches an `after()` to whatever is running at the time. So the cleanup ran as soon as the hook finished, before any test.
+  → `const baseUrl = await startApp()` at the top level of each file.
+  **Rule:** register `after()` cleanups at a test file's top level (or inside the `describe` they belong to), never from inside another hook.
+- **A concurrency test passed for the wrong reason.** "Two deletes at once, exactly one wins" would have passed without the role check, because a single `DELETE` is atomic anyway. The race that mattered (a promotion landing between a check and the delete) was never exercised.
+  → The test now holds the promotion's row lock on a second connection, so the delete really has to wait, and it fails against a check-then-delete version.
+  **Rule:** to test a race, force the bad timing (a held lock, a second connection), then show the test fails against the naive code.
+- **"Fails open" hid a 5-second stall.** With Redis unreachable, the limiter did let requests through, but node-redis queued each command first, so every sign-in waited about 5 s.
+  → `disableOfflineQueue: true`, and `test/redis-down.test.ts` asserts the request is fast as well as successful.
+  **Rule:** when testing a fallback, assert how long it takes, not only that it works.
+- **A check that can't fail proves nothing.** → Every new test and check here was proven by breaking the code once on purpose: deleting the admin-role condition, removing `/admin` from the Caddyfile.
+  **Rule:** before trusting a new test or check, make it fail once.
+
 ## Performance
 
 - **Password hashing on the main thread capped the whole API.** `bcryptjs` is pure JavaScript, so each ~60 ms hash ran on Node's only JavaScript thread, the event loop, and blocked it. Sign-in topped out at 17 per second, and a burst of sign-ins delayed every other request.

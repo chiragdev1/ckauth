@@ -9,7 +9,18 @@ if(!process.env.EMAIL_FROM) {
 }
 const from = process.env.EMAIL_FROM
 
+type OutboxMail = {to: string, subject: string, html: string, text: string}
+
+// the test suite sets MAIL_TRANSPORT=memory, so no mail ever leaves the machine and a test can read the link a user would click.
+// the push happens before the first await, so the mail is in the outbox by the time the request that sent it has answered
+export const outbox: OutboxMail[] = []
+
 async function sendEmail(to: string, subject: string, html: string, text: string) {
+  if(process.env.MAIL_TRANSPORT === 'memory') {
+    outbox.push({to, subject, html, text})
+    return null
+  }
+
   const {data, error} = await resendClient.emails.send({
     to,
     from,

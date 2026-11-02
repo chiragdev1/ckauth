@@ -78,7 +78,3 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     throw error
   }
 }
-
-export function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Something went wrong, please try again'
-}

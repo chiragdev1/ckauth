@@ -1,0 +1,14 @@
+{
+  // type checks the tests with the app's own settings; tsx runs them without checking types, so pnpm check:pr runs this too
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    // global-setup.ts imports a .ts path, see the comment there
+    "allowImportingTsExtensions": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["../src", "."]
+}

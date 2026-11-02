@@ -135,7 +135,14 @@ Open `http://localhost:3000`. The Vite dev server proxies `/api/*` to the API on
 | `pnpm db:migrate:prod` | Applies migrations with Drizzle's runtime migrator (`dist/db/migrate.js`); used by deploys. |
 | `pnpm admin <command>` | Manages roles from the command line, after `pnpm build`: `role <email> <user\|admin>`, `delete <email>`, `admins`. Use `pnpm admin role you@example.com admin` to make yourself an admin. |
 | `pnpm drizzle:studio` | Opens Drizzle Studio to browse the database. |
+| `pnpm test:coverage` | Runs the tests and fails if coverage drops below 95% of lines, 83% of branches or 85% of functions. CI runs this before every API deploy. |
+| `pnpm test` | Runs the test suite (103 tests and 5 to-dos for known gaps, about 25 s). Needs Postgres running (`pnpm db:up`); it creates and uses its own `ckauth_test` database, so your development data is never touched. |
+| `pnpm test:types` | Type checks the tests (the runner itself skips type checking). |
+| `cd frontend && pnpm test` | The frontend's unit tests (form rules, error messages, the API client's refresh). |
+| `pnpm check:pr` | Every check a branch must pass before a pull request: both builds, unused code (knip), known vulnerabilities (`pnpm audit`), the tests, SEO, speed and security of the built site, repo rules (secrets, security rules, files that change together) and links between docs. |
 | `pnpm docs:artifact` | Bundles every doc into one searchable page (`.docs-artifact/ckauth-docs.html`) and warns about broken links between docs. |
+
+**Tests:** integration tests send real HTTP requests to the app and check the database afterwards; unit tests check single functions. Emails aren't sent during tests: they're kept in memory, and a test reads the verification or reset link from there, just as a user would click it. To run a single file: `node --import tsx --import ./test/env.ts --test-global-setup=test/global-setup.ts --test test/admin.test.ts`.
 
 **Changing the database schema:** edit `src/db/schema.ts` → `pnpm db:generate` → review the SQL in `drizzle/` → `pnpm db:migrate` → commit the schema and the migration together.
 
@@ -170,6 +177,8 @@ src/
     ├── api-response.ts         # ApiResponse: consistent success responses
     ├── mail.ts                 # Email sending and templates
     └── imagekit.ts             # ImageKit upload and delete
+test/                           # Test suite: one file per area, helpers, test database setup
+scripts/check-pr.js             # `pnpm check:pr`: runs every pre-PR check (rules in scripts/check-repo.js, frontend/scripts/check-dist.js)
 drizzle/                        # Generated SQL migrations
 docs/API.md                     # API reference
 docs/DEPLOYMENT.md              # Production setup, deploys, rollbacks, backups

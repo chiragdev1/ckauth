@@ -1,0 +1,8 @@
+{
+  // type checks the frontend's unit tests; node runs them directly (it strips the types itself), so this is the only check
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["."]
+}
