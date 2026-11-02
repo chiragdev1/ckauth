@@ -166,6 +166,16 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **`onConflictDoNothing`.** Drizzle's way of saying "insert this row, but if it breaks a unique constraint, skip it quietly".
 
+**Index (database).** A sorted lookup structure kept beside a table, like a book's index, so the database can find matching rows without reading every one. Every column a request filters on should have one: `email`, each session's refresh-token hash, and the email-link token columns.
+
+**Full table scan (sequential scan).** Reading every row of a table to find the matches. Instant on a small table, but it slows down with every row added; an index avoids it.
+
+**Partial index.** An index on only the rows that match a condition. CKAuth's token indexes cover only rows `WHERE … IS NOT NULL`, the users with a link waiting in their inbox, so they stay small however many accounts there are.
+
+**Explain plan (`EXPLAIN`).** Postgres's description of how it would run a query: by scanning the whole table or by using an index. On a nearly empty table it often picks a scan anyway, because that's cheapest there.
+
+**Trigram index (`pg_trgm`).** A Postgres index that splits text into three-letter pieces, so "contains this text" searches (`ilike '%ada%'`) can use an index. Admin search may need one once there are many users.
+
 ---
 
 ## Server and performance

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { availableUserRoles, userRolesEnum } from "../app/auth/utils/constants.js";
 
@@ -43,8 +44,12 @@ export const usersTable = pgTable("users", {
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').$onUpdate( ()=> new Date())
-  
-});
+}, (table) => [
+  // every email link is looked up by its token hash; partial, since most users have no pending link, so the indexes stay small
+  index('users_email_verification_token_idx').on(table.emailVerificationToken).where(sql`${table.emailVerificationToken} is not null`),
+  index('users_reset_password_token_idx').on(table.resetPasswordToken).where(sql`${table.resetPasswordToken} is not null`),
+  index('users_email_change_token_idx').on(table.emailChangeToken).where(sql`${table.emailChangeToken} is not null`),
+]);
 
 
 // one row per signed-in device. deleting a row signs that device out at once: the access token carries the session id,
