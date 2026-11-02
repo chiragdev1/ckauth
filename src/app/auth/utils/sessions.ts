@@ -1,21 +1,17 @@
 import type { Request, Response } from 'express'
-import crypto from 'crypto'
 import { and, desc, eq, lt, notInArray } from 'drizzle-orm'
 
 import { db } from '../../../db/index.js'
 import { sessionsTable } from '../../../db/schema.js'
 import { cookieOptions } from './constants.js'
 import { generateAccessToken, generateRefreshToken, getTokenExpiry } from './jwt-token.js'
+import { hashToken } from './tokens.js'
 
 // signing in on an 11th device signs out the one used least recently, so a leaked password can't pile up sessions forever
 export const MAX_SESSIONS_PER_USER = 10
 
 // a transaction or the db itself, so a session can be started inside the same transaction as the write that allows it
 type Executor = Pick<typeof db, 'select' | 'insert' | 'update' | 'delete'>
-
-export function hashRefreshToken(refreshToken: string) {
-  return crypto.createHash('sha256').update(refreshToken).digest('hex')
-}
 
 // what the device list shows; the user agent is whatever the browser claims, so it's cut to the column and never trusted
 export function describeClient(req: Request) {
@@ -33,7 +29,7 @@ export async function startSession(executor: Executor, userId: string, req: Requ
 
   const [session] = await executor.insert(sessionsTable).values({
     userId,
-    refreshTokenHash: hashRefreshToken(refreshToken),
+    refreshTokenHash: hashToken(refreshToken),
     expiresAt,
     ...describeClient(req),
   }).returning({id: sessionsTable.id})

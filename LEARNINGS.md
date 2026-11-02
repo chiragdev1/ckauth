@@ -186,6 +186,12 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 - **Default keep-alive timeouts would have caused random 502s.** Keep-alive reuses one connection for many requests. Node closes idle connections after 5 s, while Caddy reuses upstream sockets (its connections to the app) for much longer, so a POST could land on a socket Node had just closed.
   → `keepAliveTimeout` of 125 s in Node; Caddy closes idle connections after 60 s.
   **Rule:** behind a proxy, the app's idle timeout must be longer than the proxy's.
+- **Email-link lookups scanned the whole users table.** Verify-email, reset-password and confirm-email find the user by a token column, and none of the three had an index, so each click read every row. Small tables hid it.
+  → Partial indexes on each token column (`WHERE … IS NOT NULL`), holding only users with a pending link.
+  **Rule:** every column a request filters on gets an index in the same change that adds the query. For optional values, a partial index keeps it small.
+- **An explain plan on an empty database proved nothing.** On the empty test database Postgres chose a full scan even for `email`, which has a unique index, because scanning zero rows costs nothing.
+  → Checked `pg_indexes` for what exists, and ran `EXPLAIN` with `enable_seqscan = off` to see whether an index *can* serve the query.
+  **Rule:** judge indexes by what exists and what the planner can use, not by the plan it picks on a near-empty table.
 
 ## SEO
 
@@ -230,6 +236,10 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   **Rule:** visual emphasis goes to an action people can take today.
 
 ## Process
+
+- **The same validation block was pasted into 16 handlers**, along with three copies of the "safe user fields" select and five of the token hash. The frontend parses that validation message to place field errors, and the field list decides what a client may see, so one copy drifting would have broken forms or leaked a column.
+  → `parseOrThrow`, `safeUserColumns` and `tokens.ts`, each the only copy.
+  **Rule:** when the same lines appear a third time, make them a helper, and sooner when other code depends on their exact output or they guard what leaves the server.
 
 - Commit messages for behaviour or security changes need a body explaining *why*, plus a `BREAKING CHANGE:` footer when the API changes. One-line messages are only for trivial commits.
 - After a change, test the real flow end to end against the database and the external services, not just a successful build.

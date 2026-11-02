@@ -14,10 +14,8 @@ export function createExpressApplication(): Express {
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
 
-  // middlewares
   app.use(express.json({limit: '50kb'}))
   app.use(express.urlencoded({extended: true}))
-  app.use(express.static('public'))
   app.use(cookieParser())
   
   app.use('/auth', authRouter)
@@ -26,8 +24,7 @@ export function createExpressApplication(): Express {
   if(process.env.NODE_ENV !== 'production') {
     app.use('/dev', devRouter)
   }
-  
-  // routes
+
   app.get("/", (req: Request, res: Response)=> {
     return res.status(200).json({
       message: "Express Application is running"

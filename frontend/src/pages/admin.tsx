@@ -9,7 +9,7 @@ import { describeError, validateEmail, validateExistingPassword, validateFirstNa
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
 import { timeAgo } from '@/lib/time.ts'
 import { cn } from '@/lib/utils.ts'
-import { FormAlert, PasswordField, TextField } from '@/components/form.tsx'
+import { FormAlert, PasswordField, TextField, UsernameHint } from '@/components/form.tsx'
 import { Spinner } from '@/components/brand.tsx'
 import { AvatarLightbox } from '@/components/avatar-lightbox.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
@@ -174,7 +174,7 @@ function ReauthDialog({ onConfirmed, onCancel }: { onConfirmed: () => void, onCa
             </CardHeader>
             <CardContent>
               <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="space-y-4">
-                <input type="email" name="username" autoComplete="username" value={user?.email ?? ''} readOnly hidden />
+                <UsernameHint email={user?.email} />
                 {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
                 <PasswordField label="Your password" autoComplete="current-password" autoFocus error={form.errors.password} {...form.register('password')} />
                 <div className="flex gap-2">

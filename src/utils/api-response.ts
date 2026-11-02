@@ -16,8 +16,4 @@ export class ApiResponse {
       data
     })
   }
-
-  static noContent(res: Response) {
-    return res.status(204).end()
-  }
 }

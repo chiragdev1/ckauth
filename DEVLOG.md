@@ -361,6 +361,19 @@ New entries go at the bottom, under a dated heading.
 - **Spotlight won** the same day; Banner and Accent are deleted, and `/dev/emails` now shows Spotlight in the three themes side by side.
 - **Tests:** every theme renders every email with dark mode, each has its own light and dark colours, user-supplied values are escaped, the text part keeps the steps and links, and the preview route works in development and is absent in production (166 API tests).
 
+## 2 Nov 2026 · Cleanup: one copy of each rule, and a performance check
+**In short:** a pass for repeated code and leftovers, with no change in behaviour (all 170 API and 21 frontend tests pass), plus a performance review of the request paths.
+
+- **One validation helper.** The six lines that turn a Zod failure into a 400 were pasted into 16 handlers. They're now `parseOrThrow(model, input)` (`src/utils/validate.ts`), the only place that writes the `Invalid input fields: …` message the frontend parses.
+- **One list of safe user fields.** `authenticateToken`, the profile update and the admin list each spelled out the same nine columns; they now share `safeUserColumns`, so a new secret column can't leak through a copy that was missed.
+- **One token module.** The SHA-256 line was written out five times plus `hashRefreshToken`; `tokens.ts` now holds `hashToken` and `createTempToken` (no longer needlessly `async`), and the admin controller no longer imports from the auth controller.
+- **Shared Zod fields:** names, existing and new passwords and link tokens are named models instead of retyped rules.
+- **Leftovers removed:** a commented-out `console.log`, about 30 comments that restated the next line, a wrong copy-pasted comment, unnamed `15*60*1000`s, an unused `ApiResponse.noContent`, and `express.static('public')`, which served a folder that doesn't exist. The auth controller went from 886 lines to 763.
+- **Frontend:** a `UsernameHint` component replaces four copies of the hidden input password managers need, and the device list's `revoke()` takes one target instead of an array it never used.
+- **Performance check:** the token columns used by verify-email, reset-password and confirm-email had no index, so every link click read the whole `users` table. Each now has a partial index (`WHERE … IS NOT NULL`, migration `20261102123652_ambiguous_nova`). It holds only users with a link waiting in their inbox, so it stays small however many accounts there are. Postgres uses it for the handlers' `token = $1` lookups unchanged, since equality implies not null. A plain `CREATE INDEX` briefly blocks writes to `users`, which takes milliseconds at today's size.
+  - Everything else on the hot paths already used an index: every signed-in request (including `/auth/me`) is one indexed join, refresh and logout find the session by its unique hash, and the admin list's device counts use `sessions_user_id_idx`.
+  - Left for later: admin search's `ilike '%…%'` can't use an index (a trigram index, `pg_trgm`, would fix it once there are many users).
+
 ---
 
 ## Lessons

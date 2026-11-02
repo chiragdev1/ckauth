@@ -8,22 +8,16 @@ import { sessionsTable, usersTable } from '../../db/schema.js';
 import { and, count, desc, eq, gte, ilike, ne, or, sql } from 'drizzle-orm';
 import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../utils/api-response.js';
+import { parseOrThrow } from '../../utils/validate.js';
 import { ADMIN_REAUTH_WINDOW_MS, getFrontendUrl, INVITE_LINK_LIFETIME_MS, userRolesEnum } from '../auth/utils/constants.js';
-import { createTempToken } from '../auth/controller.js';
+import { createTempToken } from '../auth/utils/tokens.js';
+import { safeUserColumns } from '../auth/utils/user-columns.js';
 import { deleteImage } from '../../utils/imagekit.js';
 import { sendAccountDeletedMail, sendInviteMail } from '../../utils/mail.js';
 
-// only fields an admin needs to see; never passwords, token hashes or the ImageKit file id
+// what the user sees about themselves, plus activity
 const adminUserFields = {
-  id: usersTable.id,
-  firstName: usersTable.firstName,
-  lastName: usersTable.lastName,
-  age: usersTable.age,
-  email: usersTable.email,
-  emailVerified: usersTable.emailVerified,
-  role: usersTable.role,
-  avatarUrl: usersTable.avatarUrl,
-  createdAt: usersTable.createdAt,
+  ...safeUserColumns,
   // from the user's live sessions, one subquery each per row on a page of at most 100; the sessions_user_id_idx index serves them.
   // the times only, never the browser or ip: an admin needs to know an account is in use, not where from
   // table-qualified by hand: drizzle prints bare column names in a raw subquery, and a bare "id" there means sessions.id,
@@ -54,13 +48,8 @@ export class AdminController {
   }
 
   public async handleListUsers(req: Request, res: Response) {
-    const validationResult = await listUsersQueryModel.safeParseAsync(req.query)
 
-    if(!validationResult.success) {
-      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
-    }
-
-    const {page, limit, search} = validationResult.data
+    const {page, limit, search} = await parseOrThrow(listUsersQueryModel, req.query)
 
     const filter = search
       ? or(ilike(usersTable.email, likePattern(search)), ilike(usersTable.firstName, likePattern(search)), ilike(usersTable.lastName, likePattern(search)))
@@ -79,17 +68,12 @@ export class AdminController {
   }
 
   public async handleReauth(req: Request, res: Response) {
-    const validationResult = await reauthPayloadModel.safeParseAsync(req.body)
-
-    if(!validationResult.success) {
-      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
-    }
-
+    const {password} = await parseOrThrow(reauthPayloadModel, req.body)
     const userId = (req.user as any)?.id
     const [userInDb] = await db.select({password: usersTable.password}).from(usersTable).where(eq(usersTable.id, userId))
 
     // 400 rather than 401: the session is fine, only the password is wrong, and a 401 would make the frontend try a refresh
-    const isPasswordValid = userInDb?.password ? await bcrypt.compare(validationResult.data.password, userInDb.password) : false
+    const isPasswordValid = userInDb?.password ? await bcrypt.compare(password, userInDb.password) : false
     if(!isPasswordValid) {
       throw ApiError.badRequest('Incorrect password')
     }
@@ -101,16 +85,11 @@ export class AdminController {
   }
 
   public async handleInviteUser(req: Request, res: Response) {
-    const validationResult = await inviteUserPayloadModel.safeParseAsync(req.body)
 
-    if(!validationResult.success) {
-      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
-    }
-
-    const {firstName, lastName, email} = validationResult.data
+    const {firstName, lastName, email} = await parseOrThrow(inviteUserPayloadModel, req.body)
     // the person chooses their own password from the emailed link (the reset flow), so the admin never knows it,
     // and opening the link proves the inbox, which verifies the account. no password until then, so nobody can sign in to it
-    const {token, hashedToken} = await createTempToken()
+    const {token, hashedToken} = createTempToken()
 
     // a clear 409 is fine here (unlike sign-up), because admins can already see every account
     const [invited] = await db.insert(usersTable).values({
@@ -137,13 +116,8 @@ export class AdminController {
   }
 
   public async handleDeleteUser(req: Request, res: Response) {
-    const validationResult = await userIdParamsModel.safeParseAsync(req.params)
 
-    if(!validationResult.success) {
-      throw ApiError.badRequest(`Invalid input fields: ${validationResult.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`)
-    }
-
-    const {id} = validationResult.data
+    const {id} = await parseOrThrow(userIdParamsModel, req.params)
     const adminId = (req.user as any)?.id
 
     // admins can't remove themselves or each other here; removing an admin is done on the server (src/scripts/manage-users.ts),

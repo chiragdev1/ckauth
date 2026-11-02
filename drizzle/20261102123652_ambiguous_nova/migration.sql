@@ -1,0 +1,3 @@
+CREATE INDEX "users_email_verification_token_idx" ON "users" ("email_verification_token") WHERE "email_verification_token" is not null;--> statement-breakpoint
+CREATE INDEX "users_reset_password_token_idx" ON "users" ("reset_password_token") WHERE "reset_password_token" is not null;--> statement-breakpoint
+CREATE INDEX "users_email_change_token_idx" ON "users" ("email_change_token") WHERE "email_change_token" is not null;
