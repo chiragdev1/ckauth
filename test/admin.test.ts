@@ -112,14 +112,29 @@ describe('sudo mode (POST /admin/reauth)', () => {
 })
 
 describe('GET /admin/stats', () => {
-  test('counts users, verified users, admins and this week\'s sign-ups', async () => {
+  test('counts users, verified users, admins and new sign-ups', async () => {
     const {client} = await adminSession()
     await createUser()
     await createUser({verified: false})
 
     const response = await client.get('/admin/stats')
     assert.equal(response.status, 200)
-    assert.deepEqual(response.body.data, {totalUsers: 3, verifiedUsers: 2, admins: 1, newThisWeek: 3})
+    assert.deepEqual(response.body.data, {totalUsers: 3, verifiedUsers: 2, admins: 1, newLast24Hours: 3, newThisWeek: 3, newThisMonth: 3, newThisYear: 3})
+  })
+
+  // rolling windows back from now; each user sits just inside one window and outside the smaller ones
+  test('new sign-ups are counted per window: 24 hours, 7 days, 30 days, 365 days', async () => {
+    const {client} = await adminSession()
+    const day = 24 * 60 * 60 * 1000
+    for(const daysAgo of [2, 20, 200, 400]) {
+      const user = await createUser()
+      await db.update(usersTable).set({createdAt: new Date(Date.now() - daysAgo * day)}).where(eq(usersTable.id, user.id))
+    }
+
+    const {data} = (await client.get('/admin/stats')).body
+    // the admin, created just now, is in every window
+    assert.deepEqual([data.newLast24Hours, data.newThisWeek, data.newThisMonth, data.newThisYear], [1, 2, 3, 4])
+    assert.equal(data.totalUsers, 5)
   })
 })
 

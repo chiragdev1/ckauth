@@ -19,7 +19,7 @@ Everything a client needs in order to use the Authentication API. New to some of
   - [Get current user](#get-authme) · [Edit profile](#patch-authme) · [Change email](#post-authchange-email) · [Confirm new email](#post-authconfirm-emailtoken) · [Upload avatar](#post-authupload-avatar) · [Remove avatar](#delete-authavatar) · [Delete account](#delete-authme)
   - [List devices](#get-authsessions) · [Sign out a device](#delete-authsessionsid) · [Sign out other devices](#delete-authsessions)
   - [Forgot password](#post-authforgot-password) · [Reset password](#post-authreset-passwordtoken) · [Change password](#post-authchange-password)
-- [Admin endpoints](#admin-endpoints): [stats](#get-adminstats) · [list users](#get-adminusers) · [confirm password](#post-adminreauth) · [invite user](#post-adminusers) · [delete user](#delete-adminusersid)
+- [Admin endpoints](#admin-endpoints): [stats](#get-adminstats) · [list users](#get-adminusers) · [activity log](#get-adminactivity) · [confirm password](#post-adminreauth) · [invite user](#post-adminusers) · [delete user](#delete-adminusersid)
 - [Typical flows](#typical-flows)
 
 ---
@@ -55,6 +55,14 @@ A few errors also carry a **`code`**, a stable name for the reason that a client
 
 ```json
 { "success": false, "message": "Confirm your password to continue", "code": "REAUTH_REQUIRED" }
+```
+
+### Request IDs
+
+Every response, success or error, carries an **`X-Request-Id`** header: a random UUID (a 36-character unique identifier) for that one request. The API's logs and the [activity log](#get-adminactivity) record the same ID, so quoting it when reporting a problem finds exactly that request's [log lines](GLOSSARY.md#logs-and-monitoring). The API always makes its own; one sent by a client is ignored.
+
+```
+X-Request-Id: f9de846b-2052-4ccb-9665-c5a63edc764e
 ```
 
 ### Authentication
@@ -663,7 +671,9 @@ Every `/admin` endpoint is **🔒 Auth required** and also needs the signed-in u
 
 > **Admins are made and removed only on the server.** The API can't create an admin, demote one or delete one, including yourself. Those changes are done with `manage-users` (see [DEPLOYMENT.md](DEPLOYMENT.md#admins)), so a stolen admin session can neither lock the real admins out nor add new admins of its own.
 
-> **Writes need a recent password confirmation ("sudo mode").** Inviting and deleting answer `403` with `"code": "REAUTH_REQUIRED"` unless the admin confirmed their password with [`POST /admin/reauth`](#post-adminreauth) in the last 15 minutes. Ask for the password, call that endpoint, then retry the request. Reading (stats, the user list) never needs it.
+> **Writes need a recent password confirmation ("sudo mode").** Inviting and deleting answer `403` with `"code": "REAUTH_REQUIRED"` unless the admin confirmed their password with [`POST /admin/reauth`](#post-adminreauth) in the last 15 minutes. Ask for the password, call that endpoint, then retry the request. Reading (stats, the user list, the activity log) never needs it.
+
+> **Admin actions are recorded.** Confirming the password (right or wrong), inviting and deleting each write an event to the [activity log](#get-adminactivity), in the same database transaction as the action itself, so an action can't happen without its record.
 
 ### `GET /admin/stats`
 
@@ -675,11 +685,14 @@ Counts for the admin dashboard, all taken in one query.
 {
   "success": true,
   "message": "Stats fetched successfully",
-  "data": { "totalUsers": 42, "verifiedUsers": 37, "admins": 1, "newThisWeek": 5 }
+  "data": {
+    "totalUsers": 42, "verifiedUsers": 37, "admins": 1,
+    "newLast24Hours": 1, "newThisWeek": 5, "newThisMonth": 12, "newThisYear": 42
+  }
 }
 ```
 
-`newThisWeek` counts accounts created in the last 7 days.
+The four `new…` fields count accounts created within a **rolling window** back from the moment of the request (not since the start of a calendar week or month): the last 24 hours, 7 days, 30 days and 365 days. All four come from one pass over the table, so a client can switch between them without another request.
 
 ---
 
@@ -725,6 +738,69 @@ One page of users, newest first, optionally filtered by a search.
 `lastActiveAt` is when any of the user's live sessions was last used, and `deviceCount` how many live sessions they have; `null` and `0` mean they aren't signed in anywhere. The device list itself (browser, IP) stays private to the user.
 
 Passwords, token hashes and internal file IDs are never returned. A `page` past the end returns an empty `users` list.
+
+---
+
+### `GET /admin/activity`
+
+One page of the **activity log** (an [audit log](GLOSSARY.md#logs-and-monitoring): who did what, to whose account, and when), newest first. Each event was written in the same database transaction as the action it records.
+
+**Query parameters**
+
+| Parameter | Type | Rules |
+|---|---|---|
+| `page` | integer | Optional, ≥ 1, default `1` |
+| `limit` | integer | Optional, 1–100, default `20` |
+| `action` | string | Optional, one of the actions below |
+| `userId` | UUID | Optional. One person's log: everything they did **and** everything done to their account |
+
+**Actions**
+
+| `action` | Recorded when | `actorId` → `targetId` | `details` |
+|---|---|---|---|
+| `sign_in` | a sign-in succeeds | the user → themselves | `newDevice`: whether this browser had no live session |
+| `sign_in_failed` | a wrong password for an **existing** account (an unknown email records nothing) | none → the account | |
+| `email_verified` | a verify link is used | the user → themselves | |
+| `password_changed` | `POST /auth/change-password` | the user → themselves | |
+| `password_reset` | a reset link is used | the user → themselves | `firstPassword`: `true` when it finished an invite |
+| `email_changed` | a new email is confirmed | the user → themselves | `previousEmail` |
+| `account_deleted` | `DELETE /auth/me` | the user → themselves | `email`, kept since the account is gone |
+| `admin_reauth` / `admin_reauth_failed` | `POST /admin/reauth`, right or wrong password | the admin → themselves | |
+| `user_invited` | `POST /admin/users` | the admin → the new account | |
+| `user_deleted` | `DELETE /admin/users/:id`, or `manage-users delete` on the server | the admin (none from the server) → the account | `email`, kept since the account is gone |
+| `role_changed` | `manage-users role` on the server | none → the account | `role` |
+
+**Response: `200`**
+
+```json
+{
+  "success": true,
+  "message": "Activity fetched successfully",
+  "data": {
+    "events": [
+      {
+        "id": "0b7d…",
+        "action": "user_invited",
+        "source": "api",
+        "details": null,
+        "requestId": "f9de846b-2052-4ccb-9665-c5a63edc764e",
+        "createdAt": "2026-11-02T12:02:00.000Z",
+        "actorId": "a1f3…", "actorEmail": "chirag@example.com", "actorFirstName": "Chirag",
+        "targetId": "7a95…", "targetEmail": "dev@example.com", "targetFirstName": "Dev"
+      }
+    ],
+    "pagination": { "page": 1, "limit": 20, "total": 93 }
+  }
+}
+```
+
+- `source` is `api`, or `cli` for `manage-users` on the server, which has no actor.
+- `actorEmail`/`targetEmail` and the first names are looked up at read time, so they're `null` once that account is deleted; `details.email` then still says who it was.
+- `requestId` is the request's [`X-Request-Id`](#request-ids), for finding its lines in the server logs.
+- The **IP address is stored but never returned**, like the device list in [`GET /admin/users`](#get-adminusers): an admin needs to know what happened, not where people are.
+- Events are kept for a limited time and then deleted automatically: `sign_in`, `sign_in_failed` and `admin_reauth` for **90 days**, everything else for **one year**.
+
+**Errors:** `400` for an unknown `action`, a `userId` that isn't a UUID, or `limit` over 100.
 
 ---
 

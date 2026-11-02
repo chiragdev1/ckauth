@@ -1,5 +1,6 @@
 import {z} from 'zod'
 import { emailModel, existingPasswordModel, firstNameModel, lastNameModel } from '../auth/models.js'
+import { availableAuditActions } from '../auth/utils/constants.js'
 
 // query strings are always text, so coerce the numbers; limit is capped so one request can't read the whole table
 const pageQueryModel = z.object({
@@ -26,4 +27,10 @@ export const reauthPayloadModel = z.object({
 
 export const userIdParamsModel = z.object({
   id: z.uuid('Invalid user id')
+})
+
+// both optional: no filter lists every event, newest first
+export const listActivityQueryModel = pageQueryModel.extend({
+  action: z.enum(availableAuditActions).optional(),
+  userId: z.uuid('Invalid user id').optional()
 })

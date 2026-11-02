@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 import { Dialog } from 'radix-ui'
-import { ChevronLeft, ChevronRight, KeyRound, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { History, KeyRound, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { api, ApiRequestError } from '@/lib/api.ts'
 import { useAuth } from '@/lib/auth.tsx'
-import { useAdminData, type AdminStats, type AdminUser } from '@/lib/admin.ts'
+import { useActivity, useAdminData, type AdminStats, type AdminUser } from '@/lib/admin.ts'
 import { useForm } from '@/lib/use-form.ts'
 import { describeError, validateEmail, validateExistingPassword, validateFirstName, validateLastName } from '@/lib/validation.ts'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
@@ -12,17 +12,32 @@ import { cn } from '@/lib/utils.ts'
 import { FormAlert, PasswordField, TextField, UsernameHint } from '@/components/form.tsx'
 import { Spinner } from '@/components/brand.tsx'
 import { AvatarLightbox } from '@/components/avatar-lightbox.tsx'
+import { ActivitySection } from '@/components/admin-activity.tsx'
+import { Pager } from '@/components/pager.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx'
 import { Input } from '@/components/ui/input.tsx'
 
 type AdminData = ReturnType<typeof useAdminData>
+type UserActions = { onChanged: () => void, onShowActivity: (user: AdminUser) => void }
 
 // one card per user, with "invite a user" as the first card in the grid
 export function Admin() {
   useDocumentTitle('Admin')
   const data = useAdminData()
+  const activity = useActivity()
+  const { reload: reloadUsers } = data
+  const { reload: reloadActivity, setFilter: setActivityFilter } = activity
+
+  // an invite or delete changes both the list and the log
+  const actions: UserActions = {
+    onChanged: useCallback(() => { reloadUsers(); reloadActivity() }, [reloadUsers, reloadActivity]),
+    onShowActivity: useCallback((user: AdminUser) => {
+      setActivityFilter({ user: { id: user.id, label: user.email } })
+      document.getElementById('activity')?.scrollIntoView({ behavior: 'smooth' })
+    }, [setActivityFilter]),
+  }
 
   return (
     <ReauthProvider>
@@ -35,21 +50,23 @@ export function Admin() {
             <p className="mt-1 text-sm text-muted-foreground">Everyone with a CKAuth account. Admins are managed on the server.</p>
           </div>
           <StatTiles stats={data.stats} />
-          <UsersSection data={data} />
+          <UsersSection data={data} actions={actions} />
+          <ActivitySection activity={activity} />
         </div>
       </div>
     </ReauthProvider>
   )
 }
 
-function UsersSection({ data }: { data: AdminData }) {
+function UsersSection({ data, actions }: { data: AdminData, actions: UserActions }) {
   const [inviting, setInviting] = useState(false)
 
   return (
     <>
       <ListHeading data={data} />
       <ListState data={data} always={inviting}>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* grid-cols-1 (minmax(0, 1fr)) on phones: a bare grid column grows to the longest email, which truncate can't stop */}
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <li className={cn(inviting && 'sm:col-span-2 lg:col-span-3')}>
             {inviting ? (
               <Card className="dossier">
@@ -61,7 +78,7 @@ function UsersSection({ data }: { data: AdminData }) {
                   <Button variant="ghost" size="icon-sm" onClick={() => setInviting(false)} aria-label="Close"><X /></Button>
                 </CardHeader>
                 <CardContent>
-                  <InviteUserForm onInvited={data.reload} />
+                  <InviteUserForm onInvited={actions.onChanged} />
                 </CardContent>
               </Card>
             ) : (
@@ -94,7 +111,12 @@ function UsersSection({ data }: { data: AdminData }) {
                           : 'not signed in'}
                       </span>
                     </div>
-                    <DeleteUserButton user={user} onDeleted={data.reload} />
+                    <span className="inline-flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => actions.onShowActivity(user)} aria-label={`Show activity for ${user.email}`}>
+                        <History />Activity
+                      </Button>
+                      <DeleteUserButton user={user} onDeleted={actions.onChanged} />
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -190,13 +212,22 @@ function ReauthDialog({ onConfirmed, onCancel }: { onConfirmed: () => void, onCa
   )
 }
 
+// the new-users tile's periods; short labels so all four fit the tile on a 320 px phone, the note spells them out
+const newUserPeriods = [
+  { id: '24h', name: 'Last 24 hours', key: 'newLast24Hours' },
+  { id: '7d', name: 'Last 7 days', key: 'newThisWeek' },
+  { id: '30d', name: 'Last 30 days', key: 'newThisMonth' },
+  { id: '1y', name: 'Last 12 months', key: 'newThisYear' },
+] as const satisfies readonly { id: string, name: string, key: keyof AdminStats }[]
+
 function StatTiles({ stats }: { stats: AdminStats | null }) {
+  const [period, setPeriod] = useState<typeof newUserPeriods[number]>(newUserPeriods[1])
   const verifiedShare = stats && stats.totalUsers > 0 ? Math.round(stats.verifiedUsers / stats.totalUsers * 100) : 0
-  const tiles = [
+  const tiles: { label: string, value: number | undefined, note?: string, control?: ReactNode }[] = [
     { label: 'Total users', value: stats?.totalUsers, note: 'All accounts' },
     { label: 'Verified', value: stats?.verifiedUsers, note: `${verifiedShare}% of users` },
-    { label: 'New this week', value: stats?.newThisWeek, note: 'Last 7 days' },
-    { label: 'Admins', value: stats?.admins, note: 'Set on the server' },
+    { label: 'New users', value: stats?.[period.key], note: period.name, control: <PeriodPicker value={period.id} onChange={setPeriod} /> },
+    { label: 'Admins', value: stats?.admins },
   ]
 
   return (
@@ -205,10 +236,35 @@ function StatTiles({ stats }: { stats: AdminStats | null }) {
         <div key={tile.label} className="rounded-xl border border-border bg-card p-4">
           <dt className="text-xs font-medium tracking-[0.15em] text-muted-foreground uppercase">{tile.label}</dt>
           <dd className="font-display mt-2 text-3xl font-semibold tabular-nums">{tile.value ?? '–'}</dd>
-          <dd className="mt-1 text-xs text-muted-foreground">{tile.note}</dd>
+          {tile.note && <dd className="mt-1 text-xs text-muted-foreground">{tile.note}</dd>}
+          {tile.control && <dd className="mt-2">{tile.control}</dd>}
         </div>
       ))}
     </dl>
+  )
+}
+
+// a segmented control filling the tile, so it fits a 320 px phone; the counts for every period come in one stats
+// response, so switching never waits on the network
+function PeriodPicker({ value, onChange }: { value: string, onChange: (period: typeof newUserPeriods[number]) => void }) {
+  return (
+    <div role="group" aria-label="Period for new users" className="grid w-full grid-cols-4 rounded-md border border-border bg-muted p-1">
+      {newUserPeriods.map(period => (
+        <button
+          key={period.id}
+          type="button"
+          aria-pressed={period.id === value}
+          aria-label={period.name}
+          onClick={() => onChange(period)}
+          className={cn(
+            'rounded py-0.5 text-xs tabular-nums transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none',
+            period.id === value ? 'bg-card font-medium text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {period.id}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -330,7 +386,7 @@ function InviteUserForm({ onInvited }: { onInvited: () => void }) {
   return (
     <form ref={form.formRef} onSubmit={form.onSubmit} noValidate className="space-y-5">
       {form.formError && <FormAlert kind="error">{form.formError}</FormAlert>}
-      {invited && !form.formError && <FormAlert kind="success">Invite sent to {invited}. The link works for 72 hours.</FormAlert>}
+      {invited && !form.formError && <FormAlert kind="success">Invite sent to <span className="break-all">{invited}</span>. The link works for 72 hours.</FormAlert>}
       <div className="grid gap-5 sm:grid-cols-3">
         <TextField label="First name" autoComplete="off" error={form.errors.firstName} {...form.register('firstName')} />
         <TextField label="Last name" optional autoComplete="off" error={form.errors.lastName} {...form.register('lastName')} />
@@ -340,22 +396,6 @@ function InviteUserForm({ onInvited }: { onInvited: () => void }) {
         {form.pending ? 'Sending…' : 'Send invite'}
       </Button>
     </form>
-  )
-}
-
-function Pager({ data }: { data: AdminData }) {
-  if(data.totalPages <= 1) return null
-
-  return (
-    <nav aria-label="Pages" className="flex items-center justify-between gap-4 text-sm">
-      <Button variant="outline" size="sm" onClick={() => data.setPage(data.page - 1)} disabled={data.page <= 1 || data.loading}>
-        <ChevronLeft />Previous
-      </Button>
-      <span className="text-muted-foreground tabular-nums">Page {data.page} of {data.totalPages}</span>
-      <Button variant="outline" size="sm" onClick={() => data.setPage(data.page + 1)} disabled={data.page >= data.totalPages || data.loading}>
-        Next<ChevronRight />
-      </Button>
-    </nav>
   )
 }
 

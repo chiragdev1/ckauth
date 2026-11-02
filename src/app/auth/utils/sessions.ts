@@ -11,7 +11,7 @@ import { hashToken } from './tokens.js'
 export const MAX_SESSIONS_PER_USER = 10
 
 // a transaction or the db itself, so a session can be started inside the same transaction as the write that allows it
-type Executor = Pick<typeof db, 'select' | 'insert' | 'update' | 'delete'>
+export type Executor = Pick<typeof db, 'select' | 'insert' | 'update' | 'delete'>
 
 // what the device list shows; the user agent is whatever the browser claims, so it's cut to the column and never trusted
 export function describeClient(req: Request) {

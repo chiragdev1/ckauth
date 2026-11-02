@@ -29,3 +29,24 @@ export const ADMIN_REAUTH_WINDOW_MS = 15 * 60 * 1000
 
 // invite links last longer than reset links (15 minutes), because the person didn't ask for the mail and may open it days later
 export const INVITE_LINK_LIFETIME_MS = 72 * 60 * 60 * 1000
+
+// every kind of audit event (the admin panel's activity log); the zod filter in admin/models.ts is built from these values.
+// a varchar, not a postgres enum, so adding an action needs no migration
+export const auditActions = {
+  SIGN_IN: 'sign_in',
+  SIGN_IN_FAILED: 'sign_in_failed',
+  EMAIL_VERIFIED: 'email_verified',
+  PASSWORD_CHANGED: 'password_changed',
+  PASSWORD_RESET: 'password_reset',
+  EMAIL_CHANGED: 'email_changed',
+  ACCOUNT_DELETED: 'account_deleted',
+  ADMIN_REAUTH: 'admin_reauth',
+  ADMIN_REAUTH_FAILED: 'admin_reauth_failed',
+  USER_INVITED: 'user_invited',
+  USER_DELETED: 'user_deleted',
+  ROLE_CHANGED: 'role_changed',
+} as const
+
+export type AuditAction = typeof auditActions[keyof typeof auditActions]
+
+export const availableAuditActions = Object.values(auditActions) as [AuditAction, ...AuditAction[]]

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { availableUserRoles, userRolesEnum } from "../app/auth/utils/constants.js";
 
 // a postgres enum, so the database itself rejects any role that isn't in the list
@@ -74,4 +74,33 @@ export const sessionsTable = pgTable("sessions", {
   expiresAt: timestamp('expires_at').notNull(),
 }, (table) => [
   index('sessions_user_id_idx').on(table.userId),
+])
+
+
+// the activity log: who did what to whom, when and from where. written in the same transaction as the action it records,
+// so an action can't happen without its row. append-only: no endpoint edits or deletes a row; only pruneAuditEvents
+// removes rows past their retention period
+export const auditEventsTable = pgTable("audit_events", {
+  id: uuid('id').primaryKey().defaultRandom(),
+  action: varchar('action', {length: 40}).notNull(),
+
+  // plain ids, no foreign keys: a row must outlive the users it mentions (a deleted account's deletion is the point).
+  // actor is who acted (null for the server's manage-users script), target is whose account it was done to
+  actorId: uuid('actor_id'),
+  targetId: uuid('target_id'),
+
+  // what the panel can't look up later, e.g. a deleted account's email. small and never a secret
+  details: jsonb('details').$type<Record<string, string | number | boolean>>(),
+
+  // 'api' or 'cli' (manage-users on the server)
+  source: varchar('source', {length: 10}).notNull(),
+  ipAddress: varchar('ip_address', {length: 45}),
+  // the X-Request-Id, so an event leads to the request's lines in the application logs
+  requestId: varchar('request_id', {length: 64}),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('audit_events_created_at_idx').on(table.createdAt),
+  index('audit_events_actor_id_idx').on(table.actorId),
+  index('audit_events_target_id_idx').on(table.targetId),
 ])

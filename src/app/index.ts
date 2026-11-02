@@ -6,6 +6,7 @@ import { authRouter } from './auth/routes.js';
 import { adminRouter } from './admin/routes.js';
 import { devRouter } from './dev/routes.js';
 import { errorHandler } from './middlewares/error-handler.js';
+import { requestLogger } from './middlewares/request-logger.js';
 
 export function createExpressApplication(): Express {
   const app = express()
@@ -14,6 +15,8 @@ export function createExpressApplication(): Express {
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
 
+  // first, so every request gets an id and a log line, including ones a later middleware rejects
+  app.use(requestLogger)
   app.use(express.json({limit: '50kb'}))
   app.use(express.urlencoded({extended: true}))
   app.use(cookieParser())
