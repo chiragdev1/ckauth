@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser'
 import type {Express, Request, Response} from 'express'
 
 import { authRouter } from './auth/routes.js';
+import { adminRouter } from './admin/routes.js';
 import { errorHandler } from './middlewares/error-handler.js';
 
 export function createExpressApplication(): Express {
@@ -19,6 +20,7 @@ export function createExpressApplication(): Express {
   app.use(cookieParser())
   
   app.use('/auth', authRouter)
+  app.use('/admin', adminRouter)
   
   // routes
   app.get("/", (req: Request, res: Response)=> {

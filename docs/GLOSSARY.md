@@ -72,6 +72,16 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Authorization.** Deciding *what* that person may do. Failure is a `403`.
 
+**Role.** A label on an account that decides what it may do. CKAuth has two: `user` (everyone) and `admin` (can see, add and delete users).
+
+**RBAC (role-based access control).** Granting permissions to roles rather than to individual people, then checking the role on each request. CKAuth's `authorizeRoles('admin')` middleware is a small example.
+
+**Re-authentication / sudo mode.** Asking for the password again before a dangerous action, even in a valid session, and trusting it for a short while afterwards. CKAuth's admins confirm their password before inviting or deleting users, and it stays confirmed for 15 minutes. GitHub uses the same pattern.
+
+**Invite.** Creating an account for someone else without choosing their password: they get a link to set it themselves, so only they ever know it.
+
+**Out-of-band.** Done through a separate channel from the normal one. CKAuth makes and removes admins with a script on the server, out-of-band from the website, so a stolen session can't do it.
+
 **Session.** The period during which a user stays signed in without re-entering their password.
 
 **JWT (JSON Web Token).** A signed token that carries facts such as a user ID. The server can check the signature, so it can tell if anyone changed the token.
@@ -146,6 +156,10 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Row lock (`SELECT … FOR UPDATE`).** Locking a row inside a transaction, so other requests wait until you're done with it.
 
+**Enum (enumerated type).** A type that allows only a fixed list of values. The `role` column is a Postgres enum (`user_role`), so the database itself rejects any other role.
+
+**Pagination.** Returning a long list one page at a time (`?page=2&limit=20`), so a single request never has to load every row.
+
 **`onConflictDoNothing`.** Drizzle's way of saying "insert this row, but if it breaks a unique constraint, skip it quietly".
 
 ---
@@ -153,6 +167,24 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 ## Server and performance
 
 **Node.js.** The JavaScript runtime the API runs on.
+
+**Unit test.** A test of one function on its own, with no server or database, such as "the email is lower-cased".
+
+**Integration test.** A test that runs several parts together: CKAuth's send real HTTP requests to the app, which talks to a real (test) database.
+
+**Test runner.** The program that finds the tests, runs them and reports what failed. CKAuth uses the one built into Node (`node:test`).
+
+**Code coverage.** How much of the code the tests actually run, as a percentage of lines, branches (each side of an `if`) and functions. CKAuth's checks fail if it drops below a set minimum.
+
+**Fail open / fail closed.** What a safety check does when it can't work: let requests through (open) or refuse them (closed). CKAuth's rate limits fail open if Redis is down, so an outage doesn't stop everyone signing in.
+
+**Regression.** Something that used to work and broke after a change. Tests exist mostly to catch these.
+
+**Dead code.** Files, exports or dependencies nothing uses any more. `knip` finds them, and `pnpm check:pr` fails until they're removed.
+
+**Dependency audit.** Checking the libraries a project uses against a list of known security holes (`pnpm audit`), so a vulnerable version gets updated.
+
+**Performance budget.** A size limit, such as "the home page's JavaScript stays under 127 KiB", that fails the checks when a change goes over it, so the site can't get slower unnoticed.
 
 **Main thread / event loop.** Node runs your JavaScript on one thread. Anything slow on that thread, like a long calculation, makes every other request wait.
 

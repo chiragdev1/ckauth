@@ -54,3 +54,8 @@ jobs:
 
       - name: Smoke test
         run: curl --fail --silent --show-error --retry 5 --retry-delay 3 "https://${{ vars.DOMAIN }}${{ inputs.smoke-path }}" > /dev/null
+
+      # the security headers live in deploy/ckauth.caddy, which every deploy copies; check the live site really sends them
+      - name: Security headers
+        run: node scripts/check-live-headers.js "https://${{ vars.DOMAIN }}"
+

@@ -7,7 +7,7 @@ import { CONTACT_EMAIL, REPO_URL } from './home-copy.ts'
 // (src/db/schema.ts, rate-limit.ts, auth/utils/constants.ts for cookies, deploy/backup.sh), so change them together.
 // structure follows the usual gdpr / india dpdp act / ccpa checklist; see DEVLOG 27 Oct 2026
 
-const UPDATED = '27 October 2026'
+const UPDATED = '2 November 2026'
 const OPERATOR = 'Chirag Arora'
 
 type Section = { id: string, heading: string, body: ReactNode }
@@ -66,14 +66,14 @@ const privacySections: Section[] = [
       <>
         <p><strong>What you give us:</strong></p>
         <ul>
-          <li><strong>Account details:</strong> your first name, your last name if you give one, your email address and, only if you give it, your age (our sign-up form doesn't ask for it).</li>
+          <li><strong>Account details:</strong> your first name, your last name if you give one, your email address and, only if you give it, your age (our sign-up form doesn't ask for it). If an admin invited you, the admin entered your name and email; you choose your own password, which the admin never sees.</li>
           <li><strong>Your password, as a one-way hash.</strong> We store a bcrypt hash, never the password itself. Nobody, including us, can turn it back into your password.</li>
           <li><strong>Profile photo,</strong> if you upload one. It's stored under a random file name, so its web address doesn't reveal who you are.</li>
           <li><strong>Messages you send us,</strong> such as support or privacy requests by email.</li>
         </ul>
         <p><strong>What we record automatically:</strong></p>
         <ul>
-          <li><strong>Security records:</strong> hashed copies of your session and email-link tokens, when they expire, whether your email is confirmed, and when your account was created and last changed.</li>
+          <li><strong>Security records:</strong> hashed copies of your session and email-link tokens, when they expire, whether your email is confirmed, your account's role (an ordinary user, or an admin who helps run CKAuth and can see and delete accounts), for admins the time they last confirmed their password, and when your account was created and last changed.</li>
           <li><strong>Server logs:</strong> your IP address, the time, the page or action requested and your browser's name and version. If sending an email to you fails, the error log includes your email address.</li>
           <li><strong>Rate-limit counters:</strong> to block password guessing, we count recent attempts per IP address, per email address and per account.</li>
         </ul>
@@ -113,7 +113,7 @@ const privacySections: Section[] = [
     body: (
       <ul>
         <li><strong>To run your account:</strong> creating it, confirming your email, signing you in, resetting your password and showing your photo. This is necessary to provide the service you asked for, and under the DPDP Act it rests on the consent you give when you sign up.</li>
-        <li><strong>To send account emails:</strong> confirmation links, password resets, and a notice if someone tries to sign up with your address. These are part of the service. We don't send marketing emails.</li>
+        <li><strong>To send account emails:</strong> confirmation links, password resets, a notice if someone tries to sign up with your address, an invitation if an admin creates an account for you, and a notice if an admin deletes your account (only to a confirmed address). These are part of the service. We don't send marketing emails.</li>
         <li><strong>To keep CKAuth and your account secure:</strong> blocking repeated wrong guesses, investigating abuse and fixing faults, using logs and rate-limit counters. This is our legitimate interest in protecting users, and a "legitimate use" under the DPDP Act.</li>
         <li><strong>To meet legal obligations,</strong> such as answering a lawful request from the authorities.</li>
       </ul>

@@ -253,7 +253,7 @@ Check that this matches what your laptop already trusts. This command should pri
 ssh-keygen -F 203.0.113.10
 ```
 
-Then, in **GitHub → Settings → Environments → production**, add these (full list in [DEPLOYMENT.md](DEPLOYMENT.md#5-connect-github-actions)):
+Then, in **GitHub → Settings → Environments → production**, add these (full list in [DEPLOYMENT.md](DEPLOYMENT.md#step-7-connect-github-to-the-vps)):
 
 | Secret | Value |
 |---|---|

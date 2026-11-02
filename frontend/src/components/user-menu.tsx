@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router'
-import { LayoutDashboard, LogOut } from 'lucide-react'
+import { LayoutDashboard, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/lib/auth.tsx'
 import { UserAvatar } from '@/components/user-avatar.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu.tsx'
@@ -32,6 +32,11 @@ export default function UserMenu() {
         <DropdownMenuItem asChild>
           <Link to="/dashboard"><LayoutDashboard />Dashboard</Link>
         </DropdownMenuItem>
+        {user.role === 'admin' && (
+          <DropdownMenuItem asChild>
+            <Link to="/admin"><ShieldCheck />Admin</Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={handleSignOut}>
           <LogOut />Sign out
         </DropdownMenuItem>

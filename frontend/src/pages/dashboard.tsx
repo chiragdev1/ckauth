@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { Camera, ExternalLink, Globe, LogOut, Mail, ShieldCheck, X } from 'lucide-react'
 import { api } from '@/lib/api.ts'
 import { useAuth } from '@/lib/auth.tsx'
@@ -61,7 +61,12 @@ export function Dashboard() {
             <h1 className="font-display mt-1 text-4xl font-semibold">Hi, {user.firstName}</h1>
             <p className="mt-1 text-sm text-muted-foreground">Manage your profile and keep your account secure.</p>
           </div>
-          <Button variant="outline" onClick={handleSignOut}><LogOut />Sign out</Button>
+          <div className="flex flex-wrap gap-2">
+            {user.role === 'admin' && (
+              <Button asChild variant="outline"><Link to="/admin"><ShieldCheck />Admin</Link></Button>
+            )}
+            <Button variant="outline" onClick={handleSignOut}><LogOut />Sign out</Button>
+          </div>
         </div>
 
         <ProfileCard />

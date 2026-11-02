@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "reauthenticated_at" timestamp;

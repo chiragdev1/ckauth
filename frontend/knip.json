@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/entry-server.tsx", "scripts/*.js", "test/**/*.test.ts"],
+  "project": ["src/**/*.{ts,tsx,css}", "scripts/*.js", "test/**/*.ts"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreIssues": {
+    "src/components/ui/**": ["exports"]
+  }
+}

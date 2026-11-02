@@ -6,6 +6,7 @@ import { db } from '../../db/index.js';
 import { usersTable } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { reqUserModel } from './models.js';
+import type { UserRole } from './utils/constants.js';
 
 declare global {
   namespace Express {
@@ -51,6 +52,7 @@ export async function authenticateToken(
     age: usersTable.age,
     email: usersTable.email,
     emailVerified: usersTable.emailVerified,
+    role: usersTable.role,
     avatarUrl: usersTable.avatarUrl,
   }).from(usersTable).where(eq(usersTable.id, payload.userId)).limit(1)
 
@@ -69,8 +71,17 @@ export async function authenticateToken(
   next()
 }
 
-// export function authorize(...roles) {
-  
-// }
+// runs after authenticateToken; the role is read from the database on every request, so a demoted admin loses access at once
+export function authorizeRoles(...roles: UserRole[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const role = (req.user as any)?.role
+
+    if(!roles.includes(role)) {
+      throw ApiError.forbidden('You do not have permission to access this resource')
+    }
+
+    next()
+  }
+}
 
 // add middleware to validate cookies before authenticateToken middleware
