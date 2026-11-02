@@ -99,7 +99,9 @@ if(!validationResult.success) {
 
 ## Known gaps
 
-- Rate limits fail open: if Redis is unreachable, requests pass (`passOnStoreError`) and the error is logged.
+- Rate limits fail open: if Redis is unreachable, requests pass (`passOnStoreError`) and the error is logged. `disableOfflineQueue` makes that immediate; without it every limited request waited ~5 s (`test/redis-down.test.ts`).
+- Admin actions (invites, deletes, role changes from the script) aren't recorded anywhere but the server's console. The upcoming logs feature covers this.
+- No MFA, for admins or anyone; sudo mode is the interim protection for admin writes. No browser end-to-end tests yet.
 - No CORS middleware (not needed while the frontend is same-origin).
 - Malformed or oversized JSON bodies return 500, because `errorHandler` only recognises `ApiError` (body-parser errors carry `status` 400/413).
 - Ending a session revokes the refresh token, but access tokens stay valid until they expire (there is no access-token denylist).

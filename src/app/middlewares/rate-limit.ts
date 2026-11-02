@@ -9,13 +9,24 @@ import { emailModel } from '../auth/models.js'
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
 
-// with REDIS_URL every instance shares one count; without it each process counts on its own, which is fine for local development
-const redisClient = process.env.REDIS_URL ? createClient({url: process.env.REDIS_URL}) : null
+// with REDIS_URL every instance shares one count; without it each process counts on its own, which is fine for local development.
+// disableOfflineQueue: while redis is unreachable a command fails at once instead of waiting in a queue, so the limiter's
+// fail-open (passOnStoreError) lets the request through straight away; queued, every limited request stalled for ~5 s
+const redisClient = process.env.REDIS_URL ? createClient({url: process.env.REDIS_URL, disableOfflineQueue: true}) : null
 
 if(redisClient) {
   // without an error listener a lost connection would crash the process; the client reconnects on its own
   redisClient.on('error', (error) => console.error('Redis error:', error instanceof Error ? error.message : error))
   redisClient.connect().catch((error) => console.error('Could not connect to Redis:', error instanceof Error ? error.message : error))
+}
+
+// stops redis's reconnect loop, which otherwise keeps the process alive; for a clean exit (the tests, a graceful shutdown)
+export function closeRateLimitStore() {
+  try {
+    redisClient?.destroy()
+  } catch {
+    // already closed
+  }
 }
 
 function createStore(name: string): Store | undefined {
