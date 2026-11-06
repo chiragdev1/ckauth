@@ -1,4 +1,5 @@
 import {z} from 'zod'
+import { refModel } from '../metrics/models.js'
 import { availableUserRoles } from './utils/constants.js'
 
 // normalize before validating so " John@Gmail.com " and "john@gmail.com" map to the same account
@@ -28,7 +29,9 @@ export const signupPayloadModel = z.object({
   lastName: lastNameModel,
   age: ageModel.optional(),
   email: emailModel,
-  password: newPasswordModel
+  password: newPasswordModel,
+  // the ?ref= the visitor arrived with; an unknown one becomes null instead of failing the sign-up
+  ref: refModel.optional()
 })
 
 export const signinPayloadModel = z.object({

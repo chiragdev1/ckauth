@@ -9,6 +9,7 @@ import { FormAlert, PasswordField, TextField } from '@/components/form.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { ResendEmail } from '@/components/resend-email.tsx'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
+import { referralSource } from '@/lib/referral.ts'
 
 export function SignUp() {
   useDocumentTitle('Create an account')
@@ -22,7 +23,7 @@ export function SignUp() {
       const lastName = values.lastName.trim()
       await api('/auth/sign-up', {
         method: 'POST',
-        body: { firstName: values.firstName.trim(), lastName: lastName || null, email: values.email.trim(), password: values.password },
+        body: { firstName: values.firstName.trim(), lastName: lastName || null, email: values.email.trim(), password: values.password, ref: referralSource() },
       })
       setSentTo(values.email.trim())
     },

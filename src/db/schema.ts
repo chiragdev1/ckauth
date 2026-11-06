@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { availableUserRoles, userRolesEnum } from "../app/auth/utils/constants.js";
 
 // a postgres enum, so the database itself rejects any role that isn't in the list
@@ -41,6 +41,9 @@ export const usersTable = pgTable("users", {
 
   // unused since sudo mode moved to sessions.reauthenticated_at; kept for rollbacks like refresh_token. drop it later
   reauthenticatedAt: timestamp('reauthenticated_at'),
+
+  // the ?ref= of the link that brought this person here (e.g. 'x'), set once at the first sign-up; null for direct visits
+  signupSource: varchar('signup_source', {length: 32}),
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').$onUpdate( ()=> new Date())
@@ -103,4 +106,15 @@ export const auditEventsTable = pgTable("audit_events", {
   index('audit_events_created_at_idx').on(table.createdAt),
   index('audit_events_actor_id_idx').on(table.actorId),
   index('audit_events_target_id_idx').on(table.targetId),
+])
+
+
+// visits that arrived through one of our own tagged links (?ref=x), as one counter per source per day. no ip, no cookie,
+// no user: a row can't tell anyone who visited, only how many. sign-ups are counted from users.signup_source instead
+export const referralVisitsTable = pgTable("referral_visits", {
+  day: date('day').defaultNow().notNull(),
+  source: varchar('source', {length: 32}).notNull(),
+  visits: integer('visits').default(0).notNull(),
+}, (table) => [
+  primaryKey({columns: [table.day, table.source]}),
 ])

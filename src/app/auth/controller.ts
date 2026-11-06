@@ -44,7 +44,7 @@ function verificationUrl(token: string) {
 export class AuthController {
 
   public async handleSignup(req: Request, res: Response) {
-    const {firstName, lastName, age, email, password} = await parseOrThrow(signupPayloadModel, req.body)
+    const {firstName, lastName, age, email, password, ref} = await parseOrThrow(signupPayloadModel, req.body)
 
     // same response whether or not the email is already registered, so this endpoint can't be used to check which emails have accounts;
     // the difference is only explained in the mail, which only the owner of the email can read
@@ -65,7 +65,9 @@ export class AuthController {
       email,
       password: hash,
       emailVerificationToken: hashedEmailVerificationToken,
-      emailVerificationTokenExpiry
+      emailVerificationTokenExpiry,
+      // only on the insert: a repeat sign-up keeps the source of the first, which is the visit that won the person over
+      signupSource: ref ?? null
     })
     .onConflictDoNothing({ target: usersTable.email })
     .returning({ id: usersTable.id })

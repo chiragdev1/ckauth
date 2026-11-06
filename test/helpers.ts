@@ -8,7 +8,7 @@ import { eq, sql } from 'drizzle-orm'
 
 import { createExpressApplication } from '../src/app/index.js'
 import { db } from '../src/db/index.js'
-import { auditEventsTable, sessionsTable, usersTable } from '../src/db/schema.js'
+import { auditEventsTable, referralVisitsTable, sessionsTable, usersTable } from '../src/db/schema.js'
 import { outbox } from '../src/utils/mail.js'
 import type { UserRole } from '../src/app/auth/utils/constants.js'
 
@@ -32,7 +32,7 @@ export async function startApp() {
 // a fresh slate for every test: no users, no mails. every table is named, and no CASCADE on purpose: if the database
 // holds tables this schema doesn't know (someone else's test database), postgres refuses instead of emptying them
 export async function resetDatabase() {
-  await db.execute(sql`truncate table ${auditEventsTable}, ${sessionsTable}, ${usersTable}`)
+  await db.execute(sql`truncate table ${auditEventsTable}, ${referralVisitsTable}, ${sessionsTable}, ${usersTable}`)
   outbox.length = 0
 }
 

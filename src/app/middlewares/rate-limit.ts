@@ -114,4 +114,6 @@ export const rateLimits = {
   adminWritePerUser: createRateLimiter({name: 'admin-write-user', windowMs: 15 * MINUTE, limit: 30, key: userKey}),
   // a bcrypt compare, like sign-in: only wrong passwords count
   adminReauthPerUser: createRateLimiter({name: 'admin-reauth-user', windowMs: 15 * MINUTE, limit: 5, key: userKey, failuresOnly: true}),
+  // the page posts once per tab, so a real visitor is far below this; it only caps a script inflating the counts
+  metricsVisitPerIp: createRateLimiter({name: 'metrics-visit-ip', windowMs: HOUR, limit: 30}),
 }

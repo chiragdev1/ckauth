@@ -27,6 +27,11 @@ describe('per-IP limits', () => {
     await assertLimit(10, attempt => client.post('/auth/sign-up', {email: `nobody${attempt}@ckauth.test`}))
   })
 
+  test('metrics visit: 30 per hour', async () => {
+    const client = new Client(baseUrl)
+    await assertLimit(30, () => client.post('/metrics/visit', {ref: 'x'}))
+  })
+
   test('forgot-password: 10 per hour', async () => {
     const client = new Client(baseUrl)
     await assertLimit(10, attempt => client.post('/auth/forgot-password', {email: `nobody${attempt}@ckauth.test`}))

@@ -28,3 +28,25 @@ test('sign up, open the emailed link, verify with the password and land on the d
   await page.reload()
   await expect(page.getByRole('heading', {name: 'Hi, Ada'})).toBeVisible()
 })
+
+test('a tagged link is counted once, leaves the address bar and goes with the sign-up', async ({page, email}) => {
+  const visits: string[] = []
+  page.on('request', request => { if(request.url().endsWith('/api/metrics/visit')) visits.push(request.postData() ?? '') })
+
+  await page.goto('/?ref=x')
+  await expect.poll(() => visits).toEqual(['{"ref":"x"}'])
+  await expect(page).toHaveURL('/')
+
+  // same tab, tag again: already counted
+  await page.goto('/sign-up?ref=x')
+  await expect(page).toHaveURL('/sign-up')
+
+  await page.getByLabel('First name').fill('Ada')
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password', {exact: true}).fill('Correct-horse-battery-9')
+  const signUp = page.waitForRequest(request => request.url().endsWith('/api/auth/sign-up'))
+  await page.getByRole('button', {name: 'Create account'}).click()
+
+  expect((await signUp).postDataJSON().ref).toBe('x')
+  expect(visits).toHaveLength(1)
+})

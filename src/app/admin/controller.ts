@@ -4,8 +4,8 @@ import bcrypt from 'bcrypt'
 
 import { inviteUserPayloadModel, listActivityQueryModel, listUsersQueryModel, reauthPayloadModel, userIdParamsModel } from './models.js';
 import { db } from '../../db/index.js';
-import { auditEventsTable, sessionsTable, usersTable } from '../../db/schema.js';
-import { and, count, desc, eq, gte, ilike, ne, or, sql } from 'drizzle-orm';
+import { auditEventsTable, referralVisitsTable, sessionsTable, usersTable } from '../../db/schema.js';
+import { and, count, desc, eq, gte, ilike, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../utils/api-response.js';
@@ -72,7 +72,32 @@ export class AdminController {
       newThisYear: count(sql`case when ${gte(usersTable.createdAt, ago(365))} then 1 end`),
     }).from(usersTable)
 
-    return ApiResponse.ok(res, 'Stats fetched successfully', stats)
+    // the last 30 days per tagged source: visits from the daily counters, sign-ups and confirmed ones from the users
+    // who arrived with that ref. a deleted account drops out of its source, the visit stays
+    const since = ago(30)
+    const [visits, signUps] = await Promise.all([
+      db.select({source: referralVisitsTable.source, visits: sql<number>`sum(${referralVisitsTable.visits})::int`})
+        .from(referralVisitsTable)
+        .where(gte(referralVisitsTable.day, since.toISOString().slice(0, 10)))
+        .groupBy(referralVisitsTable.source),
+      db.select({
+        source: usersTable.signupSource,
+        signUps: count(),
+        verified: count(sql`case when ${usersTable.emailVerified} then 1 end`),
+      }).from(usersTable)
+        .where(and(isNotNull(usersTable.signupSource), gte(usersTable.createdAt, since)))
+        .groupBy(usersTable.signupSource),
+    ])
+
+    const sources = new Set([...visits.map(row => row.source), ...signUps.map(row => row.source!)])
+    const referrals = [...sources].sort().map(source => ({
+      source,
+      visits: visits.find(row => row.source === source)?.visits ?? 0,
+      signUps: signUps.find(row => row.source === source)?.signUps ?? 0,
+      verified: signUps.find(row => row.source === source)?.verified ?? 0,
+    }))
+
+    return ApiResponse.ok(res, 'Stats fetched successfully', {...stats, referrals})
   }
 
   public async handleListUsers(req: Request, res: Response) {
