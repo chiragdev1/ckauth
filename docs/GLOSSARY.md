@@ -188,6 +188,10 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Integration test.** A test that runs several parts together: CKAuth's send real HTTP requests to the app, which talks to a real (test) database.
 
+**End-to-end (E2E) test.** A test that drives a real browser through the real site, clicking and typing as a user would, against a running API and database. It catches what API tests can't (a broken button, a form that never reaches the server). Slower than other tests, so CKAuth keeps them to the main journeys.
+
+**Playwright.** The tool CKAuth's E2E tests use to control Chromium, Firefox and WebKit (Safari's engine), including a phone-sized screen.
+
 **Test runner.** The program that finds the tests, runs them and reports what failed. CKAuth uses the one built into Node (`node:test`).
 
 **Code coverage.** How much of the code the tests actually run, as a percentage of lines, branches (each side of an `if`) and functions. CKAuth's checks fail if it drops below a set minimum.
@@ -401,6 +405,14 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 **Lab data vs field data (CrUX).** Lab data comes from a test run like Lighthouse. Field data is measured from real Chrome users; Google publishes it as CrUX, but only for sites with enough visitors.
 
 **TTFB (Time To First Byte).** How long the server takes to start answering.
+
+**LCP, CLS.** Spelled out in the Core Web Vitals table above: when the main content appears, and how much the layout jumps. `pnpm perf` records both, with TTFB, every week.
+
+**Orphan branch.** A git branch with no shared history with the others. CKAuth keeps the weekly speed results on one (`perf-data`), so those commits never appear in `main`'s history or trigger a deploy.
+
+**Worktree (git).** A second folder checked out from the same repository on another branch, so a script can write to one branch while the rest of the project stays on another.
+
+**Mermaid.** A text format for charts and diagrams that GitHub draws in Markdown. The performance report uses it for its trend charts.
 
 **CDN (Content Delivery Network).** Servers around the world that keep copies of a site close to its visitors, to cut the time requests travel.
 

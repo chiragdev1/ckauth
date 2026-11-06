@@ -143,6 +143,9 @@ Open `http://localhost:3000`. The Vite dev server proxies `/api/*` to the API on
 | `pnpm test` | Runs the test suite (103 tests and 5 to-dos for known gaps, about 25 s). Needs Postgres running (`pnpm db:up`); it creates and uses its own `ckauth_test` database, so your development data is never touched. |
 | `pnpm test:types` | Type checks the tests (the runner itself skips type checking). |
 | `cd frontend && pnpm test` | The frontend's unit tests (form rules, error messages, the API client's refresh). |
+| `pnpm e2e` | Browser end-to-end tests (Playwright): builds the API and the frontend, then drives a real browser through sign-up and sign-in on Chromium, Firefox and a phone-sized Chromium (WebKit too, once its system libraries are installed with `sudo pnpm exec playwright install-deps webkit`). Needs Postgres running; uses its own `ckauth_e2e` database, port 8090 for the API and 4180 for the site. First time: `pnpm exec playwright install`. |
+| `pnpm perf` | Measures the live site (page-load times on desktop and a phone on slow 4G, plus API round trips) and appends one line to `perf-data/results.jsonl`. Read-only against production; the weekly GitHub workflow runs it. |
+| `pnpm perf:report` | Prints the latest measurement against the previous one, with trend charts, as Markdown. |
 | `pnpm check:pr` | Every check a branch must pass before a pull request: both builds, unused code (knip), known vulnerabilities (`pnpm audit`), the tests, SEO, speed and security of the built site, repo rules (secrets, security rules, files that change together) and links between docs. |
 | `pnpm docs:artifact` | Bundles every doc into one searchable page (`.docs-artifact/ckauth-docs.html`) and warns about broken links between docs. |
 
@@ -229,7 +232,7 @@ These are planned but not done yet:
 
 - **No CORS configuration.** Not needed for the bundled frontend, which is served from the same origin. A frontend on another origin would need CORS added first.
 - **Malformed or oversized (over 50 KB) JSON bodies return `500`** instead of `400`/`413`.
-- **No automated tests yet.**
+- **Browser end-to-end tests cover only sign-up and sign-in so far**, and aren't in CI yet. The rest of the app (dashboard, password reset, admin) is covered by the API tests and by hand.
 
 ---
 

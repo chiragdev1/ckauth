@@ -403,6 +403,15 @@ New entries go at the bottom, under a dated heading.
 - Why: a token-usage report showed 97.8% of tokens were cache re-reads, and the commit phase of long sessions was the costliest task (about 29 M tokens at roughly 341k tokens of context per call). Forking that phase into a fresh context avoids paying to re-read the whole session.
 - No API or web changes.
 
+
+## 6 Nov 2026 · Browser end-to-end tests and a weekly speed measurement
+
+- **End-to-end (E2E) tests** with Playwright (a tool that drives a real browser): `pnpm e2e` builds both apps, starts the API on its own `ckauth_e2e` database and the built site, then signs up (reading the verification link from the dev-only `GET /dev/outbox`) and signs in. One test checks that a wrong password and an unknown email give the identical API response and identical on-page message (the no-account-enumeration rule), and it was proven to fail when the unknown-email message was changed. 9 of 9 pass on Chromium, Firefox and a Pixel 7 profile. WebKit needs system libraries installed first (`sudo pnpm exec playwright install-deps webkit`), not yet done here.
+- Each test sends its own fake `X-Forwarded-For`, because every browser shares one IP and the per-IP rate limits would otherwise trip during a full run. `test/global-setup.ts` now exports `prepareDatabase(url)` so both suites reuse the same create-and-migrate step.
+- **Weekly performance measurement** (`.github/workflows/perf.yml`, Mondays): Chromium loads the home page and `/sign-in` seven times cold, on a desktop profile and on a phone on slow 4G, and times 20 API calls. One line per run goes to `perf-data/results.jsonl` on an orphan `perf-data` branch (so it never touches `main` or triggers a deploy), and `scripts/perf/report.js` turns it into a report with trend charts. Read-only against production. GitHub pauses scheduled workflows after 60 days without a commit to the repo; re-enable it in the Actions tab.
+- Why: "no browser end-to-end tests yet" was a known gap, and the SEO audit's speed numbers were one-off lab runs; a weekly series shows whether a deploy made the site slower.
+- `package.json` and the lockfile changed, so the API workflow runs on merge (nothing in the image changes). Not done: E2E in CI, and tests beyond sign-up and sign-in.
+
 ---
 
 ## Lessons
@@ -474,7 +483,9 @@ Larger directions beyond Next up, roughly in order of value. Each one says what 
 - **Self-host kit.** The compose stack, edge proxy and setup script, packaged as a documented template for running your own copy.
 
 **Quality and operations**
-- **Automated tests.** There is no test suite yet. Start with integration tests of every flow against a real Postgres and Redis in CI, including the race-condition and account-enumeration rules in CLAUDE.md.
+- **Automated tests.**
+  - ✅ **API and frontend unit tests, done 2 Nov 2026.** Integration tests of every flow against a real Postgres, run in CI with a coverage minimum (see "A test suite, and the pre-PR checks back").
+  - ✅ **Browser end-to-end tests, first part done 6 Nov 2026** (sign-up and sign-in in Chromium, Firefox and a phone profile). Still to do: password reset, the dashboard, sessions, admin, and running them in CI.
 - **OpenAPI from the Zod models.** Generate a machine-readable API description from `models.ts`, so `docs/API.md` and a typed client can't drift from the code.
 - **Observability: activity logs, alerts and a stats dashboard.** The foundation landed on 2 Nov 2026: structured logs with request IDs and the `audit_events` table. (Container logs were already capped by `setup-vps.sh`'s `daemon.json`, 3 × 10 MB, since 21 Oct.) The plan was layered, cheapest first:
   - ✅ **Foundation (needed by every option), done 2 Nov 2026.** Docker log rotation (`logging: max-size/max-file`) in both compose files; structured JSON logs with pino, with `redact` stripping `password`/`token` fields so the "never log secrets" rule can't be broken by accident; request IDs; and an `audit_events` table (sign-up, sign-in success/failure, verify, reset, session ended, avatar change, rate-limit hit), written in the *same* transaction as the action, so an action can never happen without its record. This also feeds the user-facing **Activity log** above.

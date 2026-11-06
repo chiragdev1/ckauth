@@ -152,3 +152,11 @@ vite.config.ts.timestamp-*
 
 # docs page built for publishing (pnpm docs:artifact)
 .docs-artifact/
+
+# playwright output (pnpm e2e): traces and screenshots of failed tests, the html report
+test-results/
+playwright-report/
+blob-report/
+
+# the perf-data branch, checked out here by .github/workflows/perf.yml (and written by pnpm perf when run by hand)
+perf-data/

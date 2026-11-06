@@ -7,6 +7,9 @@
     "test": "node --import tsx --import ./test/env.ts --test-global-setup=test/global-setup.ts --test-concurrency=1 --test 'test/**/*.test.ts'",
     "test:coverage": "node --import tsx --import ./test/env.ts --test-global-setup=test/global-setup.ts --test-concurrency=1 --experimental-test-coverage --test-coverage-include='src/**' --test-coverage-exclude='src/scripts/**' --test-coverage-lines=95 --test-coverage-branches=83 --test-coverage-functions=85 --test 'test/**/*.test.ts'",
     "test:types": "tsc -p test/tsconfig.json",
+    "e2e": "pnpm build && pnpm --dir frontend build && playwright test",
+    "perf": "node scripts/perf/measure.js",
+    "perf:report": "node scripts/perf/report.js",
     "check:pr": "node scripts/check-pr.js",
     "start": "node dist/index.js",
     "dev": "tsc-watch --onSuccess \"node dist/index.js\" | pino-pretty",
@@ -26,6 +29,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.33.0",
   "devDependencies": {
+    "@playwright/test": "1.65.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
