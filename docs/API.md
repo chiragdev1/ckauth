@@ -19,6 +19,7 @@ Everything a client needs in order to use the Authentication API. New to some of
   - [Get current user](#get-authme) · [Edit profile](#patch-authme) · [Change email](#post-authchange-email) · [Confirm new email](#post-authconfirm-emailtoken) · [Upload avatar](#post-authupload-avatar) · [Remove avatar](#delete-authavatar) · [Delete account](#delete-authme)
   - [List devices](#get-authsessions) · [Sign out a device](#delete-authsessionsid) · [Sign out other devices](#delete-authsessions)
   - [Forgot password](#post-authforgot-password) · [Reset password](#post-authreset-passwordtoken) · [Change password](#post-authchange-password)
+- [Metrics](#post-metricsvisit): count a visit from a tagged link
 - [Admin endpoints](#admin-endpoints): [stats](#get-adminstats) · [list users](#get-adminusers) · [activity log](#get-adminactivity) · [confirm password](#post-adminreauth) · [invite user](#post-adminusers) · [delete user](#delete-adminusersid)
 - [Typical flows](#typical-flows)
 
@@ -138,6 +139,7 @@ Every response from a limited endpoint carries the standard `RateLimit-Policy` a
 | `POST /auth/confirm-email/:token` | 20 per 15 min | IP address |
 | `POST /admin/users` and `DELETE /admin/users/:id` | 30 per 15 min, shared | Signed-in admin |
 | `POST /admin/reauth` | 5 **wrong passwords** per 15 min | Signed-in admin |
+| `POST /metrics/visit` | 30 per hour | IP address. A real visitor posts once per tab; this only stops a script inflating the counts. |
 
 - **The per-email limits apply whether or not the account exists,** with the same `429`, so they can't be used to find out who's registered.
 - **While an email is limited, even the right password gets `429`.** Show "too many attempts, try again later" rather than "wrong password".
@@ -175,6 +177,7 @@ Creates an account and sends a verification email.
 | `age` | integer | Optional, positive |
 | `email` | string | Required, valid email. Spaces are trimmed and it's stored in lowercase. |
 | `password` | string | Required, 6–72 characters |
+| `ref` | any | Optional. The `?ref=` tag of the link the visitor arrived through (see [Count a visit](#post-metricsvisit)). A known tag is stored on a new account as its sign-up source; anything else is ignored and never fails the sign-up. A repeat sign-up keeps the first account's source. |
 
 ```json
 { "firstName": "Ada", "lastName": "Lovelace", "email": "ada@example.com", "password": "s3cret-pass" }
@@ -658,6 +661,29 @@ Sets a new password. `:token` comes from the `?token=` in the reset link.
 
 ---
 
+## Metrics
+
+### `POST /metrics/visit`
+
+Counts one visit that arrived through one of our own tagged links, such as `https://ckauth.chiragdev.com/?ref=x` in a post on X. No authentication. Nothing about the visitor is stored: no IP address, no cookie, no account, only a total per tag per day (the IP is only counted briefly by the rate limiter, like every limited endpoint).
+
+**Body**
+
+| Field | Type | Rules |
+|---|---|---|
+| `ref` | any | Required. Trimmed and lowercased, then matched against the known tags (`x` today, in `src/app/metrics/sources.ts`). Anything else, including a non-string, is ignored. |
+
+**Response: `200`**, for a known tag and an unknown one alike, so the endpoint doesn't reveal which tags exist:
+
+```json
+{ "success": true, "message": "Visit recorded", "data": null }
+```
+
+> **Frontend:** `captureReferral()` (`frontend/src/lib/referral.ts`) posts this once per tab when the page opens with `?ref=`, removes the tag from the address bar, and keeps it in session storage so [Sign up](#post-authsign-up) can send it as `ref`.
+> **Adding a tag:** add it to `referralSources` before posting links with it; until then its visits aren't counted.
+
+---
+
 ## Admin endpoints
 
 Every `/admin` endpoint is **🔒 Auth required** and also needs the signed-in user's `role` to be `admin`. The role is read from the database on each request, so a change takes effect immediately, not when the access token expires.
@@ -677,7 +703,7 @@ Every `/admin` endpoint is **🔒 Auth required** and also needs the signed-in u
 
 ### `GET /admin/stats`
 
-Counts for the admin dashboard, all taken in one query.
+Counts for the admin dashboard. The user counts come from one query; `referrals` from two more.
 
 **Response: `200`**
 
@@ -687,12 +713,17 @@ Counts for the admin dashboard, all taken in one query.
   "message": "Stats fetched successfully",
   "data": {
     "totalUsers": 42, "verifiedUsers": 37, "admins": 1,
-    "newLast24Hours": 1, "newThisWeek": 5, "newThisMonth": 12, "newThisYear": 42
+    "newLast24Hours": 1, "newThisWeek": 5, "newThisMonth": 12, "newThisYear": 42,
+    "referrals": [
+      { "source": "x", "visits": 120, "signUps": 6, "verified": 4 }
+    ]
   }
 }
 ```
 
 The four `new…` fields count accounts created within a **rolling window** back from the moment of the request (not since the start of a calendar week or month): the last 24 hours, 7 days, 30 days and 365 days. All four come from one pass over the table, so a client can switch between them without another request.
+
+`referrals` covers the last 30 days, one entry per tag, sorted by tag, and is empty until a tagged link is used. `visits` are [counted visits](#post-metricsvisit); `signUps` are accounts created in the window with that sign-up source, and `verified` the ones among them that confirmed their email. A deleted account leaves its tag's `signUps` but its visit still counts, so `signUps / visits` is the tag's sign-up rate.
 
 ---
 

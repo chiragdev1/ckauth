@@ -17,6 +17,11 @@ window.addEventListener('vite:preloadError', event => {
   window.location.reload()
 })
 
+// only a tagged visit loads it, so the home page's javascript budget doesn't pay for every other visitor
+if(new URLSearchParams(window.location.search).has('ref')) {
+  import('./lib/referral.ts').then(module => module.captureReferral()).catch(() => {})
+}
+
 const container = document.getElementById('root')!
 const app = <App router={createBrowserRouter(routes)} />
 

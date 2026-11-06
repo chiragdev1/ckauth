@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 import { Dialog } from 'radix-ui'
-import { History, KeyRound, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { History, KeyRound, Link2, RefreshCw, Search, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { api, ApiRequestError } from '@/lib/api.ts'
 import { useAuth } from '@/lib/auth.tsx'
 import { useActivity, useAdminData, type AdminStats, type AdminUser } from '@/lib/admin.ts'
@@ -50,6 +50,7 @@ export function Admin() {
             <p className="mt-1 text-sm text-muted-foreground">Everyone with a CKAuth account. Admins are managed on the server.</p>
           </div>
           <StatTiles stats={data.stats} />
+          <ReferralsCard referrals={data.stats?.referrals ?? []} />
           <UsersSection data={data} actions={actions} />
           <ActivitySection activity={activity} />
         </div>
@@ -241,6 +242,68 @@ function StatTiles({ stats }: { stats: AdminStats | null }) {
         </div>
       ))}
     </dl>
+  )
+}
+
+// how a ?ref= tag reads in the panel; an unlisted tag shows capitalised
+const referralNames: Record<string, string> = { x: 'X' }
+const referralName = (source: string) => referralNames[source] ?? source.charAt(0).toUpperCase() + source.slice(1)
+const counted = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
+
+// sign-ups per visit, the number that says whether a place is worth posting in. one decimal, since early rates are small
+function signUpRate(row: AdminStats['referrals'][number]) {
+  return row.visits > 0 ? `${(row.signUps / row.visits * 100).toFixed(1)}%` : '–'
+}
+
+// hidden until a tagged link has been used: an empty card would only repeat what the docs say
+function ReferralsCard({ referrals }: { referrals: AdminStats['referrals'] }) {
+  if(referrals.length === 0) return null
+  // busiest link first; the api sorts by tag, which says nothing
+  const rows = [...referrals].sort((a, b) => b.visits - a.visits)
+
+  return (
+    <section aria-labelledby="referrals-heading" className="rounded-xl border border-border bg-card p-4">
+      <h2 id="referrals-heading" className="font-display flex flex-wrap items-baseline gap-x-2 text-lg font-semibold">
+        <Link2 aria-hidden className="size-5 self-center text-primary" />Where sign-ups come from
+        <span className="text-sm font-normal text-muted-foreground">last 30 days</span>
+      </h2>
+
+      {/* a table from sm up; on phones five columns don't fit, so each tag becomes a short block instead */}
+      <table className="mt-3 hidden w-full text-sm sm:table">
+        <thead>
+          <tr className="border-b border-border text-left text-xs font-medium tracking-[0.15em] text-muted-foreground uppercase">
+            <th scope="col" className="py-2 pr-4 font-medium">Link</th>
+            <th scope="col" className="py-2 pr-4 text-right font-medium">Visits</th>
+            <th scope="col" className="py-2 pr-4 text-right font-medium">Sign-ups</th>
+            <th scope="col" className="py-2 pr-4 text-right font-medium">Verified</th>
+            <th scope="col" className="py-2 text-right font-medium">Sign-up rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.source} className="border-b border-border last:border-0">
+              <th scope="row" className="py-2 pr-4 text-left font-medium">{referralName(row.source)}</th>
+              <td className="py-2 pr-4 text-right tabular-nums">{row.visits}</td>
+              <td className="py-2 pr-4 text-right tabular-nums">{row.signUps}</td>
+              <td className="py-2 pr-4 text-right tabular-nums">{row.verified}</td>
+              <td className="py-2 text-right font-semibold tabular-nums">{signUpRate(row)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <ul className="mt-3 divide-y divide-border sm:hidden">
+        {rows.map(row => (
+          <li key={row.source} className="py-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-medium">{referralName(row.source)}</span>
+              <span className="font-semibold tabular-nums">{signUpRate(row)}<span className="sr-only"> sign-up rate</span></span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">{counted(row.visits, 'visit')} · {counted(row.signUps, 'sign-up')} · {row.verified} verified</p>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

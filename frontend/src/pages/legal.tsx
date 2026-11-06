@@ -7,7 +7,7 @@ import { CONTACT_EMAIL, REPO_URL } from './home-copy.ts'
 // (src/db/schema.ts, rate-limit.ts, auth/utils/constants.ts for cookies, deploy/backup.sh), so change them together.
 // structure follows the usual gdpr / india dpdp act / ccpa checklist; see DEVLOG 27 Oct 2026
 
-const UPDATED = '2 November 2026'
+const UPDATED = '6 November 2026'
 const OPERATOR = 'Chirag Arora'
 
 type Section = { id: string, heading: string, body: ReactNode }
@@ -78,6 +78,7 @@ const privacySections: Section[] = [
           <li><strong>Server logs:</strong> your IP address, the time, the page or action requested and your browser's name and version, plus your account's ID while you're signed in. Our logs never record the full web address of a request, since some carry one-time links, and they name your account by its ID, never by your email address, even when sending an email to you fails.</li>
           <li><strong>Activity log:</strong> a record of what happens to your account, so it can be checked later: signing in (and whether from a new browser), a wrong password typed for it, confirming your email, changing or resetting your password, changing your email (with the previous address), deleting the account, and an admin inviting or deleting it. Each record keeps the time, the IP address it came from and a reference to the request. Admins can read the activity log in their panel, without the IP addresses.</li>
           <li><strong>Rate-limit counters:</strong> to block password guessing, we count recent attempts per IP address, per email address and per account.</li>
+          <li><strong>Which of our links brought you here:</strong> our own posts link to CKAuth with a tag such as <code>?ref=x</code>. When you arrive through one, we add one to a daily total for that tag, with no IP address, cookie or account attached, so the total can't tell anyone who visited. If you then sign up, your account keeps that tag, so we can see how many sign-ups each place brought.</li>
         </ul>
         <p>We don't collect data about you from other sources, and we don't collect sensitive data such as financial, health or government ID details.</p>
       </>
@@ -89,7 +90,7 @@ const privacySections: Section[] = [
     body: (
       <ul>
         <li>We don't sell, rent or trade your data, and we don't share it for advertising.</li>
-        <li>We don't show ads, and we don't use analytics, tracking pixels or third-party cookies.</li>
+        <li>We don't show ads, and we don't use analytics services, tracking pixels or third-party cookies. The only counting we do is the daily link totals described above.</li>
         <li>We don't build profiles of you. The only automatic decision we make is a temporary block after too many attempts (at most an hour), which lifts on its own; email us if you think it was wrong.</li>
         <li>We don't read your password, and we never send one by email.</li>
       </ul>
@@ -105,7 +106,7 @@ const privacySections: Section[] = [
           <li><strong>access_token</strong> proves who you are for about 15 minutes.</li>
           <li><strong>refresh_token</strong> renews it for up to a day, until you sign out. Each device has its own.</li>
         </ul>
-        <p>Both are <code>httpOnly</code> (page scripts can't read them), only sent over HTTPS, and only sent to this site. Your browser's local storage also remembers your light or dark theme and your language choice, and its session storage (cleared when you close the tab) notes the time of an automatic reload after we release a new version, so it can't repeat in a loop. All of this stays on your device and is never sent to us. Since we don't track you, there's nothing for a "Do Not Track" or Global Privacy Control signal to switch off.</p>
+        <p>Both are <code>httpOnly</code> (page scripts can't read them), only sent over HTTPS, and only sent to this site. Your browser's local storage also remembers your light or dark theme and your language choice, and its session storage (cleared when you close the tab) notes the time of an automatic reload after we release a new version, so it can't repeat in a loop, and the tag of the link you arrived through, so a sign-up in that tab can carry it. Apart from that tag, which goes with your sign-up, all of this stays on your device and is never sent to us. Since we don't track you, there's nothing for a "Do Not Track" or Global Privacy Control signal to switch off.</p>
       </>
     ),
   },

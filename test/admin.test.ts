@@ -119,7 +119,7 @@ describe('GET /admin/stats', () => {
 
     const response = await client.get('/admin/stats')
     assert.equal(response.status, 200)
-    assert.deepEqual(response.body.data, {totalUsers: 3, verifiedUsers: 2, admins: 1, newLast24Hours: 3, newThisWeek: 3, newThisMonth: 3, newThisYear: 3})
+    assert.deepEqual(response.body.data, {totalUsers: 3, verifiedUsers: 2, admins: 1, newLast24Hours: 3, newThisWeek: 3, newThisMonth: 3, newThisYear: 3, referrals: []})
   })
 
   // rolling windows back from now; each user sits just inside one window and outside the smaller ones

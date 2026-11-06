@@ -14,6 +14,8 @@ export type AdminStats = {
   newThisWeek: number
   newThisMonth: number
   newThisYear: number
+  // the last 30 days per ?ref= source; visits are counted per tab, sign-ups by the account's signup_source
+  referrals: { source: string, visits: number, signUps: number, verified: number }[]
 }
 
 type Page<K extends string, T> = Record<K, T[]> & { pagination: { page: number, limit: number, total: number } }

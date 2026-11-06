@@ -412,6 +412,18 @@ New entries go at the bottom, under a dated heading.
 - Why: "no browser end-to-end tests yet" was a known gap, and the SEO audit's speed numbers were one-off lab runs; a weekly series shows whether a deploy made the site slower.
 - `package.json` and the lockfile changed, so the API workflow runs on merge (nothing in the image changes). Not done: E2E in CI, and tests beyond sign-up and sign-in.
 
+
+## 6 Nov 2026 · Counting visits and sign-ups from our own links
+
+- **Referral tags:** the links in our posts end with `?ref=x` (X today). When a page opens with one, `captureReferral()` (`frontend/src/lib/referral.ts`) removes it from the address bar, keeps it in session storage and posts it once per tab to the new `POST /metrics/visit`. `main.tsx` loads that code only when the address has `?ref=`, because adding it to the home bundle pushed it 0.1 KiB over its 127 KiB budget. The API adds one to a daily counter per tag (`referral_visits`: day, source, visits) with a single `INSERT … ON CONFLICT DO UPDATE`, so visits at the same moment all count. No IP, cookie or account is stored with a visit.
+- **Sign-ups:** sign-up sends the tag as `ref`, and a new account stores it in `users.signup_source`. Only the insert sets it, so a repeat sign-up keeps the first source (first-touch attribution). `GET /admin/stats` now returns `referrals`: visits, sign-ups and verified accounts per tag over the last 30 days.
+- **Only known tags count:** `normalizeRefSource` (`src/app/metrics/sources.ts`) trims and lowercases the tag and matches it against a fixed list; anything else, including non-strings, is dropped, with the same response, and never fails a sign-up. A pattern would let anyone create rows by editing a link. A new place to post needs its tag added to `referralSources` first.
+- Tests: `test/metrics.test.ts` (tags, the counter under 20 concurrent visits, sign-up sources, the stats), a rate-limit case, and an E2E test that a tagged link is counted once, leaves the address bar and goes with the sign-up; each was proven to fail once. WebKit still needs its system libraries here.
+- `POST /metrics/visit` is limited to 30 per hour per IP. The Privacy Policy (now dated 6 Nov) describes the counters and the stored tag, and no longer says there is no measurement at all; it still uses no analytics service, cookie or pixel.
+- Why: the build-in-public posts carry `?ref=x`, but nothing read it, so there was no way to tell whether posts brought sign-ups. Partly covers M02 in the SEO audit.
+- Migration `20261106074228_small_the_santerians` adds a nullable column and a new table, so it's backwards-compatible.
+- **On `/admin`:** a "Where sign-ups come from" card under the stat tiles, one row per tag (busiest first) with visits, sign-ups, verified and the sign-up rate (sign-ups ÷ visits). A table from `sm` up, a short block per tag on phones. Hidden until a tagged link has been used, and fixed at 30 days (picked over a fifth tile and funnel bars, which hold one tag or make a 5% rate a sliver).
+
 ---
 
 ## Lessons
@@ -432,7 +444,7 @@ Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in
   - Check the new header at 320, 360 and 390 px in a real phone or DevTools, and the skip link, focus moves and ticker pause with a screen reader (VoiceOver or NVDA); the review fixes were built and prerendered but not yet tried in a browser.
   - Build the "Connect your website" flow the dashboard now announces (see Future scope, "Hosted sign-in for other apps"); until it ships, keep the FAQ saying a developer sets CKAuth up.
   - Split the inlined CSS so the home page carries only its own classes, then lower the `homeHtml` budget back to 22.
-  - Count the sign-up funnel (visit → sign-up → verified) once analytics exist, to measure the conversion changes. If analytics are added, update the Privacy Policy, which says there are none.
+  - Count the whole sign-up funnel (visit → sign-up → verified) once analytics exist; tagged links (`?ref=`) are counted since 6 Nov. If analytics are added, update the Privacy Policy, which now describes only the link counters.
   - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
   - Pick the email theme (Ember / Midnight / Warm) at `/dev/emails`, make it `DEFAULT_EMAIL_THEME`, delete the others, and send a real email to a Gmail inbox on a phone in dark mode to check it.
   - Translate the app pages (sign-up, sign-in, dashboard), the form messages, the API's error messages and the emails into Hindi together, with a stored language per user, reviewed by a Hindi speaker; until then the language choice stops at the home page.

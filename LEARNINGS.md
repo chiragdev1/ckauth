@@ -196,6 +196,9 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 - **An explain plan on an empty database proved nothing.** On the empty test database Postgres chose a full scan even for `email`, which has a unique index, because scanning zero rows costs nothing.
   → Checked `pg_indexes` for what exists, and ran `EXPLAIN` with `enable_seqscan = off` to see whether an index *can* serve the query.
   **Rule:** judge indexes by what exists and what the planner can use, not by the plan it picks on a near-empty table.
+- **A 0.5 KiB helper pushed the home page over its JavaScript budget.** The `?ref=` capture was imported in `main.tsx`, so every visitor downloaded it, though only visitors from a tagged link use it. The home bundle went from 127.0 to 127.1 KiB, over its 127 KiB budget, and `check-dist.js` failed.
+  → `main.tsx` imports it with a dynamic `import()` only when the address has `?ref=` (938dd21).
+  **Rule:** code that only some visits need loads behind the condition that needs it, not in the entry file. Don't raise a budget for it.
 
 ## Logging
 
