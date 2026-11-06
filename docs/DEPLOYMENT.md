@@ -549,7 +549,7 @@ Rules that keep rollbacks safe:
 
 ### Admins
 
-Every account has a **role**: `user` (the default) or `admin`. Admins can open `/admin` on the site to search, invite and delete users (after confirming their password). On purpose, the website **can't** make anyone an admin, demote an admin or delete one. Those changes happen here, on the server, with the `manage-users` script that ships in the API image. Someone who steals an admin's session cookie still can't lock the real admins out, because that would take SSH access to the VPS.
+Every account has a **role**: `user` (the default) or `admin`. Admins can open `/admin` on the site to search, invite and delete users (after confirming their password), and to read the **activity log** (sign-ins, wrong passwords, account changes and admin actions; see [`GET /admin/activity`](API.md#get-adminactivity)). On purpose, the website **can't** make anyone an admin, demote an admin or delete one. Those changes happen here, on the server, with the `manage-users` script that ships in the API image. Someone who steals an admin's session cookie still can't lock the real admins out, because that would take SSH access to the VPS.
 
 **Become the first admin.** Sign up on the site and verify your email first. An unverified account can't sign in at all. Then, on the VPS, from any folder:
 
@@ -573,6 +573,8 @@ docker exec ckauth-api-1 node dist/scripts/manage-users.js delete someone@exampl
 
 Locally it's the same script: `pnpm build`, then `pnpm admin role you@example.com admin`.
 
+`role` and `delete` are recorded in the activity log like any other change, as done "by the server", since the script has no signed-in admin.
+
 ### Logs and status
 
 ```bash
@@ -585,6 +587,17 @@ docker stats --no-stream                           # CPU and memory per containe
 df -h /                                            # disk space
 grep -E '^(API|WEB)_TAG' .env                      # which commit each service is running
 ```
+
+**Reading the API logs.** The API writes **[structured logs](GLOSSARY.md#logs-and-monitoring)**: one JSON object per line, with a `level` (`info`, `warn`, `error`), a fixed message (`msg`) and the details as fields. Every request gets one `request completed` line with its `route` (the route's template, e.g. `/auth/verify-email/:token`, never the real URL, which can hold one-time tokens), `status`, `ms`, `ip` and `userId`. Useful searches:
+
+```bash
+docker compose logs --since 1h api | grep '"level":"error"'          # failures, with their stack traces
+docker compose logs --since 1h api | grep '"level":"warn"'           # rate limits hit, refused /admin requests
+docker compose logs --since 1d api | grep '"msg":"mail failed"'      # every email that didn't send ("mail" says which)
+docker compose logs --since 1d api | grep f9de846b-2052-4ccb         # one request, by the X-Request-Id a user quoted
+```
+
+**How much is logged** is set by `LOG_LEVEL` in `api.env`: `info` when it's not set (the default and the right choice for production), `debug` to also see routine lines such as the two `401`s every signed-out visit makes, or `warn` for less. Change it like any other setting (`docker compose up -d api`). Docker rotates each container's log at 3 × 10 MB (`daemon.json`, written by `setup-vps.sh`), so the oldest lines disappear on their own.
 
 **Database shell:** `docker compose exec db psql -U ckauth`. Try `\dt` to list tables, `select email, email_verified from users;`, and `\q` to quit.
 
@@ -723,7 +736,7 @@ Measured on 2 dedicated cores, with the API capped like production. **Expect abo
 |---|---|---|
 | A real user gets "Too many requests" | They (or someone guessing their password) hit a limit; see the table in [API.md](API.md#rate-limits) | Wait out the window (15 min for sign-in), or clear it now: `docker compose exec redis redis-cli --scan --pattern 'rl:signin-email:*'` lists the keys, then `redis-cli del <key>` |
 | Everyone at one office/school gets 429 on sign-in | They share one public IP, and 100 sign-ins per 15 min is the per-IP limit | Raise `signinPerIp` in `src/app/middlewares/rate-limit.ts` |
-| Limits seem to do nothing; API logs show `Redis error` | Redis is down, and limits fail open on purpose so sign-in keeps working | `docker compose ps redis`; `docker compose up -d redis` |
+| Limits seem to do nothing; API logs show `redis error` | Redis is down, and limits fail open on purpose so sign-in keeps working | `docker compose ps redis`; `docker compose up -d redis` |
 | Every request appears to come from one IP | The API isn't seeing the real client address | It must be reached only through the edge proxy (it trusts exactly one proxy hop) |
 
 ### Deploys (GitHub Actions)

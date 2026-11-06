@@ -150,6 +150,8 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Transaction.** A group of database changes that succeed or fail together.
 
+**Seed data.** Made-up records loaded into a development database so a page can be judged with realistic content. `pnpm seed:activity` adds six fake users and a month of activity events, and refuses to run in production.
+
 **Unique constraint.** A database rule that a column can't hold the same value twice, such as two accounts with one email.
 
 **Race condition.** A bug that appears only when two requests arrive at almost the same moment and interfere with each other.
@@ -323,15 +325,21 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Observability.** Being able to tell what a running system is doing, and why, from what it records: logs, metrics and alerts.
 
-**Structured log.** A log entry written as one JSON object, such as `{"event":"signin_failed","ip":"1.2.3.4"}`, instead of free text, so tools can filter, count and alert on it. **pino** is a fast structured logger for Node; its `redact` option removes fields like `password` before anything is written.
+**Structured log.** A log entry written as one JSON object, such as `{"level":"error","msg":"mail failed","mail":"welcome","userId":"7a95…"}`, instead of free text, so tools can filter, count and alert on it. The message stays the same every time (`mail failed`) and the details go in fields, so one search finds every case. **pino** is the fast structured logger CKAuth's API uses (`src/utils/logger.ts`), with **pino-http** writing one line per request.
 
-**Audit log.** A permanent record of security-relevant actions (sign-ins, password resets, sessions ended), answering "what happened to this account?" Ordinary logs answer "is the server healthy?"
+**Log level.** How serious a log line is: `debug` (developer detail), `info` (normal events), `warn` (unexpected but handled), `error` (something failed and needs fixing), `fatal` (the process can't continue). A server is set to a minimum level and drops everything below it; CKAuth's production runs at `info`, set by `LOG_LEVEL`.
 
-**Request ID.** A unique ID given to each request and included in every log line it produces, so all the lines for one request can be found together.
+**Redaction.** Removing secrets from a log line before it's written, e.g. replacing a `password` field with `[redacted]`. CKAuth also uses an **allow-list**: the request logger writes only named fields (method, route, status, time taken, IP, user ID), never headers, cookies or the body.
 
-**Log rotation.** Capping how large logs grow by starting a new file at a size limit and deleting the oldest. Without it, logs eventually fill the disk.
+**Audit log.** A record of security-relevant actions, answering "who did what, to whose account, and when?" (sign-ins, wrong passwords, password and email changes, deletions, admin actions). Ordinary logs answer "is the server healthy?" CKAuth's is the `audit_events` table, shown to admins as the **activity log**; each event is written in the same [transaction](#database) as the action it records, so an action can't happen without its record.
 
-**Retention.** How long logs or metrics are kept before being deleted.
+**Request ID.** A unique ID given to each request and included in every log line it produces, so all the lines for one request can be found together. CKAuth returns it to the client as the `X-Request-Id` header and stores it on audit events.
+
+**Log rotation.** Capping how large logs grow by starting a new file at a size limit and deleting the oldest. Without it, logs eventually fill the disk. On the VPS, Docker keeps at most three 10 MB files per container.
+
+**Retention.** How long logs or records are kept before being deleted. **Pruning** is the job that deletes them; CKAuth's API prunes audit events daily: sign-ins after 90 days, everything else after a year.
+
+**Rolling window.** A period counted back from now ("the last 7 days") rather than from a calendar boundary ("since Monday"), so a number doesn't drop to zero at the start of each week. The admin stats use rolling windows.
 
 **Metrics.** Numbers measured over time, such as requests per second, error rate or sign-ins per hour. **Prometheus** is the usual tool for storing them.
 

@@ -14,7 +14,8 @@ import { safeUserColumns } from './utils/user-columns.js';
 import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../utils/api-response.js';
 import { parseOrThrow } from '../../utils/validate.js';
-import { getFrontendUrl, PASSWORD_HASH_ROUNDS, userRolesEnum } from './utils/constants.js';
+import { auditActions, getFrontendUrl, PASSWORD_HASH_ROUNDS, userRolesEnum } from './utils/constants.js';
+import { recordEvent } from './utils/audit.js';
 import { sendAccountDeletedMail, sendAccountExistsMail, sendConfirmEmailChangeMail, sendEmailChangedMail, sendEmailChangeRequestedMail, sendEmailTakenMail, sendNewSignInMail, sendEmailVerificationMail, sendResetPasswordMail, sendWelcomeMail } from '../../utils/mail.js';
 import { deleteImage, uploadImage } from '../../utils/imagekit.js';
 import { describeDevice } from '../../utils/device.js';
@@ -72,7 +73,7 @@ export class AuthController {
     // new account: send the verification mail; the user can get a new one by signing up or signing in again if this fails
     if(result) {
       sendEmailVerificationMail(email, link).catch((error) => {
-        console.error(`Failed to send verification mail to ${email}:`, error)
+        req.log.error({err: error, mail: 'verification', userId: result.id}, 'mail failed')
       })
       return ApiResponse.created(res, genericMessage)
     }
@@ -100,7 +101,7 @@ export class AuthController {
 
     if(unverifiedUser) {
       sendEmailVerificationMail(email, link).catch((error) => {
-        console.error(`Failed to send verification mail to ${email}:`, error)
+        req.log.error({err: error, mail: 'verification', userId: unverifiedUser.id}, 'mail failed')
       })
       return ApiResponse.created(res, genericMessage)
     }
@@ -115,11 +116,11 @@ export class AuthController {
       eq(usersTable.emailVerified, true),
       or(isNull(usersTable.accountExistsMailSentAt), lt(usersTable.accountExistsMailSentAt, accountExistsMailCooldown))
     ))
-    .returning({firstName: usersTable.firstName})
+    .returning({id: usersTable.id, firstName: usersTable.firstName})
 
     if(verifiedUser) {
       sendAccountExistsMail(email, verifiedUser.firstName, `${getFrontendUrl()}/sign-in`, `${getFrontendUrl()}/forgot-password`).catch((error) => {
-        console.error(`Failed to send account exists mail to ${email}:`, error)
+        req.log.error({err: error, mail: 'account-exists', userId: verifiedUser.id}, 'mail failed')
       })
     }
 
@@ -140,7 +141,9 @@ export class AuthController {
 
     const isPasswordValid = await bcrypt.compare(password, userInDb.password)
 
+    // only for a real account: an unknown email has nobody to show it to, and storing it would keep a guessed address
     if(!isPasswordValid) {
+      await recordEvent(db, req, {action: auditActions.SIGN_IN_FAILED, targetId: userInDb.id})
       throw ApiError.unauthorized('Invalid email or password')
     }
 
@@ -161,7 +164,7 @@ export class AuthController {
       // a mail failure shouldn't change the response
       if(linkRenewed) {
         sendEmailVerificationMail(userInDb.email, verificationUrl(emailVerificationToken)).catch((error) => {
-          console.error(`Failed to send verification mail to ${userInDb.email}:`, error)
+          req.log.error({err: error, mail: 'verification', userId: userInDb.id}, 'mail failed')
         })
       }
 
@@ -179,12 +182,16 @@ export class AuthController {
       .limit(1)
 
     // a new session for this device; sessions on other devices carry on
-    const tokens = await startSession(db, userInDb.id, req)
+    const tokens = await db.transaction(async (tx) => {
+      const started = await startSession(tx, userInDb.id, req)
+      await recordEvent(tx, req, {action: auditActions.SIGN_IN, actorId: userInDb.id, targetId: userInDb.id, details: {newDevice: !knownBrowser}})
+      return started
+    })
     setSessionCookies(res, tokens)
 
     if(!knownBrowser) {
       sendNewSignInMail(userInDb.email, userInDb.firstName, describeDevice(client.userAgent), client.ipAddress, `${getFrontendUrl()}/dashboard#devices`, `${getFrontendUrl()}/forgot-password`).catch((error) => {
-        console.error(`Failed to send new sign-in mail to ${userInDb.email}:`, error)
+        req.log.error({err: error, mail: 'new-sign-in', userId: userInDb.id}, 'mail failed')
       })
     }
 
@@ -230,6 +237,7 @@ export class AuthController {
         throw ApiError.notFound('Invalid or expired email token')
       }
 
+      await recordEvent(tx, req, {action: auditActions.EMAIL_VERIFIED, actorId: updateRes.id, targetId: updateRes.id})
       return {id: updateRes.id, tokens: await startSession(tx, updateRes.id, req)}
     })
 
@@ -238,7 +246,7 @@ export class AuthController {
 
     // send welcome mail now that signup is complete; a mail failure shouldn't fail verification
     sendWelcomeMail(userInDb.email, userInDb.firstName).catch((error) => {
-      console.error(`Failed to send welcome mail to ${userInDb.email}:`, error)
+      req.log.error({err: error, mail: 'welcome', userId: userInDb.id}, 'mail failed')
     })
 
     return ApiResponse.ok(res, 'Email verified successfully', {id: verified.id})
@@ -386,7 +394,7 @@ export class AuthController {
 
     // send the reset password email without awaiting it, so a mail failure or the extra delay doesn't reveal that the user exists
     sendResetPasswordMail(userInDb.email, userInDb.firstName, resetUrl).catch((error) => {
-      console.error(`Failed to send reset password mail to ${userInDb.email}:`, error)
+      req.log.error({err: error, mail: 'reset-password', userId: userInDb.id}, 'mail failed')
     })
 
     return ApiResponse.ok(res, genericMessage)
@@ -425,6 +433,8 @@ export class AuthController {
 
       if(updated) {
         await tx.delete(sessionsTable).where(eq(sessionsTable.userId, updated.id))
+        // an invited user setting their first password shows up here too, as firstPassword
+        await recordEvent(tx, req, {action: auditActions.PASSWORD_RESET, actorId: updated.id, targetId: updated.id, details: {firstPassword: !userInDb.password}})
       }
       return updated
     })
@@ -466,6 +476,7 @@ export class AuthController {
       }
 
       await tx.delete(sessionsTable).where(eq(sessionsTable.userId, updated.id))
+      await recordEvent(tx, req, {action: auditActions.PASSWORD_CHANGED, actorId: updated.id, targetId: updated.id})
       return {id: updated.id, tokens: await startSession(tx, updated.id, req)}
     })
 
@@ -506,7 +517,7 @@ export class AuthController {
     } catch (error) {
       // the db was not updated, so remove the file we just uploaded instead of leaving it unused in ImageKit
       deleteImage(uploadedAvatar.fileId).catch((deleteError) => {
-        console.error(`Failed to delete unused avatar ${uploadedAvatar.fileId} from ImageKit:`, deleteError)
+        req.log.error({err: deleteError, fileId: uploadedAvatar.fileId}, 'unused avatar delete failed')
       })
       throw error
     }
@@ -514,7 +525,7 @@ export class AuthController {
     // the new avatar is saved, so a failure to delete the old one shouldn't fail the upload
     if(previousAvatarFileId) {
       deleteImage(previousAvatarFileId).catch((error) => {
-        console.error(`Failed to delete old avatar ${previousAvatarFileId} from ImageKit:`, error)
+        req.log.error({err: error, fileId: previousAvatarFileId}, 'old avatar delete failed')
       })
     }
 
@@ -540,7 +551,7 @@ export class AuthController {
     // the db no longer points at the file, so a failed delete leaves only an unused file, never a broken avatar
     if(previousAvatarFileId) {
       deleteImage(previousAvatarFileId).catch((error) => {
-        console.error(`Failed to delete removed avatar ${previousAvatarFileId} from ImageKit:`, error)
+        req.log.error({err: error, fileId: previousAvatarFileId}, 'removed avatar delete failed')
       })
     }
 
@@ -593,9 +604,16 @@ export class AuthController {
 
     // the role check is part of the delete, so a promotion between the read above and this write can't slip through.
     // deleting the row deletes every session with it, so every device is signed out at once
-    const [deletedUser] = await db.delete(usersTable)
-      .where(and(eq(usersTable.id, userId), ne(usersTable.role, userRolesEnum.ADMIN)))
-      .returning({id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, avatarFileId: usersTable.avatarFileId})
+    // the email is kept on the event, since the account it belonged to is gone (see the privacy policy's retention)
+    const deletedUser = await db.transaction(async (tx) => {
+      const [deleted] = await tx.delete(usersTable)
+        .where(and(eq(usersTable.id, userId), ne(usersTable.role, userRolesEnum.ADMIN)))
+        .returning({id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, avatarFileId: usersTable.avatarFileId})
+      if(deleted) {
+        await recordEvent(tx, req, {action: auditActions.ACCOUNT_DELETED, actorId: deleted.id, targetId: deleted.id, details: {email: deleted.email}})
+      }
+      return deleted
+    })
 
     if(!deletedUser) {
       throw ApiError.forbidden('Admin accounts can only be deleted on the server')
@@ -607,13 +625,13 @@ export class AuthController {
     // the account is already gone, so a failure to remove the photo or send the mail shouldn't fail the request
     if(deletedUser.avatarFileId) {
       deleteImage(deletedUser.avatarFileId).catch((error) => {
-        console.error(`Failed to delete avatar ${deletedUser.avatarFileId} from ImageKit:`, error)
+        req.log.error({err: error, fileId: deletedUser.avatarFileId}, 'deleted account avatar delete failed')
       })
     }
 
     // authenticateToken only lets verified users through, so this address is known to be theirs
     sendAccountDeletedMail(deletedUser.email, deletedUser.firstName, `${getFrontendUrl()}/privacy`, 'user').catch((error) => {
-      console.error(`Failed to send account deleted mail to ${deletedUser.email}:`, error)
+      req.log.error({err: error, mail: 'account-deleted', userId: deletedUser.id}, 'mail failed')
     })
 
     return ApiResponse.ok(res, 'Account deleted successfully', {id: deletedUser.id})
@@ -649,7 +667,7 @@ export class AuthController {
 
     if(taken) {
       sendEmailTakenMail(newEmail).catch((error) => {
-        console.error(`Failed to send email taken mail to ${newEmail}:`, error)
+        req.log.error({err: error, mail: 'email-taken', userId}, 'mail failed')
       })
       return ApiResponse.ok(res, genericMessage)
     }
@@ -667,11 +685,11 @@ export class AuthController {
     }
 
     sendConfirmEmailChangeMail(newEmail, userInDb.firstName, `${getFrontendUrl()}/confirm-email?token=${token}`, EMAIL_CHANGE_LINK_MS / 60_000).catch((error) => {
-      console.error(`Failed to send confirm email change mail to ${newEmail}:`, error)
+      req.log.error({err: error, mail: 'confirm-email-change', userId}, 'mail failed')
     })
     // the current address hears about it at once, before anything can change
     sendEmailChangeRequestedMail(userInDb.email, userInDb.firstName, newEmail, `${getFrontendUrl()}/forgot-password`).catch((error) => {
-      console.error(`Failed to send email change requested mail to ${userInDb.email}:`, error)
+      req.log.error({err: error, mail: 'email-change-requested', userId}, 'mail failed')
     })
 
     return ApiResponse.ok(res, genericMessage)
@@ -689,22 +707,32 @@ export class AuthController {
     if(!userInDb || !userInDb.pendingEmail) {
       throw ApiError.notFound('Invalid or expired email change link')
     }
+    // a const keeps the null check above inside the transaction's callback
+    const newEmail = userInDb.pendingEmail
 
     // matching on the token makes the link single-use even when opened twice at once. the unique constraint on email
     // decides the race with someone signing up with the same address in the meantime. a reset link still in the old
     // inbox is cancelled: people often move because they lost that inbox, and its link would hand the account back
     let updated: {id: string} | undefined
     try {
-      [updated] = await db.update(usersTable).set({
-        email: userInDb.pendingEmail,
-        pendingEmail: null,
-        emailChangeToken: null,
-        emailChangeTokenExpiry: null,
-        resetPasswordToken: null,
-        resetPasswordTokenExpiry: null,
+      updated = await db.transaction(async (tx) => {
+        const [changed] = await tx.update(usersTable).set({
+          email: newEmail,
+          pendingEmail: null,
+          emailChangeToken: null,
+          emailChangeTokenExpiry: null,
+          resetPasswordToken: null,
+          resetPasswordTokenExpiry: null,
+        })
+        .where(and(eq(usersTable.id, userInDb.id), eq(usersTable.emailChangeToken, hashedToken)))
+        .returning({id: usersTable.id})
+
+        // the old address, so a takeover that moved the account to the attacker's inbox can be traced back
+        if(changed) {
+          await recordEvent(tx, req, {action: auditActions.EMAIL_CHANGED, actorId: changed.id, targetId: changed.id, details: {previousEmail: userInDb.email}})
+        }
+        return changed
       })
-      .where(and(eq(usersTable.id, userInDb.id), eq(usersTable.emailChangeToken, hashedToken)))
-      .returning({id: usersTable.id})
     } catch (error) {
       if((error as {cause?: {code?: string}})?.cause?.code === '23505') {
         await db.update(usersTable).set({pendingEmail: null, emailChangeToken: null, emailChangeTokenExpiry: null}).where(eq(usersTable.id, userInDb.id))
@@ -718,7 +746,7 @@ export class AuthController {
     }
 
     sendEmailChangedMail(userInDb.email, userInDb.firstName, userInDb.pendingEmail, `${getFrontendUrl()}/privacy`).catch((error) => {
-      console.error(`Failed to send email changed mail to ${userInDb.email}:`, error)
+      req.log.error({err: error, mail: 'email-changed', userId: userInDb.id}, 'mail failed')
     })
 
     return ApiResponse.ok(res, 'Email changed successfully', {email: userInDb.pendingEmail})
@@ -753,7 +781,7 @@ export class AuthController {
 
     if(linkRenewed) {
       sendEmailVerificationMail(email, verificationUrl(emailVerificationToken)).catch((error) => {
-        console.error(`Failed to send verification mail to ${email}:`, error)
+        req.log.error({err: error, mail: 'verification', userId: linkRenewed.id}, 'mail failed')
       })
     }
 

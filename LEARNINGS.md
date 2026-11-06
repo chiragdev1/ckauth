@@ -169,6 +169,10 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 - **A check that can't fail proves nothing.** → Every new test and check here was proven by breaking the code once on purpose: deleting the admin-role condition, removing `/admin` from the Caddyfile.
   **Rule:** before trusting a new test or check, make it fail once.
 
+- **A "break it once" check that didn't break anything.** To prove the audit row commits with its action, the event was written with `db` instead of `tx`, and the test still passed: the failing insert threw inside the transaction callback, so the transaction rolled back anyway. The way the guarantee really breaks is writing the record after the commit, and that version failed the test.
+  → The proof now moves the write after the commit.
+  **Rule:** break the code the way it would really go wrong, not just in some way; a break that leaves the test green proves nothing about the test.
+
 ## Performance
 
 - **Password hashing on the main thread capped the whole API.** `bcryptjs` is pure JavaScript, so each ~60 ms hash ran on Node's only JavaScript thread, the event loop, and blocked it. Sign-in topped out at 17 per second, and a burst of sign-ins delayed every other request.
@@ -193,6 +197,15 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   → Checked `pg_indexes` for what exists, and ran `EXPLAIN` with `enable_seqscan = off` to see whether an index *can* serve the query.
   **Rule:** judge indexes by what exists and what the planner can use, not by the plan it picks on a near-empty table.
 
+## Logging
+
+- **The request log lost its route prefix exactly on errors.** The first version logged `${req.baseUrl}${req.route.path}`. When a handler throws, the error leaves the router and Express 5 resets `req.baseUrl` to `''`, so failed requests were logged as `/me` instead of `/auth/me`. The level rules match `/auth/me`, so the two routine `401`s of every signed-out visit came out at `info` instead of `debug`. Reading the code didn't show it; ten real requests did.
+  → The mount prefix is taken from the URL itself: everything before the template's own segments.
+  **Rule:** build a log line from what is still true when the response finishes, and check it against real requests, including failing ones, before trusting it.
+- **The default access log would have written every session cookie.** pino-http's default `req` serializer logs all headers, and `cookie` holds the access and refresh JWTs. Logging `req.url`, as most examples do, would also have stored every single-use token, since they travel in paths (`/verify-email/:token`). Caught while writing the logger, before it shipped.
+  → An allow-list of six fields, the route template instead of the URL, and `redact` as a second line of defence.
+  **Rule:** a logger's fields are an allow-list; never log a whole request, headers object or URL on an auth server.
+
 ## SEO
 
 - **The SPA fallback answered 200 for every address.** A single-page app needs unknown paths to load `index.html`, so the router in the browser can draw them. But `try_files {path} /index.html` meant `/robots.txt`, `/sitemap.xml` and every misspelled URL returned the app with status 200. Search engines count those as "soft 404s", and the site had no way to say "this page doesn't exist".
@@ -213,6 +226,7 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 - **Hindi was harder to read than the English beside it.** Same font size, line height and letter-spacing as English, with the system's fallback font. Devanagari letters hang from a top line and carry marks above and below, so at the same size they looked a size smaller, the lines crowded each other, and letter-spacing cut the top line into pieces.
   → Bundle Noto Sans Devanagari, scale it with `size-adjust: 112%`, load it only for Devanagari characters (`unicode-range`), and give `:lang(hi)` taller lines, no letter-spacing, slightly bigger small text and darker grey text.
   **Rule:** a second script needs its own typography, not just a translation. Mark the text with `lang`, and tune size, line height and spacing for that script.
+
 
 ## Frontend UX & accessibility
 
@@ -235,11 +249,22 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   → The highlight follows the first plan you can pick ("Available now").
   **Rule:** visual emphasis goes to an action people can take today.
 
+- **A long email widened the whole admin page on phones.** The users list was `grid` with columns only from `sm:` up, so on phones its single column was an automatic track, which grows to its widest item's content. `truncate` with `min-w-0` stopped the email overflowing its own box but not widening the track, so `walkthrough.invitee@seed.example.com` pushed the page 36–78 px sideways at 320 px. It only showed up once the seed data had long addresses.
+  → `grid-cols-1` (`minmax(0, 1fr)`) on phones, and `break-all` on emails in running text.
+  **Rule:** give every grid an explicit column template at every width, and test phone widths with the longest realistic data, not the shortest.
+- **Fixed column widths left an empty strip.** Moving the activity table to `table-fixed` with set widths for When and Event made every filter look the same, but Details took all the rest, so short sentences left a wide blank on the right. The look the user liked (one person's log) came from the content: short, balanced cells that the browser's automatic layout spread evenly.
+  → Back to automatic layout.
+  **Rule:** uneven table spacing is a content problem first. Balance what each column holds before reaching for widths.
+
 ## Process
 
 - **The same validation block was pasted into 16 handlers**, along with three copies of the "safe user fields" select and five of the token hash. The frontend parses that validation message to place field errors, and the field list decides what a client may see, so one copy drifting would have broken forms or leaked a column.
   → `parseOrThrow`, `safeUserColumns` and `tokens.ts`, each the only copy.
   **Rule:** when the same lines appear a third time, make them a helper, and sooner when other code depends on their exact output or they guard what leaves the server.
+
+- **A design the user liked was overwritten before anyone committed it.** The activity table went through a redesign that replaced the chosen version; when the user asked for it back, git had nothing, and it had to be rebuilt by hand from the conversation.
+  → Rebuilt, and the branch is committed before further experiments.
+  **Rule:** commit (or at least stash) a version the user has approved before trying alternatives on top of it.
 
 - Commit messages for behaviour or security changes need a body explaining *why*, plus a `BREAKING CHANGE:` footer when the API changes. One-line messages are only for trivial commits.
 - After a change, test the real flow end to end against the database and the external services, not just a successful build.

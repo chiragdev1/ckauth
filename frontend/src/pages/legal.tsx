@@ -75,7 +75,8 @@ const privacySections: Section[] = [
         <ul>
           <li><strong>Security records:</strong> hashed copies of your session and email-link tokens, when they expire, whether your email is confirmed, your account's role (an ordinary user, or an admin who helps run CKAuth and can see and delete accounts), when your account was created and last changed, and, while you're changing your email, the new address and a hashed copy of its confirmation link (both cleared once it's confirmed, replaced or expired).</li>
           <li><strong>Your signed-in devices:</strong> for each device you're signed in on, the browser's description of itself (its "user agent", such as Chrome on Windows), the IP address it last used, when it signed in and when it was last active, and for admins when they last confirmed their password on it. You see this list on your dashboard, so you can spot and sign out a device that isn't yours. We don't work out your location from the IP address.</li>
-          <li><strong>Server logs:</strong> your IP address, the time, the page or action requested and your browser's name and version. If sending an email to you fails, the error log includes your email address.</li>
+          <li><strong>Server logs:</strong> your IP address, the time, the page or action requested and your browser's name and version, plus your account's ID while you're signed in. Our logs never record the full web address of a request, since some carry one-time links, and they name your account by its ID, never by your email address, even when sending an email to you fails.</li>
+          <li><strong>Activity log:</strong> a record of what happens to your account, so it can be checked later: signing in (and whether from a new browser), a wrong password typed for it, confirming your email, changing or resetting your password, changing your email (with the previous address), deleting the account, and an admin inviting or deleting it. Each record keeps the time, the IP address it came from and a reference to the request. Admins can read the activity log in their panel, without the IP addresses.</li>
           <li><strong>Rate-limit counters:</strong> to block password guessing, we count recent attempts per IP address, per email address and per account.</li>
         </ul>
         <p>We don't collect data about you from other sources, and we don't collect sensitive data such as financial, health or government ID details.</p>
@@ -115,7 +116,7 @@ const privacySections: Section[] = [
       <ul>
         <li><strong>To run your account:</strong> creating it, confirming your email, signing you in, keeping you signed in on each of your devices, resetting your password and showing your photo. This is necessary to provide the service you asked for, and under the DPDP Act it rests on the consent you give when you sign up.</li>
         <li><strong>To send account emails:</strong> confirmation links, password resets, a notice if someone tries to sign up with your address, an invitation if an admin creates an account for you, a notice when your account is signed in on a new browser (naming the browser and IP address), the messages that confirm a change of email (to the new address, and a notice to the old one), and a notice when your account is deleted, by you or by an admin (only to a confirmed address). These are part of the service. We don't send marketing emails.</li>
-        <li><strong>To keep CKAuth and your account secure:</strong> blocking repeated wrong guesses, investigating abuse and fixing faults, using logs and rate-limit counters. This is our legitimate interest in protecting users, and a "legitimate use" under the DPDP Act.</li>
+        <li><strong>To keep CKAuth and your account secure:</strong> blocking repeated wrong guesses, investigating abuse and fixing faults, and knowing who changed what, using logs, the activity log and rate-limit counters. This is our legitimate interest in protecting users, and a "legitimate use" under the DPDP Act.</li>
         <li><strong>To meet legal obligations,</strong> such as answering a lawful request from the authorities.</li>
       </ul>
     ),
@@ -145,13 +146,15 @@ const privacySections: Section[] = [
     heading: 'How long we keep it',
     body: (
       <ul>
-        <li><strong>Account data:</strong> for as long as your account exists. When you delete it from your dashboard, or ask us to, we remove it from the live database and delete your photo.</li>
+        <li><strong>Account data:</strong> for as long as your account exists. When you delete it from your dashboard, or ask us to, we remove it from the live database and delete your photo. The activity log's record of the deletion keeps your email address for one year (see below).</li>
         <li><strong>Signed-in devices:</strong> until that device signs out, you sign it out from your dashboard, or its session expires (about a day after it was last used). Ten at most: signing in on an eleventh device removes the one used least recently.</li>
         <li><strong>Unconfirmed sign-ups:</strong> an account whose email was never confirmed is kept until it's confirmed or you ask us to delete it. It can't be used to sign in.</li>
         <li><strong>Backups:</strong> nightly copies of the database are kept for 14 days, so deleted data disappears from them within 14 days.</li>
         <li><strong>Rate-limit counters:</strong> one hour at most.</li>
         <li><strong>Email links:</strong> expire after 15 minutes and stop working once used.</li>
-        <li><strong>Server logs and emails you send us:</strong> for a limited period, only as long as we need them for security, troubleshooting or answering you.</li>
+        <li><strong>Activity log:</strong> sign-ins and wrong passwords for 90 days; everything else, such as password and email changes and deletions, for one year. Older records are deleted automatically every day.</li>
+        <li><strong>Server logs:</strong> in rotating files of at most 30 MB per service, so the oldest lines are deleted automatically as new ones are written.</li>
+        <li><strong>Emails you send us:</strong> only as long as we need them to answer you.</li>
         <li>We may keep data longer only where the law requires it.</li>
       </ul>
     ),

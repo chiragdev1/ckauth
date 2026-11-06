@@ -1,6 +1,7 @@
 import "dotenv/config"
 import ImageKit, {NotFoundError, toFile} from "@imagekit/nodejs"
 import {ApiError} from "./api-error.js"
+import {logger} from "./logger.js"
 
 let imagekitClient: ImageKit | null = null
 
@@ -31,12 +32,12 @@ export async function uploadImage(buffer: Buffer, fileName: string, mimeType: st
       useUniqueFileName: true,
     })
   } catch (error) {
-    console.error(`Failed to upload ${fileName} to ImageKit:`, error)
+    logger.error({err: error, fileName}, 'imagekit upload failed')
     throw new ApiError(502, "Failed to upload image")
   }
 
   if (!response.fileId || !response.url) {
-    console.error(`ImageKit upload of ${fileName} returned no fileId or url:`, response)
+    logger.error({fileName, response}, 'imagekit upload returned no fileId or url')
     throw new ApiError(502, "Failed to upload image")
   }
 

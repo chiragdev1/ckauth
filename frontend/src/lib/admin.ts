@@ -9,7 +9,11 @@ export type AdminStats = {
   totalUsers: number
   verifiedUsers: number
   admins: number
+  // rolling windows back from now (docs/API.md)
+  newLast24Hours: number
   newThisWeek: number
+  newThisMonth: number
+  newThisYear: number
 }
 
 type Page<K extends string, T> = Record<K, T[]> & { pagination: { page: number, limit: number, total: number } }
@@ -78,4 +82,86 @@ export function useAdminData() {
     search, setSearch: setSearchText, searching: appliedSearch !== '',
     loading, error, reload,
   }
+}
+
+// one row of GET /admin/activity (docs/API.md). the joined names are null once that account is deleted;
+// details.email then still says who it was
+export type ActivityEvent = {
+  id: string
+  action: ActivityAction
+  source: 'api' | 'cli'
+  details: Record<string, string | number | boolean> | null
+  requestId: string | null
+  createdAt: string
+  actorId: string | null
+  targetId: string | null
+  actorEmail: string | null
+  actorFirstName: string | null
+  targetEmail: string | null
+  targetFirstName: string | null
+}
+
+// the api's auditActions (src/app/auth/utils/constants.ts), with the label the type filter shows
+export const activityActions = {
+  sign_in: 'Signed in',
+  sign_in_failed: 'Wrong password at sign-in',
+  email_verified: 'Email verified',
+  password_changed: 'Password changed',
+  password_reset: 'Password reset',
+  email_changed: 'Email changed',
+  account_deleted: 'Deleted own account',
+  admin_reauth: 'Admin password confirmed',
+  admin_reauth_failed: 'Wrong admin password',
+  user_invited: 'User invited',
+  user_deleted: 'User deleted',
+  role_changed: 'Role changed',
+} as const
+
+export type ActivityAction = keyof typeof activityActions
+
+export const ACTIVITY_PAGE_SIZE = 25
+
+export type ActivityFilter = { action: ActivityAction | null, user: { id: string, label: string } | null }
+
+// one page of the activity log, refetched when the filter or page changes
+export function useActivity() {
+  const [page, setPage] = useState(1)
+  const [filter, setFilterState] = useState<ActivityFilter>({ action: null, user: null })
+  const [list, setList] = useState<Page<'events', ActivityEvent> | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [version, setVersion] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+
+    const query = new URLSearchParams({ page: String(page), limit: String(ACTIVITY_PAGE_SIZE) })
+    if(filter.action) query.set('action', filter.action)
+    if(filter.user) query.set('userId', filter.user.id)
+
+    api<Page<'events', ActivityEvent>>(`/admin/activity?${query}`, { authed: true }).then(response => {
+      if(cancelled) return
+      setList(response.data)
+      setError(null)
+    }, caught => {
+      if(!cancelled) setError(describeError(caught).formError ?? 'Could not load activity, please try again')
+    }).finally(() => {
+      if(!cancelled) setLoading(false)
+    })
+
+    return () => { cancelled = true }
+  }, [page, filter, version])
+
+  const reload = useCallback(() => setVersion(current => current + 1), [])
+  // a new filter starts from the first page
+  const setFilter = useCallback((next: Partial<ActivityFilter>) => {
+    setFilterState(current => ({ ...current, ...next }))
+    setPage(1)
+  }, [])
+
+  const total = list?.pagination.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / ACTIVITY_PAGE_SIZE))
+
+  return { events: list?.events ?? [], total, page, totalPages, setPage, filter, setFilter, loading, error, reload }
 }

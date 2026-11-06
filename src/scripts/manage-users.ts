@@ -14,7 +14,8 @@ import { z } from 'zod'
 import { db } from '../db/index.js'
 import { usersTable } from '../db/schema.js'
 import { emailModel } from '../app/auth/models.js'
-import { availableUserRoles, userRolesEnum } from '../app/auth/utils/constants.js'
+import { auditActions, availableUserRoles, userRolesEnum } from '../app/auth/utils/constants.js'
+import { recordEvent } from '../app/auth/utils/audit.js'
 import { deleteImage } from '../utils/imagekit.js'
 
 const usage = 'usage: manage-users role <email> <user|admin> | delete <email> | admins'
@@ -23,7 +24,14 @@ async function setRole(rawEmail: string | undefined, rawRole: string | undefined
   const email = emailModel.parse(rawEmail)
   const role = z.enum(availableUserRoles).parse(rawRole)
 
-  const [user] = await db.update(usersTable).set({role}).where(eq(usersTable.email, email)).returning({id: usersTable.id, emailVerified: usersTable.emailVerified})
+  // recorded like an api action, with no actor: whoever had shell access to the server
+  const user = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(usersTable).set({role}).where(eq(usersTable.email, email)).returning({id: usersTable.id, emailVerified: usersTable.emailVerified})
+    if(updated) {
+      await recordEvent(tx, null, {action: auditActions.ROLE_CHANGED, targetId: updated.id, details: {role}})
+    }
+    return updated
+  })
 
   if(!user) {
     throw new Error(`no user with email ${email}`)
@@ -39,7 +47,13 @@ async function setRole(rawEmail: string | undefined, rawRole: string | undefined
 async function deleteUser(rawEmail: string | undefined) {
   const email = emailModel.parse(rawEmail)
 
-  const [user] = await db.delete(usersTable).where(eq(usersTable.email, email)).returning({avatarFileId: usersTable.avatarFileId})
+  const user = await db.transaction(async (tx) => {
+    const [deleted] = await tx.delete(usersTable).where(eq(usersTable.email, email)).returning({id: usersTable.id, avatarFileId: usersTable.avatarFileId})
+    if(deleted) {
+      await recordEvent(tx, null, {action: auditActions.USER_DELETED, targetId: deleted.id, details: {email}})
+    }
+    return deleted
+  })
 
   if(!user) {
     throw new Error(`no user with email ${email}`)

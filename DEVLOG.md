@@ -374,6 +374,27 @@ New entries go at the bottom, under a dated heading.
   - Everything else on the hot paths already used an index: every signed-in request (including `/auth/me`) is one indexed join, refresh and logout find the session by its unique hash, and the admin list's device counts use `sessions_user_id_idx`.
   - Left for later: admin search's `ilike '%…%'` can't use an index (a trigram index, `pg_trgm`, would fix it once there are many users).
 
+## 2 Nov 2026 · Observability: structured logs and an activity log
+**In short:** the API now writes structured logs (one JSON line per request, with a request ID) instead of scattered `console.error` calls, and every account change and admin action is recorded in an **audit log**, shown to admins as an activity table in `/admin`. The admin stats gained a 24-hour / 7-day / 30-day / 1-year switch.
+
+- **Structured logs** ([pino](docs/GLOSSARY.md#logs-and-monitoring) + pino-http, `src/utils/logger.ts`, `src/app/middlewares/request-logger.ts`):
+  - One `request completed` line per request: `reqId`, `method`, `route`, `status`, `ms`, `ip`, `userId`. The ID is returned as `X-Request-Id`, so a user can quote it.
+  - **Route templates, never URLs:** one-time tokens travel in paths (`/auth/verify-email/:token`), and `/admin/users?search=` holds what an admin typed, so the line names a request by its Express route template. An unmatched path is logged with segments of 32+ characters masked.
+  - **An allow-list, plus redaction as a backstop:** pino-http's default serializer logs every header, cookies (the JWTs) included, so it's replaced by six named fields; `redact` still strips `password`, `token`, `cookie`, `authorization` and `body` if someone logs a whole object.
+  - **Levels as text** (`"level":"warn"`, not pino's default `40`), which is what Loki, Datadog and OpenTelemetry expect. `logLevelFor` picks one per request: `error` for 5xx, `warn` for 429s and refused `/admin` requests, `debug` for the two `401`s every signed-out visit makes (`/auth/me`, `/auth/refresh`), `info` otherwise. Production runs at `info` (`LOG_LEVEL`).
+  - **The 37 `console` calls** became `req.log.error({err, mail, userId}, 'mail failed')` and similar: fixed messages with the details as fields, and **no email addresses**, which the privacy review had flagged on 27 Oct. A 5xx's stack trace goes on the request's own line (`res.err`), so a fault is one line, not two.
+  - **Cost:** about 0.5–1 ms per request on an empty route at ~6,000 requests a second; under 2% of a real endpoint.
+- **The activity log** (`audit_events`, migration `20261102130423_worthless_lyja`, `src/app/auth/utils/audit.ts`):
+  - 12 actions: sign-in (and whether from a new browser), a wrong password for a real account, email verified, password changed or reset (or set from an invite), email changed (keeping the old address), self-delete, admin password confirmed or wrong, invite, admin delete, and `manage-users` role changes and deletes.
+  - **Written in the same transaction as the action**, so an action can't happen without its record; a test makes the insert fail and checks the password change rolled back. Five single-statement actions (sign-in, self-delete, email change, invite, admin delete) were wrapped in transactions for this.
+  - Actor and target are **plain ids without foreign keys**, so a record outlives the account; a deleted account's email is kept in `details`. Wrong passwords for **unknown** emails aren't recorded: nobody to show them to, and storing the guess would keep data about someone who never signed up.
+  - **Retention:** `pruneAuditEvents` runs at start-up and daily: sign-ins, wrong passwords and admin confirmations after 90 days, everything else after a year. The Privacy Policy now states both, and that the old "error log includes your email" line is gone.
+  - **`GET /admin/activity`** (filters `?action=`, `?userId=` for everything a person did *or* had done to them) joins names at read time and **never returns IP addresses**, like the users list. Tested at 500,000 rows: every page query under 1 ms; deep pages and the pager's `count(*)` 30–50 ms.
+- **`/admin`:** an Activity table (When · Event · a sentence in Details) with an event filter, first names (the email on hover), and the filtered person's name dropped from their own rows; clicking a name or a card's **Activity** button filters to them. Several redesigns were tried in the design lab (a timeline, a feed, a four-column table, burst grouping); the plain table won. The **New users** tile switches between rolling windows (24 h, 7 d, 30 d, 1 y), all counted in the stats query's one pass; `newThisWeek` keeps its name so the deployed web keeps working. The Admins tile lost its "Set on the server" note.
+- **`pnpm seed:activity`** fills a development database with six fake users and a month of events that tell small stories (a password-guessing burst, an invite, an email change), and refuses to run in production.
+- **Tests:** 199 API tests (29 new: `activity`, `request-logger`, stats windows), coverage 98.2% lines / 88.7% branches; each new guarantee was broken once to watch its test fail.
+- **Browser walkthrough** (Playwright on spare ports 8081/3001, a temporary admin, removed afterwards): 15 checks on `/admin` at 1280, 390 and 320 px in light and dark, including an invite through the sudo-mode prompt appearing at the top of the log. It found three phone-width overflows the tests can't see: the users grid (from before this branch) grew to the longest email on the page, the new period picker was wider than a 320 px tile, and the invite confirmation's email couldn't wrap. Fixed with `grid-cols-1`, a 4-column picker that fills its tile, and `break-all` on shown emails. It also caught the seed script dating some of today's events in the future.
+
 ---
 
 ## Lessons
@@ -382,19 +403,18 @@ Mistakes and the rules learned from them are kept topic by topic in [LEARNINGS.m
 ## Next up
 Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md).
 
-- **Logs feature** (next): record admin actions (invites, deletes, role changes from `manage-users`) with who, whom, when and from where, kept for a stated period. Remove its `test.todo` in `test/known-gaps.test.ts` when it lands.
+- **Observability, next layer:** ship the logs off the VPS (Grafana Alloy → Grafana Cloud) with alerts on error rate and sign-in failures, plus an external uptime check, so a dead VPS still raises an alarm. See Future scope, "Observability".
 - Delete the old `tests` branch and the 23 Oct stash, now that both are folded in. Watch the first CI run with the Postgres service.
 - **SEO phase 1:**
   - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].
   - Have a lawyer review the Privacy Policy and Terms, and confirm the operator and Grievance Officer name, the ₹1,000 liability cap, and a city for "Governing law" (it says only "the courts of India").
-  - Make the policy's retention promises concrete: delete unconfirmed sign-ups after a fixed period (e.g. 30 days), and rotate logs with a stated period.
+  - Make the last open retention promise concrete: delete unconfirmed sign-ups after a fixed period (e.g. 30 days). Logs and the activity log now have stated periods.
   - Check that open and click tracking is off for the sending domain in Resend; then the policy can say emails aren't tracked.
   - Decide whether the device list should show an approximate location (an offline GeoLite2 lookup at display time, nothing stored), and whether sessions should keep a sign-in history; either needs the Privacy Policy.
   - Drop the unused `users.refresh_token` and `users.reauthenticated_at` columns, one release after the sessions deploy.
   - Check the new header at 320, 360 and 390 px in a real phone or DevTools, and the skip link, focus moves and ticker pause with a screen reader (VoiceOver or NVDA); the review fixes were built and prerendered but not yet tried in a browser.
   - Build the "Connect your website" flow the dashboard now announces (see Future scope, "Hosted sign-in for other apps"); until it ships, keep the FAQ saying a developer sets CKAuth up.
   - Split the inlined CSS so the home page carries only its own classes, then lower the `homeHtml` budget back to 22.
-  - Add log rotation so "server logs are kept only as long as needed" has a number.
   - Count the sign-up funnel (visit → sign-up → verified) once analytics exist, to measure the conversion changes. If analytics are added, update the Privacy Policy, which says there are none.
   - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
   - Pick the email theme (Ember / Midnight / Warm) at `/dev/emails`, make it `DEFAULT_EMAIL_THEME`, delete the others, and send a real email to a Gmail inbox on a phone in dark mode to check it.
@@ -436,7 +456,7 @@ Larger directions beyond Next up, roughly in order of value. Each one says what 
 **Authorization**
 - **Roles and permissions.** The landing page promises "decide what gets through": add roles (user, admin), a `requireRole()` middleware that runs after `authenticateToken`, and permission checks per route.
 - **Admin dashboard.** Search users, see sessions and rate-limit hits, resend verification emails, lock or unlock an account.
-- **Activity log.** Sign-ins, password changes and failed attempts, shown to the user on their dashboard.
+- **Activity log for users.** Their own sign-ins, password changes and failed attempts on the dashboard. The `audit_events` table already holds them: it's `GET /admin/activity` filtered to the signed-in user.
 
 **CKAuth as a product for other apps**
 - **Hosted sign-in for other apps.** Register an app, get keys, send users to CKAuth's sign-in page and back. Built on OpenID Connect (the standard behind "Sign in with Google", using the authorization-code flow with PKCE), so any standard client library works.
@@ -448,8 +468,8 @@ Larger directions beyond Next up, roughly in order of value. Each one says what 
 **Quality and operations**
 - **Automated tests.** There is no test suite yet. Start with integration tests of every flow against a real Postgres and Redis in CI, including the race-condition and account-enumeration rules in CLAUDE.md.
 - **OpenAPI from the Zod models.** Generate a machine-readable API description from `models.ts`, so `docs/API.md` and a typed client can't drift from the code.
-- **Observability: activity logs, alerts and a stats dashboard.** Today Caddy writes an access log, the API has only scattered `console.log`/`console.error` calls, and neither compose file sets a size limit on container logs, so Docker keeps every line until the disk fills. The plan is layered, cheapest first:
-  - **Foundation (needed by every option).** Docker log rotation (`logging: max-size/max-file`) in both compose files; structured JSON logs with pino, with `redact` stripping `password`/`token` fields so the "never log secrets" rule can't be broken by accident; request IDs; and an `audit_events` table (sign-up, sign-in success/failure, verify, reset, session ended, avatar change, rate-limit hit), written in the *same* transaction as the action, so an action can never happen without its record. This also feeds the user-facing **Activity log** above.
+- **Observability: activity logs, alerts and a stats dashboard.** The foundation landed on 2 Nov 2026: structured logs with request IDs and the `audit_events` table. (Container logs were already capped by `setup-vps.sh`'s `daemon.json`, 3 × 10 MB, since 21 Oct.) The plan was layered, cheapest first:
+  - ✅ **Foundation (needed by every option), done 2 Nov 2026.** Docker log rotation (`logging: max-size/max-file`) in both compose files; structured JSON logs with pino, with `redact` stripping `password`/`token` fields so the "never log secrets" rule can't be broken by accident; request IDs; and an `audit_events` table (sign-up, sign-in success/failure, verify, reset, session ended, avatar change, rate-limit hit), written in the *same* transaction as the action, so an action can never happen without its record. This also feeds the user-facing **Activity log** above.
   - **Dashboard and alerts (recommended): Grafana Cloud's free tier.** An agent on the VPS sends logs and metrics; alerts go to email/Telegram. Uses almost no VPS memory and still alerts when the VPS itself is down. Trade-offs: 14–30 day retention, and users' emails/IPs go to a third party (mention it in a privacy policy).
   - **Security: CrowdSec** (~100 MB) reads Caddy and SSH logs, spots brute force and scans, and blocks attacking IPs for every site on the VPS.
   - **Alternatives considered:** (1) *built into CKAuth*: an admin page charting `audit_events`, Uptime Kuma for uptime alerts and a scheduled query for "too many failed sign-ins"; the lightest and most private option, but basic charts, and it can't see server-level events. (2) *Self-hosted Grafana + Loki + Prometheus + Alloy*: the industry standard and private, but ~1–1.5 GB RAM on a VPS shared with other sites, four more services to maintain, and Grafana must be locked down. Move here later if the VPS is upgraded; the app side doesn't change. (3) *Wazuh* for file integrity monitoring: needs 4–8 GB RAM, too heavy for this VPS.

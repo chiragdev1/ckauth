@@ -20,6 +20,8 @@ The repo also contains the **CKAuth web app** in [`frontend/`](frontend/) (React
 - **Session handling** with short-lived access tokens and refresh tokens that are replaced on every use, both stored in `httpOnly` cookies.
 - **Password management:** forgot password, reset password and change password.
 - **Roles and an admin panel:** every account is a `user` or an `admin`. Admins can search, invite and delete users at `/admin`, after confirming their password. Invited people choose their own password from an emailed link. Admins themselves are made and removed only from the server (`pnpm admin`), never through the website.
+- **Activity log:** sign-ins, wrong passwords, password and email changes, deletions and every admin action are recorded in an [audit log](docs/GLOSSARY.md#logs-and-monitoring), each in the same database transaction as the action, and shown to admins at `/admin`. Old events are deleted automatically (90 days for sign-ins, a year for the rest).
+- **Structured logs:** the API writes one JSON line per request with a request ID (also returned as `X-Request-Id`), names requests by their route template so one-time tokens never reach the logs, and never logs headers, cookies, bodies or email addresses.
 - **Avatar uploads** to [ImageKit](https://imagekit.io). The real file type is checked from the file's contents, and old images are cleaned up automatically.
 - **Built with security in mind:**
   - Every token is stored hashed.
@@ -83,6 +85,7 @@ Then open `.env` and fill in the values:
 | `FRONTEND_URL` | Yes | Base URL of your frontend. Links in emails point here. Default: `http://localhost:3000`. |
 | `IMAGEKIT_PRIVATE_KEY` | For avatars | ImageKit private API key. The server starts without it; only avatar uploads fail. |
 | `REDIS_URL` | No | Redis for rate-limit counts, e.g. `redis://localhost:6379`. Without it, limits are counted in the process's memory (fine for one local process). |
+| `LOG_LEVEL` | No | How much the API logs: `debug`, `info`, `warn` or `error`. Default: `info`. The API always writes JSON lines; `pnpm dev` pipes them through pino-pretty so they're readable in a terminal. |
 
 Generate strong JWT secrets with:
 
@@ -134,6 +137,7 @@ Open `http://localhost:3000`. The Vite dev server proxies `/api/*` to the API on
 | `pnpm db:migrate` | Applies pending migrations to the database. |
 | `pnpm db:migrate:prod` | Applies migrations with Drizzle's runtime migrator (`dist/db/migrate.js`); used by deploys. |
 | `pnpm admin <command>` | Manages roles from the command line, after `pnpm build`: `role <email> <user\|admin>`, `delete <email>`, `admins`. Use `pnpm admin role you@example.com admin` to make yourself an admin. |
+| `pnpm seed:activity` | Development only, after `pnpm build`: adds six fake users (`@seed.example.com`) and a month of activity-log events, so `/admin` has something to show. `--clear` removes them. Refuses to run when `NODE_ENV=production`. |
 | `pnpm drizzle:studio` | Opens Drizzle Studio to browse the database. |
 | `pnpm test:coverage` | Runs the tests and fails if coverage drops below 95% of lines, 83% of branches or 85% of functions. CI runs this before every API deploy. |
 | `pnpm test` | Runs the test suite (103 tests and 5 to-dos for known gaps, about 25 s). Needs Postgres running (`pnpm db:up`); it creates and uses its own `ckauth_test` database, so your development data is never touched. |
@@ -161,13 +165,15 @@ src/
 │   │   ├── models.ts           # Zod schemas for request bodies
 │   │   ├── middleware.ts       # authenticateToken (reads the access token cookie), authorizeRoles
 │   │   └── utils/              # JWT helpers, cookie options, frontend URL, user roles
-│   ├── admin/                  # /admin endpoints: stats, list, add and delete users (admins only)
+│   ├── admin/                  # /admin endpoints: stats, list, add and delete users, activity log (admins only)
 │   └── middlewares/
 │       ├── error-handler.ts    # Turns errors into JSON responses
 │       ├── rate-limit.ts       # Rate limiters, shared through Redis
+│       ├── request-logger.ts   # One structured log line per request, plus the X-Request-Id header
 │       └── upload-multer.ts    # Avatar upload parsing and validation
 ├── scripts/
-│   └── manage-users.ts         # `pnpm admin`: make, demote or delete admins from the server
+│   ├── manage-users.ts         # `pnpm admin`: make, demote or delete admins from the server
+│   └── seed-activity.ts        # `pnpm seed:activity`: fake activity for local development
 ├── db/
 │   ├── index.ts                # Drizzle database client
 │   ├── migrate.ts              # Runtime migrator used in production
@@ -175,6 +181,7 @@ src/
 └── utils/
     ├── api-error.ts            # ApiError: errors with an HTTP status
     ├── api-response.ts         # ApiResponse: consistent success responses
+    ├── logger.ts               # The pino logger: JSON lines, LOG_LEVEL, redaction
     ├── mail.ts                 # Email sending and templates
     └── imagekit.ts             # ImageKit upload and delete
 test/                           # Test suite: one file per area, helpers, test database setup

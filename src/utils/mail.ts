@@ -1,6 +1,5 @@
 import "dotenv/config"
 import {Resend} from "resend"
-import {ApiError} from "./api-error.js"
 import {renderEmailHtml, renderEmailText} from "./email-layout.js"
 import {emails, type Email} from "./emails.js"
 
@@ -35,9 +34,9 @@ async function sendEmail(to: string, subject: string, html: string, text: string
     text,
   })
 
+  // every caller logs the failure with its request id, so resend's reason goes in the error rather than a line of its own
   if (error) {
-    console.error(`Failed to send email to ${to}:`, error)
-    throw ApiError.internal("Failed to send email")
+    throw new Error(`Resend rejected the mail: ${error.message}`)
   }
 
   return data

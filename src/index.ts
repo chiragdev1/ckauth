@@ -1,6 +1,8 @@
 import http from "node:http"
 import "dotenv/config"
 import { createExpressApplication } from "./app/index.js";
+import { logger } from "./utils/logger.js";
+import { pruneAuditEvents } from "./app/auth/utils/audit.js";
 
 async function main() {
   try {
@@ -13,10 +15,17 @@ async function main() {
     const PORT: number = process.env.PORT? +process.env.PORT : 8080
 
     server.listen(PORT, () => {
-      console.log(`Server is running on port: ${PORT} in ${process.env.NODE_ENV} mode`)
+      logger.info({port: PORT, env: process.env.NODE_ENV}, 'server started')
     })
+
+    // no cron needed: the api is always running. unref, so the timer alone never keeps the process alive
+    const prune = () => pruneAuditEvents()
+      .then((deleted) => logger.info({deleted}, 'old audit events pruned'))
+      .catch((error) => logger.error({err: error}, 'audit event pruning failed'))
+    prune()
+    setInterval(prune, 24 * 60 * 60 * 1000).unref()
   } catch (error) {
-    console.error(`Error in starting http server, ${error}`)
+    logger.fatal({err: error}, 'could not start the http server')
     process.exit(1)
   }
 }

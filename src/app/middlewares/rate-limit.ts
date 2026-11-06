@@ -4,6 +4,7 @@ import { RedisStore } from 'rate-limit-redis'
 import { createClient } from 'redis'
 
 import { ApiError } from '../../utils/api-error.js'
+import { logger } from '../../utils/logger.js'
 import { emailModel } from '../auth/models.js'
 
 const MINUTE = 60 * 1000
@@ -16,8 +17,8 @@ const redisClient = process.env.REDIS_URL ? createClient({url: process.env.REDIS
 
 if(redisClient) {
   // without an error listener a lost connection would crash the process; the client reconnects on its own
-  redisClient.on('error', (error) => console.error('Redis error:', error instanceof Error ? error.message : error))
-  redisClient.connect().catch((error) => console.error('Could not connect to Redis:', error instanceof Error ? error.message : error))
+  redisClient.on('error', (error) => logger.error({err: error}, 'redis error'))
+  redisClient.connect().catch((error) => logger.error({err: error}, 'could not connect to redis'))
 }
 
 // stops redis's reconnect loop, which otherwise keeps the process alive; for a clean exit (the tests, a graceful shutdown)

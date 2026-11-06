@@ -11,6 +11,9 @@ process.env.RESEND_API_KEY = 're_test_unused'
 process.env.EMAIL_FROM = 'CKAuth <no-reply@ckauth.test>'
 process.env.FRONTEND_URL = 'http://ckauth.test'
 
+// no request lines in the test output; request-logger.test.ts tests what would be logged directly
+process.env.LOG_LEVEL = 'silent'
+
 // no redis: each test file counts rate limits in its own memory, starting from zero
 process.env.REDIS_URL = ''
 // no imagekit: avatar deletes fail quietly (and are logged) instead of calling the real service

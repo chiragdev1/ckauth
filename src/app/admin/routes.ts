@@ -15,6 +15,7 @@ adminRouter.use(authenticateToken, authorizeRoles(userRolesEnum.ADMIN))
 
 adminRouter.get('/stats', adminController.handleStats.bind(adminController))
 adminRouter.get('/users', adminController.handleListUsers.bind(adminController))
+adminRouter.get('/activity', adminController.handleListActivity.bind(adminController))
 
 // checks a password, so it gets the same failures-only limit as sign-in
 adminRouter.post('/reauth', rateLimits.adminReauthPerUser, adminController.handleReauth.bind(adminController))
