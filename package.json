@@ -22,7 +22,8 @@
     "admin": "node dist/scripts/manage-users.js",
     "seed:activity": "node dist/scripts/seed-activity.js",
     "drizzle:studio": "npx drizzle-kit studio",
-    "docs:artifact": "node scripts/docs-artifact/build.js"
+    "docs:artifact": "node scripts/docs-artifact/build.js",
+    "brand:images": "node scripts/brand-images.mjs"
   },
   "keywords": [],
   "author": "",

@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/ckauth-dark.png">
+  <img alt="CKAuth: every sign-in, guarded. Email-confirmed sign-ups, password guessing blocked, new-device alerts." src="docs/brand/ckauth-light.png">
+</picture>
+
 # CKAuth
 
 A production-minded authentication API built with **Express 5**, **TypeScript** and **PostgreSQL**.
@@ -147,6 +152,7 @@ Open `http://localhost:3000`. The Vite dev server proxies `/api/*` to the API on
 | `pnpm perf` | Measures the live site (page-load times on desktop and a phone on slow 4G, plus API round trips) and appends one line to `perf-data/results.jsonl`. Read-only against production; the weekly GitHub workflow runs it. |
 | `pnpm perf:report` | Prints the latest measurement against the previous one, with trend charts, as Markdown. |
 | `pnpm check:pr` | Every check a branch must pass before a pull request: both builds, unused code (knip), known vulnerabilities (`pnpm audit`), the tests, SEO, speed and security of the built site, repo rules (secrets, security rules, files that change together) and links between docs. |
+| `pnpm brand:images` | Renders the brand SVGs to PNG: the link-preview image, the app icons, this README's banner and the social profile kit. The [brand guide](docs/BRAND.md) lists every file and where it's used. |
 | `pnpm docs:artifact` | Bundles every doc into one searchable page (`.docs-artifact/ckauth-docs.html`) and warns about broken links between docs. |
 
 **Tests:** integration tests send real HTTP requests to the app and check the database afterwards; unit tests check single functions. Emails aren't sent during tests: they're kept in memory, and a test reads the verification or reset link from there, just as a user would click it. To run a single file: `node --import tsx --import ./test/env.ts --test-global-setup=test/global-setup.ts --test test/admin.test.ts`.

@@ -22,29 +22,20 @@ export type EmailContent = {
 
 export type EmailIcon = 'verify' | 'welcome' | 'reset' | 'account-exists' | 'invite' | 'deleted' | 'new-sign-in' | 'email-change' | 'email-change-requested' | 'email-taken'
 
-// colour themes, compared on the dev-only /dev/emails page until one is picked. the brand ember stays the same in all of
-// them, because the icons (public/email/*.png) are drawn in it; what changes is the page, the card and the text
-export type EmailTheme = 'ember' | 'midnight' | 'warm'
-export const emailThemes: EmailTheme[] = ['ember', 'midnight', 'warm']
-export const DEFAULT_EMAIL_THEME: EmailTheme = 'ember'
+// colour themes, compared on the dev-only /dev/emails page. midnight was picked on 6 Nov 2026 over ember (cool grey)
+// and warm (cream), because its colours are the site's own, so an email looks like the product. to try a new theme, add
+// it here and it shows up on that page; the brand ember stays in every theme, because the icons (public/email/*.png) are drawn in it
+export type EmailTheme = 'midnight'
+export const emailThemes: EmailTheme[] = ['midnight']
+export const DEFAULT_EMAIL_THEME: EmailTheme = 'midnight'
 
 type Palette = {page: string, card: string, border: string, strong: string, body: string, muted: string, link: string}
 
 const themes: Record<EmailTheme, {light: Palette, dark: Palette}> = {
-  // a cool grey page and a white card, ember for everything that's the brand
-  ember: {
-    light: {page: '#f4f5f7', card: '#ffffff', border: '#e5e7eb', strong: '#111827', body: '#374151', muted: '#6b7280', link: '#c2410c'},
-    dark: {page: '#0b0f17', card: '#151b26', border: '#273042', strong: '#f3f4f6', body: '#d1d5db', muted: '#9ca3af', link: '#fb923c'},
-  },
   // the site's own "slate and ember": slate headings on a blue-grey page, ember kept for the action
   midnight: {
     light: {page: '#eef1f6', card: '#ffffff', border: '#dde3ec', strong: '#0f172a', body: '#334155', muted: '#64748b', link: '#c2410c'},
     dark: {page: '#070b14', card: '#111827', border: '#1e293b', strong: '#f1f5f9', body: '#cbd5e1', muted: '#94a3b8', link: '#fb923c'},
-  },
-  // cream paper and soft brown ink: friendlier, less like a system notice
-  warm: {
-    light: {page: '#f8f3ec', card: '#fffdf9', border: '#eadfd2', strong: '#2b2118', body: '#4a3f35', muted: '#7a6d60', link: '#b4400c'},
-    dark: {page: '#14100c', card: '#1f1914', border: '#3a2f25', strong: '#f6efe7', body: '#ddd2c6', muted: '#a8998a', link: '#fb923c'},
   },
 }
 

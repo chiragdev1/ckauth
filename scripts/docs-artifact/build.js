@@ -19,6 +19,7 @@ const docs = [
   { key: 'deployment', path: 'docs/DEPLOYMENT.md', title: 'Deployment', group: 'Run', blurb: 'From an empty VPS to live, plus operations' },
   { key: 'vps-access', path: 'docs/VPS-ACCESS.md', title: 'VPS access', group: 'Run', blurb: 'SSH keys, GitHub and the deploy user' },
   { key: 'glossary', path: 'docs/GLOSSARY.md', title: 'Glossary', group: 'Reference', blurb: 'Every term the docs use' },
+  { key: 'brand', path: 'docs/BRAND.md', title: 'Brand guide', group: 'Reference', blurb: 'Name, crest, colours, voice and brand files' },
   { key: 'seo-audit', path: 'docs/SEO-AUDIT.md', title: 'SEO audit', group: 'Reference', blurb: '64 strict tests and the traffic plan' },
   { key: 'devlog', path: 'DEVLOG.md', title: 'Dev log', group: 'Journey', blurb: 'What changed, and when' },
   { key: 'learnings', path: 'LEARNINGS.md', title: 'Learnings', group: 'Journey', blurb: 'Mistakes and the rules they taught' },

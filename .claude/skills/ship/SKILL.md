@@ -32,7 +32,7 @@ $ARGUMENTS
 - `docs/API.md` (endpoints, payloads, status codes, the rate-limit table), `CLAUDE.md` (layout, rules, known gaps: remove a gap once fixed), `README.md` (setup, scripts, env vars), `docs/DEPLOYMENT.md` + `deploy/api.env.sample` (env vars, deploy steps), `docs/GLOSSARY.md` (every new term).
 - Docs are for beginners but professional: keep the technical term and explain it on first use.
 - `frontend/src/pages/legal.tsx`: if stored fields, cookies, emails, processors or retention changed, update the policy and bump its date.
-- **Search copy:** if a user-visible feature shipped or was removed, update `<title>`, meta description, `og:title` and `og:description` in `frontend/index.html`. Title 50–60 characters, topic words first; description 140–160 with a call to action; both true to what the live site does. A new headline also means updating `og-image.svg` and re-rendering `public/og.png`.
+- **Search copy:** if a user-visible feature shipped or was removed, update `<title>`, meta description, `og:title` and `og:description` in `frontend/index.html`. Title 50–60 characters, topic words first; description 140–160 with a call to action; both true to what the live site does. A new headline also means updating `og-image.svg` and `brand/social-header.svg` and running `pnpm brand:images`, which re-renders every brand PNG (`docs/BRAND.md` lists them).
 
 ## 4. Checks
 

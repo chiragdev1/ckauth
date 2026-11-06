@@ -12,7 +12,7 @@ import { FormAlert } from '@/components/form.tsx'
 type Preview = { themes: string[], emails: { id: string, subject: string }[] }
 type Mode = 'light' | 'dark' | 'gmail'
 
-const themeNames: Record<string, string> = { ember: 'Ember', midnight: 'Midnight', warm: 'Warm' }
+const themeNames: Record<string, string> = { midnight: 'Midnight' }
 const modes: { id: Mode, label: string }[] = [
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark (Apple Mail, Outlook)' },
@@ -36,7 +36,7 @@ export function DevEmails() {
       <div>
         <p className="eyebrow">Development only</p>
         <h1 className="font-display mt-1 text-3xl font-semibold">Email designs</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Every email, rendered by the API's real templates with sample values. The Spotlight design in each colour theme. Pick one theme; the others get deleted.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Every email, rendered by the API's real templates with sample values. The Spotlight design in the Midnight theme. A new theme added to email-layout.ts shows up here to compare.</p>
       </div>
       {error && <FormAlert kind="error">{error}</FormAlert>}
       {!preview && !error && <Spinner />}

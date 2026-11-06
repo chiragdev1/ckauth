@@ -24,10 +24,19 @@ describe('email layout', () => {
   })
 
   test('every theme colours both the light version and the dark one', () => {
-    const pages = emailThemes.map(theme => renderEmailHtml(welcome, theme).match(/<body class="e-page" style="[^"]*background-color:(#[0-9a-f]{6})/)?.[1])
-    const darkPages = emailThemes.map(theme => renderEmailHtml(welcome, theme).match(/\.e-page \{ background-color: (#[0-9a-f]{6})/)?.[1])
-    assert.equal(new Set(pages).size, emailThemes.length, `each theme has its own page colour: ${pages}`)
-    assert.equal(new Set(darkPages).size, emailThemes.length, `and its own dark page colour: ${darkPages}`)
+    for(const theme of emailThemes) {
+      const html = renderEmailHtml(welcome, theme)
+      const page = html.match(/<body class="e-page" style="[^"]*background-color:(#[0-9a-f]{6})/)?.[1]
+      const darkPage = html.match(/\.e-page \{ background-color: (#[0-9a-f]{6})/)?.[1]
+      assert.ok(page && darkPage && page !== darkPage, `${theme}: light page ${page}, dark page ${darkPage}`)
+    }
+  })
+
+  test('the emails use the site\'s own colours (midnight, picked 6 Nov 2026)', () => {
+    const html = renderEmailHtml(welcome)
+    // frontend/src/index.css: --foreground #0f172a by day, --card #111827 by night
+    assert.match(html, /color:#0f172a/, 'headings are the site\'s slate')
+    assert.match(html, /\.e-card \{ background-color: #111827/, 'the dark card is the dashboard\'s card')
   })
 
   test('values from users are escaped, never inserted as html', () => {

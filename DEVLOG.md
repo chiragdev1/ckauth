@@ -424,6 +424,18 @@ New entries go at the bottom, under a dated heading.
 - Migration `20261106074228_small_the_santerians` adds a nullable column and a new table, so it's backwards-compatible.
 - **On `/admin`:** a "Where sign-ups come from" card under the stat tiles, one row per tag (busiest first) with visits, sign-ups, verified and the sign-up rate (sign-ups ÷ visits). A table from `sm` up, a short block per tag on phones. Hidden until a tagged link has been used, and fixed at 30 days (picked over a fifth tile and funnel bars, which hold one tag or make a 5% rate a sliver).
 
+## 6 Nov 2026 · A brand image
+**In short:** one picture that shows what CKAuth does, used for link previews, the README and GitHub.
+
+- **The image:** "Every sign-in, guarded." beside a sign-in card and the "new device signed in" alert, with three checks (email-confirmed sign-ups, password guessing blocked, new-device alerts). It replaces the crest-and-slogan card, which named CKAuth but didn't show what it does. Picked over a centred "spotlight" card like the emails and a bold poster. Everything in it is drawn from shapes and real product copy, so there's no illustration and no made-up claim.
+- **One source, three outputs:** `frontend/og-image.svg` holds both themes as CSS variables copied from `index.css`. `pnpm brand:images` (`scripts/brand-images.mjs`) renders it in Chromium through the Playwright install the E2E tests already use, with Inter embedded: `public/og.png` (1200×630, dark) and `docs/brand/ckauth-{dark,light}.png` (1280×640). The larger size crops the design slightly (`preserveAspectRatio="xMidYMid slice"`) instead of stretching it.
+- **Where it's used:** link previews (dark only, because a preview can't follow the reader's theme), the top of the README (a `<picture>` that follows GitHub's theme) and GitHub's social preview (uploaded by hand). `og:image:alt` describes the new image.
+- **App icons:** `public/` had only `favicon.svg`, so an iPhone "Add to Home Screen" showed a screenshot. `brand/icon.svg` (the crest on the navy background, full-bleed, inside the maskable safe zone) now renders `apple-touch-icon.png` (180), `icon-192.png` and `icon-512.png`, and `public/manifest.json` lists them for Android. The manifest is `.json`, not `.webmanifest`, so Caddy serves it with a type browsers accept without extra config. Adding the two `<link>` tags put the home page 8 bytes over its 22.5 KiB gzip budget, so their comment went instead of raising the budget.
+- **Social profile kit:** `brand/social-header.svg` renders the X header (1500 × 500) and LinkedIn banner (1584 × 396, cropped from the same design), and the icon gives a 400 × 400 avatar, each dark and light, in `docs/brand/social/`.
+- **Stale images fail the build:** each PNG stores the SHA-256 of its SVG in a `tEXt` chunk, and `check-dist.js` fails when `og.png` or an app icon doesn't match its current source. File dates can't do this, because a git checkout resets them. Proven to fail once by editing `icon.svg` without re-rendering.
+- **Brand guide:** `docs/BRAND.md` covers the name, the crest, colours, type, voice and taglines, imagery, every brand file with where it's used and how to upload it, and the email colours.
+- **Email theme picked: midnight,** over ember (cool grey) and warm (cream), after comparing two real emails in all three, light and dark. Its colours are the site's own (the dark card is `--card`, `#111827`), so an email looks like the product. The other two palettes are deleted; `emailThemes` stays a one-entry list, so `/dev/emails` can still compare a new candidate. A new test keeps the emails on the site's slate and card colours, proven to fail once.
+
 ---
 
 ## Lessons
