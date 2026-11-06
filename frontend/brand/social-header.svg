@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500">
+  <!-- the profile header for X (1500×500) and LinkedIn (1584×396, cropped from this by `pnpm brand:images`, so everything
+       stays between y 70 and 430). the left third is empty because both sites put the profile photo over it.
+       colours mirror src/index.css, class="light" for the day theme -->
+  <style>
+    svg { --bg: #0a0f1c; --fg: #e8ecf4; --primary: #fb7a3c; --muted: #9aa6ba; --tint: rgb(251 122 60 / 0.15); --grid: 0.07; --glow: 0.22 }
+    svg.light { --bg: #f7f8fb; --fg: #0f172a; --primary: #c2410c; --muted: #4b5568; --tint: rgb(194 65 12 / 0.1); --grid: 0.06; --glow: 0.14 }
+    text { font-family: Inter, sans-serif; fill: var(--fg) }
+    .muted { fill: var(--muted) }
+    .primary { fill: var(--primary) }
+  </style>
+  <defs>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" style="stroke: var(--primary); stroke-opacity: var(--grid)" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="glow" cx="0.85" cy="0.2" r="0.7">
+      <stop offset="0" style="stop-color: var(--primary); stop-opacity: var(--glow)"/>
+      <stop offset="1" style="stop-color: var(--primary); stop-opacity: 0"/>
+    </radialGradient>
+    <symbol id="crest" viewBox="0 0 32 32">
+      <path d="M16 1.5 28 5.5v9.2c0 7.4-5 12.9-12 15.8C9 27.6 4 22.1 4 14.7V5.5z" class="primary"/>
+      <path d="M8.5 12.5v-3h2.6v1.6h2.2V9.5h5.4v1.6h2.2V9.5h2.6v3z M8.5 13.5h15v6.8c0 3.6-3.3 6.6-7.5 8.2-4.2-1.6-7.5-4.6-7.5-8.2z" style="fill: var(--bg)"/>
+      <circle cx="16" cy="18" r="2" class="primary"/>
+      <path d="M15 19h2l.7 4.5h-3.4z" class="primary"/>
+    </symbol>
+    <symbol id="check" viewBox="0 0 26 26">
+      <circle cx="13" cy="13" r="13" style="fill: var(--tint)"/>
+      <path d="M7.5 13.5l3.6 3.6 7.4-7.6" fill="none" style="stroke: var(--primary)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+
+  <rect x="-200" y="-200" width="1900" height="900" style="fill: var(--bg)"/>
+  <rect x="-200" y="-200" width="1900" height="900" fill="url(#grid)"/>
+  <rect width="1500" height="500" fill="url(#glow)"/>
+
+  <use href="#crest" x="520" y="96" width="52" height="52"/>
+  <text x="586" y="135" font-weight="700" font-size="32" letter-spacing="0.5">CKAuth</text>
+
+  <text x="520" y="244" font-weight="800" font-size="70" letter-spacing="-1.5">Every sign-in, <tspan class="primary">guarded.</tspan></text>
+
+  <use href="#check" x="520" y="290" width="26" height="26"/>
+  <text x="558" y="312" font-size="24" font-weight="500">Confirmed sign-ups</text>
+  <use href="#check" x="812" y="290" width="26" height="26"/>
+  <text x="850" y="312" font-size="24" font-weight="500">Guessing blocked</text>
+  <use href="#check" x="1084" y="290" width="26" height="26"/>
+  <text x="1122" y="312" font-size="24" font-weight="500">New-device alerts</text>
+
+  <text x="520" y="392" font-size="24" font-weight="600" class="muted">ckauth.chiragdev.com · free during early access</text>
+</svg>
