@@ -157,7 +157,7 @@ Can we see who visits and where they come from, and are we actively telling peop
 | ID | Test | Must reach | Live | Build | Measured | Fix | Quick |
 |---|---|---|---|---|---|---|---|
 | M01 | Analytics on the site | Privacy-friendly, cookieless | ❌ | ❌ | None | Self-host Umami or Plausible on the VPS (CSP-friendly) | yes |
-| M02 | Sign-up funnel measured | Visit → sign-up → verified | ❌ | ❌ | Not measured | Count from the users table + analytics events | yes |
+| M02 | Sign-up funnel measured | Visit → sign-up → verified | ❌ | ❌ | Tagged links only (`?ref=x`), from 6 Nov: visits, sign-ups and verified per tag in `GET /admin/stats`. Untagged visits still uncounted | Count from the users table + analytics events (M01) | yes |
 | M03 | Uptime monitoring with alerts | External check, alerts you | ❌ | ❌ | Deploy smoke test only | Free external monitor on / and /api/health | yes |
 | M04 | Search performance reviewed | Monthly Search Console review | ❌ | ❌ | Not possible yet | Monthly: queries, pages, index coverage | yes |
 | M05 | Launch posts and listings | Show HN, Reddit, dev.to, Product Hunt | ❌ | ❌ | None | Plan, phase 1 | yes |

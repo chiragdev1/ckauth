@@ -438,6 +438,10 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Conversion rate.** The share of visitors who take the action a page is built for. For CKAuth's landing page, that's creating an account: 30 sign-ups from 1,000 visits is a 3% conversion rate.
 
+**Referral tag (`?ref=`).** A label added to the links in our own posts, such as `https://ckauth.chiragdev.com/?ref=x` on X, so the site can tell which place a visit came from. CKAuth counts tagged visits per day and keeps the tag on accounts created in that tab, which gives a sign-up rate per place (`signUps / visits` in `GET /admin/stats`). Only known tags count; see `src/app/metrics/sources.ts`.
+
+**Attribution.** Crediting a result (here, a sign-up) to what caused it. CKAuth uses *first touch*: an account keeps the tag of the visit that first brought the person, even if they sign up again later.
+
 **CTA (call to action).** The button or link that asks the visitor to act, such as "Create your free account". A page converts best with one main CTA, repeated, rather than several competing ones.
 
 **Friction.** Anything that makes acting harder: extra form fields, a required card, unclear cost. The reassurance line under CKAuth's buttons ("No card required") removes the most common worries before the click.
