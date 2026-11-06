@@ -119,13 +119,16 @@ A new headline on the landing page usually means a new line in `og-image.svg` an
 
 ## Emails
 
-Emails share one layout (`src/utils/email-layout.ts`) in the "spotlight" design: a tinted top with a big centred icon, then the message and a pill button. Three colour themes are still candidates, compared on the dev-only `/dev/emails` page:
+Emails share one layout (`src/utils/email-layout.ts`) in the "spotlight" design: a tinted top with a big centred icon, then the message and a pill button. The colour theme is **midnight**, the site's own slate and ember:
 
-- **ember:** a cool grey page and a white card.
-- **midnight:** the site's own slate and ember, with slate headings on a blue-grey page.
-- **warm:** cream paper and soft brown text; friendlier, less like a system notice.
+| | Day | Night |
+|---|---|---|
+| Page | `#eef1f6` | `#070b14` |
+| Card | `#ffffff` | `#111827` (the site's `--card`) |
+| Headings / body | `#0f172a` / `#334155` | `#f1f5f9` / `#cbd5e1` |
+| Links and buttons | `#c2410c` | `#fb923c` |
 
-All three keep ember for the brand and red for security warnings. The default is `ember` until one is picked; then the other two get deleted.
+Ember marks the brand and red marks security warnings, as on the site. Midnight was picked on 6 Nov 2026 over *ember* (a cool grey page) and *warm* (cream paper), because an email that uses the site's colours looks like the same product; warm also didn't match the navy site. A test (`test/emails.test.ts`) keeps the emails on the site's colours. To try another theme, add it to `emailThemes` and compare it on the dev-only `/dev/emails` page.
 
 ## Don'ts
 
