@@ -7,7 +7,12 @@ import { testDatabaseUrl } from './database-url.ts'
 // runs once before every test file (node --test-global-setup): creates the test database if needed and applies
 // the same migrations production gets, so the tests always run against the current schema
 export async function globalSetup() {
-  const url = new URL(testDatabaseUrl())
+  await prepareDatabase(testDatabaseUrl())
+}
+
+// also used by e2e/start-api.ts for its own database, so the two suites can run at the same time
+export async function prepareDatabase(databaseUrl: string) {
+  const url = new URL(databaseUrl)
   const name = decodeURIComponent(url.pathname.slice(1))
 
   // CREATE DATABASE has to run from another database; every Postgres server has one called postgres
