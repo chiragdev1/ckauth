@@ -389,6 +389,26 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Open Graph / Twitter card.** Tags that control the title, text and image shown when someone shares a link.
 
+**OG image (share image).** The picture in a link preview, 1200×630 pixels. CKAuth's is `public/og.png`, rendered from `og-image.svg`. Previews can't follow the reader's light or dark theme, so it is dark only.
+
+**Social preview.** GitHub's version of an OG image: the card shown when the repository is linked. It's uploaded by hand in the repository settings, not read from a file.
+
+**Favicon.** The small icon in a browser tab. CKAuth's is `favicon.svg`, the crest.
+
+**Apple touch icon.** The 180 × 180 PNG an iPhone or iPad uses when someone adds the site to their home screen. Without one, iOS shows a blurry screenshot of the page.
+
+**Web app manifest (`manifest.json`).** A small JSON file that tells Android and Chrome the site's name, colours and home-screen icons.
+
+**Maskable icon / safe zone.** An icon whose background fills the whole square, so the phone can cut it into its own shape (a circle, a rounded square). The important part stays inside the centre 80% circle, the safe zone, which no shape cuts into.
+
+**Wordmark.** A product's name set as a logo. CKAuth's is "CKAuth" in Inter Bold beside the crest.
+
+**Brand guide.** The rules for how a product looks and sounds (name, logo, colours, type, voice), so every page, email and post matches. CKAuth's is `docs/BRAND.md`.
+
+**PNG text chunk (`tEXt`).** A PNG file is a series of chunks; a `tEXt` chunk holds a short label and value that image viewers ignore. CKAuth's brand PNGs store the SHA-256 of their SVG source there, so the build can tell when one is stale.
+
+**`<picture>` element.** HTML that offers several versions of an image and lets the browser pick one, for example by `prefers-color-scheme`. The README uses it to show the light or dark banner.
+
 **Structured data (JSON-LD).** A machine-readable description of the page that search engines read, such as the site's name.
 
 **Lighthouse.** Google's tool that scores a page from 0 to 100 on performance, accessibility, best practices and SEO.
