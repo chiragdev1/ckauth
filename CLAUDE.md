@@ -102,14 +102,10 @@ const {email, password} = await parseOrThrow(somePayloadModel, req.body)
 ## Workflow
 
 - **Schema changes:** edit `schema.ts` → `pnpm db:generate` → review the SQL → `pnpm db:migrate`. A change isn't done until the migration is applied, and the migration folder must be committed with it.
-- **UI changes:** for any visual redesign or a new page's look, build 2–3 alternatives as design-lab looks (see `design-lab.tsx`) and let the user compare them before committing to one. Afterwards, promote the winner to the defaults and delete the other candidates, keeping the lab itself.
+- **UI changes:** use the `/ui-change` skill: agree the direction with ASCII sketches first, then build looks in the design lab (`design-lab.tsx`), promote the winner and keep the lab.
 - **API changes:** update `docs/API.md` and the frontend in the same change.
 - **Deploys:** migrations run automatically before the new API starts, and rollbacks don't undo them, so keep migrations backwards-compatible. New env vars go in `deploy/api.env.sample` and `docs/DEPLOYMENT.md`, and must be added to `/opt/ckauth/api.env` on the VPS before the deploy that needs them. VPS users: `chirag` (admin, sudo) and `deploy` (CI only, no sudo); root SSH is off. `/opt/ckauth` and `/opt/edge` are setgid folders owned by the `deploy` group, which `chirag` belongs to, so scripts must work whichever of the two owns a file (rename into place, don't `chmod` or `chown`). Settings changes need `docker compose up -d api`, not `restart`. `deploy/backup.sh` is the nightly dump. Containers run as non-root with `cap_drop: [ALL]`, `no-new-privileges` and read-only filesystems where possible, so keep it that way when adding services. The production database has no public port and isn't on the `edge` network. Security headers belong in `deploy/ckauth.caddy`, not in the web container. Breaking changes need a `BREAKING CHANGE:` footer in the commit.
-- **Before a PR:** `pnpm check:pr` must pass (`scripts/check-pr.js`; the detailed rules are in `scripts/check-repo.js` and `frontend/scripts/check-dist.js`). When a rule is added here, add its check there too and prove it fails once on a broken input. Raising a size budget in `check-dist.js` needs a dated reason next to it.
-- **Commits:** Conventional Commits (`feat(auth): …`, `fix(auth): …`), with a body explaining *why* for any behaviour or security change. Only commit when the user asks.
-- **Search copy:** when a user-visible feature ships (or one is removed), update the search title and description in `frontend/index.html` (and `og:title`/`og:description`; the JSON-LD description is copied from the meta description at build time). Keep the title 50–60 characters with the topic words first, the description 140–160 with a call to action, and both true to what the live site does today. If the headline changes, update `og-image.svg` and re-render `public/og.png` too.
-- **Docs page:** the docs are also published as one page, the "CKAuth Docs" artifact, built by `scripts/docs-artifact/` (Journey and Practice views are generated from DEVLOG and LEARNINGS). Before every commit, run `pnpm docs:artifact` and fix any broken link it reports. Republish the page to the same URL at most twice a week, at least 3 days after the last publish (the artifact list shows the date). A new doc goes in the `docs` list in `build.js`.
-- **After notable changes:** add a dated entry to `DEVLOG.md` (above the `---` before "Lessons") and update its "Next up" (short-term to-dos) and "Future scope" (larger product directions). Add any mistake or lesson to `LEARNINGS.md` under its topic, in the format *what went wrong → fix → **Rule:***.
+- **Commit, PR, docs, search copy, docs artifact:** all in the `/ship` skill (`.claude/skills/ship/SKILL.md`), which runs in a fresh Sonnet subagent. Only commit when the user asks; then use `/ship`. When a rule is added here, add its check to `scripts/check-repo.js` or `frontend/scripts/check-dist.js` and prove it fails once.
 
 ## Known gaps
 
@@ -117,13 +113,4 @@ const {email, password} = await parseOrThrow(somePayloadModel, req.body)
 - No MFA, for admins or anyone; sudo mode is the interim protection for admin writes. No browser end-to-end tests yet.
 - No CORS middleware (not needed while the frontend is same-origin).
 - Malformed or oversized JSON bodies return 500, because `errorHandler` only recognises `ApiError` (body-parser errors carry `status` 400/413).
-- **SEO and traffic** (full list with test IDs in `docs/SEO-AUDIT.md`; this build scores 33/100 on its strict tests):
-  - The domain is new (registered 21 Oct 2026), `chiragdev.com` itself is a Hostinger parked page, no sites link in yet, and `/` is the only indexable page.
-  - LCP is ~2.2 s in the mobile lab (target 1.8 s); the hero no longer fades in, so what's left is network and font loading.
-  - Every anonymous visit logs two 401s (`/auth/me`, then `/auth/refresh`).
-  - Contrast passes WCAG AA; keep it that way by not putting opacity modifiers on text.
-  - The landing page loads ~126 KiB of JavaScript (gzip; `check-dist.js` budget 127), ~56 KiB of it unused there (mostly React Router and Tailwind Merge).
-  - `/index.html` answers 200 alongside `/` (only the canonical tag deduplicates them).
-  - No CDN, no IPv6, no CAA record, no COOP/CORP; HSTS has no `includeSubDomains`/preload; the CSP still allows inline styles.
-  - DMARC is `p=none` with no reports; there's no analytics or uptime monitoring.
-  - The prerendered footer year is the build year until the client re-renders, and the `@app` route list in `frontend/Caddyfile` must be kept in sync with `src/app.tsx` by hand.
+- **SEO and traffic:** the full list, with test IDs and the 33/100 score, is in `docs/SEO-AUDIT.md`. Two rules to keep while building: no opacity modifiers on text (contrast passes WCAG AA), and the `@app` route list in `frontend/Caddyfile` is kept in sync with `src/app.tsx` by hand. Also: the prerendered footer year is the build year until the client re-renders.

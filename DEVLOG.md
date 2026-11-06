@@ -395,6 +395,14 @@ New entries go at the bottom, under a dated heading.
 - **Tests:** 199 API tests (29 new: `activity`, `request-logger`, stats windows), coverage 98.2% lines / 88.7% branches; each new guarantee was broken once to watch its test fail.
 - **Browser walkthrough** (Playwright on spare ports 8081/3001, a temporary admin, removed afterwards): 15 checks on `/admin` at 1280, 390 and 320 px in light and dark, including an invite through the sudo-mode prompt appearing at the top of the log. It found three phone-width overflows the tests can't see: the users grid (from before this branch) grew to the longest email on the page, the new period picker was wider than a 320 px tile, and the invite confirmation's email couldn't wrap. Fixed with `grid-cols-1`, a 4-column picker that fills its tile, and `break-all` on shown emails. It also caught the seed script dating some of today's events in the future.
 
+
+## 6 Nov 2026 · Dev tooling: `/ship` and `/ui-change` skills, and a shorter CLAUDE.md
+
+- Added two Claude Code skills (a skill is a saved set of instructions the assistant loads on demand) under `.claude/skills/`. `/ship` finishes a branch (tests, docs, `pnpm check:pr`, docs artifact, commits, PR and merge text) in a fresh, cheaper context, with a stop rule: a failed security check or an irreversible change stops everything, other code problems are reported and not fixed, and docs-only work gets two review rounds. `/ui-change` agrees a UI direction with ASCII sketches first, then builds design-lab looks.
+- Trimmed `CLAUDE.md` (24.8 KB to 22.4 KB): the shipping-only Workflow bullets now live in `/ship`, and the SEO known-gaps list points to `docs/SEO-AUDIT.md`, keeping only the rules it doesn't cover.
+- Why: a token-usage report showed 97.8% of tokens were cache re-reads, and the commit phase of long sessions was the costliest task (about 29 M tokens at roughly 341k tokens of context per call). Forking that phase into a fresh context avoids paying to re-read the whole session.
+- No API or web changes.
+
 ---
 
 ## Lessons

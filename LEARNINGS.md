@@ -266,5 +266,9 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   → Rebuilt, and the branch is committed before further experiments.
   **Rule:** commit (or at least stash) a version the user has approved before trying alternatives on top of it.
 
+- **The commit phase of long sessions was the most expensive work.** Almost all tokens (97.8%) were the session being re-read on every call, and committing at the end of a long session re-read about 341k tokens each time.
+  → The commit phase became the `/ship` skill, which runs in a fresh, cheaper context and is given a short summary instead of the whole conversation.
+  **Rule:** when the cost is re-reading a long session, fork the commit phase into a fresh context.
+
 - Commit messages for behaviour or security changes need a body explaining *why*, plus a `BREAKING CHANGE:` footer when the API changes. One-line messages are only for trivial commits.
 - After a change, test the real flow end to end against the database and the external services, not just a successful build.
