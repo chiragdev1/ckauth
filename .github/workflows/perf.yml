@@ -1,0 +1,59 @@
+name: Performance
+
+# measures the live site once a week from a github runner (scripts/perf/measure.js) and keeps every result on the
+# perf-data branch: results.jsonl (one line per run) and README.md, the report with charts, which github shows when
+# you open the branch. read-only against production: page loads and GET /api/, no sign-ins, no mail
+on:
+  schedule:
+    # mondays 03:30 utc, 09:00 in india. schedules only run from the default branch, and github pauses them after
+    # 60 days without a commit to the repo (a "workflow disabled" email; re-enable it in the Actions tab)
+    - cron: '30 3 * * 1'
+  # a run on demand, e.g. right after a deploy, from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  # to push the results to the perf-data branch
+  contents: write
+
+# two runs at once would both append to results.jsonl and one push would be rejected
+concurrency: perf
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # the results live on their own branch so the weekly commits never touch main's history or trigger a deploy.
+      # the first run creates it, with no history of its own (an orphan branch)
+      - name: Check out the perf-data branch
+        run: |
+          if git fetch origin perf-data; then
+            git worktree add -B perf-data perf-data origin/perf-data
+          else
+            git worktree add --orphan -b perf-data perf-data
+          fi
+
+      - name: Measure the live site
+        run: pnpm perf
+        env:
+          PERF_WHERE: GitHub Actions runner (US)
+
+      - name: Write the report
+        run: pnpm --silent perf:report >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save the results
+        working-directory: perf-data
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+          git add results.jsonl README.md
+          git commit -m "perf: weekly measurement, $(date -u +%F)"
+          git push origin perf-data

@@ -7,6 +7,7 @@ import { DEFAULT_EMAIL_THEME, emailThemes, renderEmailHtml } from '../../utils/e
 import { ApiError } from '../../utils/api-error.js'
 import { ApiResponse } from '../../utils/api-response.js'
 import { getFrontendUrl } from '../auth/utils/constants.js'
+import { outbox } from '../../utils/mail.js'
 
 // development only: src/app/index.ts mounts this router only when NODE_ENV isn't production, and the dockerfile and
 // compose.yml both set production, so none of it exists on the live site. it renders every email with sample values for
@@ -49,4 +50,19 @@ devRouter.get('/emails/:id', (req: Request, res: Response) => {
   }
   // the page shows it in an iframe; html, not the usual json envelope
   return res.type('html').send(renderEmailHtml(sample().content, query.data.theme))
+})
+
+const outboxQueryModel = z.object({to: z.string().min(1)})
+
+// the browser tests (e2e/) run the API in another process, so they can't read `outbox` directly: this is their inbox.
+// only with MAIL_TRANSPORT=memory, the one setup where the outbox fills, so a dev server that sends real mail exposes nothing
+devRouter.get('/outbox', (req: Request, res: Response) => {
+  const query = outboxQueryModel.safeParse(req.query)
+  const mail = process.env.MAIL_TRANSPORT === 'memory' && query.success
+    ? outbox.findLast(mail => mail.to === query.data.to)
+    : undefined
+  if(!mail) {
+    throw ApiError.notFound('No mail to that address')
+  }
+  return ApiResponse.ok(res, 'Latest mail', {to: mail.to, subject: mail.subject, text: mail.text})
 })

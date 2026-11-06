@@ -575,6 +575,14 @@ Locally it's the same script: `pnpm build`, then `pnpm admin role you@example.co
 
 `role` and `delete` are recorded in the activity log like any other change, as done "by the server", since the script has no signed-in admin.
 
+### Performance measurements
+
+A weekly GitHub workflow (`.github/workflows/perf.yml`, Mondays 03:30 UTC, or run it by hand from the Actions tab) loads the live home page and `/sign-in` in Chromium on a desktop profile and a phone on slow 4G, and times 20 `GET /api/` calls. It only reads: no sign-ins, no email. Nothing needs setting up on the VPS or in secrets.
+
+Results go to an **orphan branch** (one with no shared history) called `perf-data`, created by the first run: `results.jsonl` holds one line per run, and `README.md` is the report with trend charts, which GitHub shows when you open the branch. Keeping them off `main` means the weekly commits never trigger a deploy. The same report appears in the run's summary.
+
+GitHub **pauses scheduled workflows after 60 days with no commit to the repository** and emails you; re-enable it in the Actions tab. To measure from your own machine, run `pnpm perf` and `pnpm perf:report`.
+
 ### Logs and status
 
 ```bash
@@ -780,6 +788,7 @@ Measured on 2 dedicated cores, with the API capped like production. **Expect abo
 | `deploy/setup-vps.sh` | One-time server preparation |
 | `.github/workflows/api.yml`, `web.yml` | Build and deploy pipelines (by changed path) |
 | `.github/workflows/deploy.yml` | The deploy job both pipelines share |
+| `.github/workflows/perf.yml` | Weekly speed measurement of the live site (see "Performance measurements") |
 
 ### Files on the VPS
 
