@@ -3,6 +3,7 @@
 // run by scripts/check-pr.js after the frontend build
 import { readdir, readFile } from 'node:fs/promises'
 import { gzipSync } from 'node:zlib'
+import { createHash } from 'node:crypto'
 
 const SITE_URL = 'https://ckauth.chiragdev.com'
 const dist = new URL('../dist/', import.meta.url)
@@ -45,6 +46,22 @@ check(robots.includes(`Sitemap: ${SITE_URL}/sitemap.xml`) && !/^Disallow: \/\s*$
 check((await read('sitemap.xml')).includes(`<loc>${SITE_URL}/</loc>`), 'sitemap.xml must list the home page')
 const ogImage = await readFile(new URL('og.png', dist))
 check(ogImage.readUInt32BE(16) === 1200 && ogImage.readUInt32BE(20) === 630, 'og.png must be 1200×630')
+
+// --- brand images: each png names the sha-256 of the svg it was rendered from (scripts/brand-images.mjs), so an edited
+// source with a stale png fails here. a git checkout resets file dates, so comparing modification times can't work
+const sourceOf = png => {
+  for(let at = 8; at < png.length; at += 12 + png.readUInt32BE(at)) {
+    const text = png.toString('latin1', at + 8, at + 8 + png.readUInt32BE(at))
+    if(png.toString('latin1', at + 4, at + 8) === 'tEXt' && text.startsWith('ckauth-source\0')) return text.slice(14)
+  }
+}
+const brand = { 'og.png': '../og-image.svg', 'apple-touch-icon.png': '../brand/icon.svg', 'icon-192.png': '../brand/icon.svg', 'icon-512.png': '../brand/icon.svg' }
+for(const [png, svg] of Object.entries(brand)) {
+  const hash = createHash('sha256').update(await readFile(new URL(svg, dist))).digest('hex')
+  const image = await readFile(new URL(png, dist)).catch(() => null)
+  check(image && sourceOf(image) === hash, `${png} is missing or older than ${svg.slice(3)}: run pnpm brand:images`)
+}
+check(head.includes('<link rel="apple-touch-icon" href="/apple-touch-icon.png"') && head.includes('<link rel="manifest" href="/manifest.json"'), 'home page must link the apple-touch-icon and the manifest')
 
 // --- optimisation: nothing blocks the first paint, and the downloads fit the budgets
 check(!/<link rel="stylesheet"/.test(head), 'home page links a stylesheet (render-blocking); the css should be inlined')
