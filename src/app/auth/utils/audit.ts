@@ -10,7 +10,8 @@ type AuditEvent = {
   action: AuditAction
   actorId?: string | null
   targetId?: string | null
-  details?: Record<string, string | number | boolean>
+  // undefined allowed explicitly, so a helper that has nothing to add can say so; stored as null either way
+  details?: Record<string, string | number | boolean> | undefined
 }
 
 // pass the transaction that makes the change, so the row commits or rolls back with it. req is null for manage-users,

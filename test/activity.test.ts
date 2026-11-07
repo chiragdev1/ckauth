@@ -116,6 +116,57 @@ describe('what gets recorded', () => {
     assert.deepEqual(byAction.user_deleted?.details, {email: 'invited@ckauth.test'})
   })
 
+  test('a profile edit', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    assert.equal((await client.patch('/auth/me', {firstName: 'Renamed', age: 41})).status, 200)
+
+    const [updated] = await events('profile_updated')
+    assert.equal(updated?.actorId, user.id)
+    assert.equal(updated?.targetId, user.id)
+    // field names only: neither the new name nor the age is kept
+    assert.deepEqual(updated?.details, {firstName: true, age: true})
+  })
+
+  test('removing a photo, but not removing one that is already gone', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    // imagekit is off in the tests, so the photo is put in place directly; the upload path is covered by its catch
+    await db.update(usersTable).set({avatarUrl: 'https://ik.imagekit.io/test/a.png', avatarFileId: 'file-1'}).where(eq(usersTable.id, user.id))
+    await client.delete('/auth/avatar')
+    await client.delete('/auth/avatar')
+
+    const changes = await events('avatar_changed')
+    assert.deepEqual(changes.map(row => row.details), [{removed: true}])
+  })
+
+  test('signing out one device, the others, and nothing when there were none', async () => {
+    const user = await createUser()
+    const phone = await signIn(baseUrl, user)
+    const laptop = await signIn(baseUrl, user)
+    await signIn(baseUrl, user)
+    const phoneSession = (await laptop.get('/auth/sessions')).body.data.find((session: {current: boolean}) => !session.current)
+    assert.equal((await laptop.delete(`/auth/sessions/${phoneSession.id}`)).status, 200)
+    await laptop.delete('/auth/sessions')
+    await laptop.delete('/auth/sessions')
+    void phone
+
+    const revoked = await events('sessions_revoked')
+    assert.deepEqual(revoked.map(row => row.details), [{count: 1, current: false}, {count: 1, current: false}])
+  })
+
+  test('an email change request, recorded the same whether or not the new address is taken', async () => {
+    const user = await createUser()
+    const other = await createUser()
+    const client = await signIn(baseUrl, user)
+    await client.post('/auth/change-email', {newEmail: 'free@ckauth.test', password: user.password})
+    await client.post('/auth/change-email', {newEmail: other.email, password: user.password})
+
+    const requests = await events('email_change_requested')
+    assert.equal(requests.length, 2)
+    assert.deepEqual(requests.map(row => [row.actorId, row.details]), [[user.id, null], [user.id, null]])
+  })
+
   test('a refused action records nothing', async () => {
     const {admin, client} = await adminSession()
     const otherAdmin = await createUser({role: 'admin'})
@@ -138,6 +189,20 @@ describe('what gets recorded', () => {
     }
     // the old password still works, so the change rolled back
     assert.equal((await new Client(baseUrl).post('/auth/sign-in', {email: user.email, password: user.password})).status, 200)
+  })
+
+  // the same promise for the events added on 7 Nov, which moved single writes into transactions
+  test('a profile edit rolls back when its record cannot be written', async () => {
+    const user = await createUser({firstName: 'Original'})
+    const client = await signIn(baseUrl, user)
+    await db.execute(sql`alter table audit_events add constraint test_block check (action <> 'profile_updated')`)
+    try {
+      assert.equal((await client.patch('/auth/me', {firstName: 'Renamed'})).status, 500)
+    } finally {
+      await db.execute(sql`alter table audit_events drop constraint test_block`)
+    }
+    const [row] = await db.select({firstName: usersTable.firstName}).from(usersTable).where(eq(usersTable.id, user.id))
+    assert.equal(row?.firstName, 'Original')
   })
 })
 

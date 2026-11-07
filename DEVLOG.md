@@ -436,6 +436,14 @@ New entries go at the bottom, under a dated heading.
 - **Brand guide:** `docs/BRAND.md` covers the name, the crest, colours, type, voice and taglines, imagery, every brand file with where it's used and how to upload it, and the email colours.
 - **Email theme picked: midnight,** over ember (cool grey) and warm (cream), after comparing two real emails in all three, light and dark. Its colours are the site's own (the dark card is `--card`, `#111827`), so an email looks like the product. The other two palettes are deleted; `emailThemes` stays a one-entry list, so `/dev/emails` can still compare a new candidate. A new test keeps the emails on the site's slate and card colours, proven to fail once.
 
+## 7 Nov 2026 · The activity log's missing events
+**In short:** every change to an account now shows in the activity log.
+
+- **Four new activity-log events:** `profile_updated` (one `true` per field sent, such as `{firstName: true}`, never the new value), `avatar_changed` (`removed` for a removal), `sessions_revoked` (`count`, and whether it was this device) and `email_change_requested`. These account changes wrote nothing, although CLAUDE.md says every one does. Each is written in the transaction that makes the change; the profile edit, device sign-outs and email request were single writes, so they moved into one. Removing a photo that's already gone, or "sign out other devices" with none, records nothing. An email request is recorded the same whether or not the new address is taken, and keeps no address, so the log can't be read as a list of who has an account. Sign-up stays unrecorded, as decided on 6 Nov.
+- **Why field names and not values:** the log is kept for a year and admins read it. A name change is a common sign of a takeover, so which field changed is worth keeping; the age or name itself isn't.
+- **Tests:** one per event in `test/activity.test.ts` (the profile one checks that only field names are kept), plus a rollback test for the profile edit; the device one proven to fail once by removing its write. Photo uploads can't be tested while ImageKit is off in the tests, so only removal is covered.
+- **Policy and docs:** the Privacy Policy's activity-log line lists the new events ("which fields, not what you typed"); `docs/API.md` has them in its actions table; the admin panel's filter has their labels.
+
 ---
 
 ## Lessons

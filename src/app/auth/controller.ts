@@ -41,6 +41,19 @@ function verificationUrl(token: string) {
   return `${getFrontendUrl()}/verify-email?token=${token}`
 }
 
+type ProfileChanges = {firstName?: string, lastName?: string | null, age?: number | null}
+
+// what a profile_updated event keeps in details. admins read it in the activity log, and it's kept for a year, so it
+// names the fields sent and never their values (the privacy policy promises "which fields, not what you typed").
+// a name change is a common sign of a takeover, so which field it was is worth keeping; the age itself isn't
+function profileChangeDetails(changes: ProfileChanges): Record<string, string | number | boolean> | undefined {
+  const details: Record<string, boolean> = {}
+  for(const field of ['firstName', 'lastName', 'age'] as const) {
+    if(changes[field] !== undefined) details[field] = true
+  }
+  return Object.keys(details).length ? details : undefined
+}
+
 export class AuthController {
 
   public async handleSignup(req: Request, res: Response) {
@@ -298,7 +311,14 @@ export class AuthController {
     const userId = (req.user as any)?.id
 
     // matching on the user too means nobody can end someone else's session, and a guessed id answers like a missing one
-    const [revoked] = await db.delete(sessionsTable).where(and(eq(sessionsTable.id, id), eq(sessionsTable.userId, userId))).returning({id: sessionsTable.id})
+    const revoked = await db.transaction(async (tx) => {
+      const [deleted] = await tx.delete(sessionsTable).where(and(eq(sessionsTable.id, id), eq(sessionsTable.userId, userId))).returning({id: sessionsTable.id})
+      // signing devices out is what someone does when they think their account was taken, so it belongs in the log
+      if(deleted) {
+        await recordEvent(tx, req, {action: auditActions.SESSIONS_REVOKED, actorId: userId, targetId: userId, details: {count: 1, current: deleted.id === req.sessionId}})
+      }
+      return deleted
+    })
 
     if(!revoked) {
       throw ApiError.notFound('Session not found')
@@ -315,7 +335,14 @@ export class AuthController {
   public async handleRevokeOtherSessions(req: Request, res: Response) {
     const userId = (req.user as any)?.id
 
-    const revoked = await db.delete(sessionsTable).where(and(eq(sessionsTable.userId, userId), ne(sessionsTable.id, req.sessionId!))).returning({id: sessionsTable.id})
+    const revoked = await db.transaction(async (tx) => {
+      const deleted = await tx.delete(sessionsTable).where(and(eq(sessionsTable.userId, userId), ne(sessionsTable.id, req.sessionId!))).returning({id: sessionsTable.id})
+      // nothing signed out, nothing changed: an empty click doesn't fill the log
+      if(deleted.length > 0) {
+        await recordEvent(tx, req, {action: auditActions.SESSIONS_REVOKED, actorId: userId, targetId: userId, details: {count: deleted.length, current: false}})
+      }
+      return deleted
+    })
 
     return ApiResponse.ok(res, 'Other sessions ended successfully', {count: revoked.length})
   }
@@ -513,6 +540,8 @@ export class AuthController {
         }
 
         await tx.update(usersTable).set({avatarUrl: uploadedAvatar.url, avatarFileId: uploadedAvatar.fileId}).where(eq(usersTable.id, userId))
+        // if this insert fails, the catch below removes the uploaded file like any other failed save
+        await recordEvent(tx, req, {action: auditActions.AVATAR_CHANGED, actorId: userId, targetId: userId, details: {removed: false}})
 
         return userInDb.avatarFileId
       })
@@ -539,13 +568,17 @@ export class AuthController {
 
     // lock the row, like upload does, so a removal racing an upload can't leave a file nobody points at
     const previousAvatarFileId = await db.transaction(async (tx) => {
-      const [userInDb] = await tx.select({avatarFileId: usersTable.avatarFileId}).from(usersTable).where(eq(usersTable.id, userId)).for('update')
+      const [userInDb] = await tx.select({avatarFileId: usersTable.avatarFileId, avatarUrl: usersTable.avatarUrl}).from(usersTable).where(eq(usersTable.id, userId)).for('update')
 
       if(!userInDb) {
         throw ApiError.unauthorized('User not found')
       }
 
       await tx.update(usersTable).set({avatarUrl: null, avatarFileId: null}).where(eq(usersTable.id, userId))
+      // only when there was a photo to remove: a retry or a double click changes nothing, so it records nothing
+      if(userInDb.avatarUrl) {
+        await recordEvent(tx, req, {action: auditActions.AVATAR_CHANGED, actorId: userId, targetId: userId, details: {removed: true}})
+      }
 
       return userInDb.avatarFileId
     })
@@ -572,7 +605,13 @@ export class AuthController {
       ...(age !== undefined && {age}),
     }
 
-    const [updatedUser] = await db.update(usersTable).set(changes).where(eq(usersTable.id, userId)).returning(safeUserColumns)
+    const updatedUser = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(usersTable).set(changes).where(eq(usersTable.id, userId)).returning(safeUserColumns)
+      if(updated) {
+        await recordEvent(tx, req, {action: auditActions.PROFILE_UPDATED, actorId: userId, targetId: userId, details: profileChangeDetails(changes)})
+      }
+      return updated
+    })
 
     if(!updatedUser) {
       throw ApiError.internal('Could not update profile in db')
@@ -668,6 +707,9 @@ export class AuthController {
     const [taken] = await db.select({id: usersTable.id}).from(usersTable).where(eq(usersTable.email, newEmail))
 
     if(taken) {
+      // recorded the same as a request that goes ahead, so the log can't be read as a list of who has an account.
+      // no address in details: a taken one belongs to someone else, and email_changed records the move once it's confirmed
+      await recordEvent(db, req, {action: auditActions.EMAIL_CHANGE_REQUESTED, actorId: userId, targetId: userId})
       sendEmailTakenMail(newEmail).catch((error) => {
         req.log.error({err: error, mail: 'email-taken', userId}, 'mail failed')
       })
@@ -676,11 +718,17 @@ export class AuthController {
 
     // a new request replaces any earlier one, so only the latest link works
     const {token, hashedToken} = createTempToken()
-    const [saved] = await db.update(usersTable).set({
-      pendingEmail: newEmail,
-      emailChangeToken: hashedToken,
-      emailChangeTokenExpiry: new Date(Date.now() + EMAIL_CHANGE_LINK_MS),
-    }).where(eq(usersTable.id, userId)).returning({id: usersTable.id})
+    const saved = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(usersTable).set({
+        pendingEmail: newEmail,
+        emailChangeToken: hashedToken,
+        emailChangeTokenExpiry: new Date(Date.now() + EMAIL_CHANGE_LINK_MS),
+      }).where(eq(usersTable.id, userId)).returning({id: usersTable.id})
+      if(updated) {
+        await recordEvent(tx, req, {action: auditActions.EMAIL_CHANGE_REQUESTED, actorId: userId, targetId: userId})
+      }
+      return updated
+    })
 
     if(!saved) {
       throw ApiError.internal('Could not save email change in db')

@@ -794,7 +794,11 @@ One page of the **activity log** (an [audit log](GLOSSARY.md#logs-and-monitoring
 | `email_verified` | a verify link is used | the user → themselves | |
 | `password_changed` | `POST /auth/change-password` | the user → themselves | |
 | `password_reset` | a reset link is used | the user → themselves | `firstPassword`: `true` when it finished an invite |
+| `email_change_requested` | `POST /auth/change-email` with the right password, whether or not the new address is taken (so the log can't tell) | the user → themselves | none: the new address may belong to someone else |
 | `email_changed` | a new email is confirmed | the user → themselves | `previousEmail` |
+| `profile_updated` | `PATCH /auth/me` | the user → themselves | which fields changed |
+| `avatar_changed` | a photo is uploaded, or removed (removing one that's already gone records nothing) | the user → themselves | `removed`: `true` for a removal |
+| `sessions_revoked` | `DELETE /auth/sessions/:id`, or `DELETE /auth/sessions` that signed at least one device out | the user → themselves | `count`: devices signed out; `current`: whether it was this device |
 | `account_deleted` | `DELETE /auth/me` | the user → themselves | `email`, kept since the account is gone |
 | `admin_reauth` / `admin_reauth_failed` | `POST /admin/reauth`, right or wrong password | the admin → themselves | |
 | `user_invited` | `POST /admin/users` | the admin → the new account | |
