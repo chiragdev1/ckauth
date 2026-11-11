@@ -15,7 +15,7 @@ const repoUrl = 'https://github.com/chiragdev1/ckauth'
 const docs = [
   { key: 'readme', path: 'README.md', title: 'Overview', group: 'Start here', blurb: 'What CKAuth is, setup and scripts' },
   { key: 'api', path: 'docs/API.md', title: 'API reference', group: 'Build', blurb: 'Every endpoint, payload and error' },
-  { key: 'conventions', path: 'CLAUDE.md', title: 'Conventions', group: 'Build', blurb: 'Layout, code style and security rules' },
+  { key: 'conventions', path: 'CLAUDE.md', title: 'Conventions', group: 'Build', blurb: 'Where things live, code style and security rules' },
   { key: 'deployment', path: 'docs/DEPLOYMENT.md', title: 'Deployment', group: 'Run', blurb: 'From an empty VPS to live, plus operations' },
   { key: 'vps-access', path: 'docs/VPS-ACCESS.md', title: 'VPS access', group: 'Run', blurb: 'SSH keys, GitHub and the deploy user' },
   { key: 'oidc', path: 'docs/OIDC.md', title: 'Sign in with CKAuth', group: 'Build', blurb: 'The OpenID Connect design, from analogy to security rules' },
@@ -23,6 +23,7 @@ const docs = [
   { key: 'brand', path: 'docs/BRAND.md', title: 'Brand guide', group: 'Reference', blurb: 'Name, crest, colours, voice and brand files' },
   { key: 'seo-audit', path: 'docs/SEO-AUDIT.md', title: 'SEO audit', group: 'Reference', blurb: '64 strict tests and the traffic plan' },
   { key: 'devlog', path: 'DEVLOG.md', title: 'Dev log', group: 'Journey', blurb: 'What changed, and when' },
+  { key: 'roadmap', path: 'ROADMAP.md', title: 'Roadmap', group: 'Journey', blurb: 'Next up, then the bigger directions' },
   { key: 'learnings', path: 'LEARNINGS.md', title: 'Learnings', group: 'Journey', blurb: 'Mistakes and the rules they taught' },
 ]
 
@@ -152,3 +153,27 @@ const page = readFileSync(join(here, 'template.html'), 'utf8')
 mkdirSync(dirname(outFile), { recursive: true })
 writeFileSync(outFile, page)
 console.log(`wrote ${posix.relative(root.split('\\').join('/'), outFile.split('\\').join('/'))} (${Math.round(page.length / 1024)} KiB, ${docs.length} docs, commit ${data.commit.slice(0, 7)}${data.uncommitted ? ' + uncommitted changes' : ''})`)
+
+// the published page is republished at most every 3 days ("twice a week or on a 3 day gap"). publishing happens through
+// claude.ai, which this script can't see, so `--published` records it here (local, gitignored) and every build says
+// when the next one is due, instead of someone looking the date up
+const REPUBLISH_GAP_DAYS = 3
+const stampFile = join(root, '.docs-artifact', 'published.json')
+// local dates (YYYY-MM-DD), not UTC: a publish at 1:30 am in India is still that day's publish
+const day = date => date.toLocaleDateString('en-CA')
+let published = []
+try { published = JSON.parse(readFileSync(stampFile, 'utf8')).published ?? [] } catch {}
+if (process.argv.includes('--published')) {
+  published = [...published, day(new Date())].slice(-20)
+  writeFileSync(stampFile, `${JSON.stringify({ published }, null, 2)}\n`)
+}
+const last = published.at(-1)
+if (!last) {
+  console.log('docs page: no publish recorded; after publishing, run `pnpm docs:artifact --published`')
+} else {
+  const dueDate = new Date(`${last}T00:00:00`)
+  dueDate.setDate(dueDate.getDate() + REPUBLISH_GAP_DAYS)
+  const due = day(dueDate)
+  const today = day(new Date())
+  console.log(`docs page: last published ${last}; next republish ${due <= today ? `allowed now (due since ${due})` : `due ${due}`}`)
+}
