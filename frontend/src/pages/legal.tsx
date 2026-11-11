@@ -7,7 +7,7 @@ import { CONTACT_EMAIL, REPO_URL } from './home-copy.ts'
 // (src/db/schema.ts, rate-limit.ts, auth/utils/constants.ts for cookies, deploy/backup.sh), so change them together.
 // structure follows the usual gdpr / india dpdp act / ccpa checklist; see DEVLOG 27 Oct 2026
 
-const UPDATED = '7 November 2026'
+const UPDATED = '11 November 2026'
 const OPERATOR = 'Chirag Arora'
 
 type Section = { id: string, heading: string, body: ReactNode }
@@ -106,7 +106,7 @@ const privacySections: Section[] = [
           <li><strong>access_token</strong> proves who you are for about 15 minutes.</li>
           <li><strong>refresh_token</strong> renews it for up to a day, until you sign out. Each device has its own.</li>
         </ul>
-        <p>Both are <code>httpOnly</code> (page scripts can't read them), only sent over HTTPS, and only sent to this site. Your browser's local storage also remembers your light or dark theme and your language choice, and its session storage (cleared when you close the tab) notes the time of an automatic reload after we release a new version, so it can't repeat in a loop, and the tag of the link you arrived through, so a sign-up in that tab can carry it. Apart from that tag, which goes with your sign-up, all of this stays on your device and is never sent to us. Since we don't track you, there's nothing for a "Do Not Track" or Global Privacy Control signal to switch off.</p>
+        <p>Both are <code>httpOnly</code> (page scripts can't read them), only sent over HTTPS, and only sent to this site. Your browser's local storage also remembers your light or dark theme, and its session storage (cleared when you close the tab) notes the time of an automatic reload after we release a new version, so it can't repeat in a loop, and the tag of the link you arrived through, so a sign-up in that tab can carry it. Apart from that tag, which goes with your sign-up, all of this stays on your device and is never sent to us. Since we don't track you, there's nothing for a "Do Not Track" or Global Privacy Control signal to switch off.</p>
       </>
     ),
   },

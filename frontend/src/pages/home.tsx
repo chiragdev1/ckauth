@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { ArrowRight, BadgeCheck, Check, ChevronDown, CodeXml, ExternalLink, EyeOff, Fingerprint, HeartHandshake, ImageUp, KeyRound, LogOut, Mail, MailCheck, Pause, PhoneOff, Play, RefreshCcw, ShieldBan, ShieldCheck, Timer, UserCheck, UserPlus, Vault, type LucideIcon } from 'lucide-react'
 import { useAuth } from '@/lib/auth.tsx'
-import { useLanguage } from '@/lib/language.tsx'
 import { cn } from '@/lib/utils.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { useDocumentTitle } from '@/lib/use-document-title.ts'
@@ -11,11 +10,10 @@ import { CONTACT_EMAIL, homeCopy, REPO_URL, type HomeCopy } from './home-copy.ts
 // the landing page, written for anyone running a website or app (words: home-copy.ts, from content/landing-page.md)
 export function Home() {
   useDocumentTitle()
-  const { language } = useLanguage()
-  const copy = homeCopy[language]
+  const copy = homeCopy
 
   return (
-    <div lang={language}>
+    <div>
       <Hero copy={copy} />
       <Ticker items={copy.ticker} pauseLabel={copy.tickerPause} />
       <Features copy={copy} />

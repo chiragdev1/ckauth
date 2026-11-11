@@ -3,6 +3,7 @@
 // - app.html: the empty shell for every other route (the web Caddyfile serves it), which must not carry the home page's markup
 import { createHash } from 'node:crypto'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { criticalCss } from './critical-css.js'
 
 const SITE_URL = 'https://ckauth.chiragdev.com'
 const dist = new URL('../dist/', import.meta.url)
@@ -17,7 +18,6 @@ function replaceOnce(html, search, replacement) {
 const shell = await readFile(new URL('index.html', dist), 'utf8')
 
 // the latin file of the font the first screen uses; preloading starts it with the html instead of after the css.
-// the hindi font isn't preloaded: the page starts in english, and most visitors never switch
 const fonts = (await readdir(new URL('assets/', dist))).filter(name => /^inter-latin-wght-normal-.+\.woff2$/.test(name))
 if(fonts.length !== 1) throw new Error(`prerender: expected the inter latin font, found ${fonts.join(', ') || 'none'}`)
 const preloads = fonts.map(name => `<link rel="preload" href="/assets/${name}" as="font" type="font/woff2" crossorigin />`).join('\n    ')
@@ -53,13 +53,20 @@ const homeHead = [
 ].join('\n    ')
 
 let home = replaceOnce(appShell, '</head>', `  ${homeHead}\n  </head>`)
-// the home page is the landing page, so its css comes inline instead of as a render-blocking request
-// (~11 kB gzip, already allowed by style-src 'unsafe-inline'). app.html keeps the cacheable stylesheet link
+home = replaceOnce(home, '<div id="root"></div>', `<div id="root" data-prerendered="/">${render('/')}</div>`)
+
+// the home page is the landing page, so its css comes inline instead of as a render-blocking request (allowed by
+// style-src 'unsafe-inline'), and only the part it uses (scripts/critical-css.js). app.html keeps the plain link.
+// the full sheet still loads, preloaded in <head> and linked at the end of <body>: there it doesn't hold up the first
+// paint, but module scripts wait for every stylesheet the parser met, so react hydrates (and can render the lazy user
+// menu or move to another page) only once every class is styled. that wait is what makes dropping rules safe
 const stylesheet = home.match(/<link rel="stylesheet" crossorigin href="\/assets\/([^"]+\.css)">/)
 if(!stylesheet) throw new Error('prerender: no stylesheet link in index.html')
 const css = await readFile(new URL(`assets/${stylesheet[1]}`, dist), 'utf8')
-home = replaceOnce(home, stylesheet[0], `<style>${css}</style>`)
-home = replaceOnce(home, '<div id="root"></div>', `<div id="root" data-prerendered="/">${render('/')}</div>`)
+const firstLoadJs = await Promise.all([...home.matchAll(/(?:src|href)="\/assets\/([^"]+\.js)"/g)].map(match => readFile(new URL(`assets/${match[1]}`, dist), 'utf8')))
+const sheetUrl = `/assets/${stylesheet[1]}`
+home = replaceOnce(home, stylesheet[0], `<link rel="preload" href="${sheetUrl}" as="style" crossorigin>\n    <style>${criticalCss(css, home + firstLoadJs.join(''))}</style>`)
+home = replaceOnce(home, '</body>', `  <link rel="stylesheet" crossorigin href="${sheetUrl}">\n  </body>`)
 
 await writeFile(new URL('app.html', dist), appShell)
 await writeFile(new URL('index.html', dist), home)

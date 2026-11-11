@@ -1,8 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router'
-import { CheckCircle2, Languages, X } from 'lucide-react'
+import { CheckCircle2, X } from 'lucide-react'
 import { useAuth } from '@/lib/auth.tsx'
-import { useLanguage } from '@/lib/language.tsx'
 import { cn } from '@/lib/utils.ts'
 import { CONTACT_EMAIL, homeCopy } from '@/pages/home-copy.ts'
 import { Logo, Spinner } from '@/components/brand.tsx'
@@ -14,7 +13,6 @@ const UserMenu = lazy(() => import('@/components/user-menu.tsx'))
 
 export function Layout() {
   const { pathname } = useLocation()
-  const { language } = useLanguage()
   const main = useRef<HTMLElement>(null)
   const shownPath = useRef(pathname)
 
@@ -30,8 +28,8 @@ export function Layout() {
     <div className="flex min-h-dvh flex-col">
       {/* new pages start at the top, and back/forward return to where you were */}
       <ScrollRestoration />
-      <a href="#main" lang={language} className="sr-only z-50 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
-        {homeCopy[language].nav.skip}
+      <a href="#main" className="sr-only z-50 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
+        {homeCopy.nav.skip}
       </a>
       <SiteHeader />
       <main id="main" ref={main} tabIndex={-1} className="flex flex-1 flex-col outline-none">
@@ -79,12 +77,11 @@ function AccountDeletedNotice() {
 function SiteHeader() {
   const { user } = useAuth()
   const { pathname } = useLocation()
-  const { language, setLanguage } = useLanguage()
   const onHome = pathname === '/'
-  const nav = homeCopy[language].nav
+  const nav = homeCopy.nav
 
   return (
-    <header lang={language} className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/65">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md supports-backdrop-filter:bg-background/65">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
         <Logo />
         {onHome && (
@@ -96,12 +93,6 @@ function SiteHeader() {
           </div>
         )}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* only the home page has hindi words so far; icon-only on phones, where the header has room for four controls */}
-          {onHome && (
-            <Button variant="ghost" onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} aria-label={nav.switchLabel} lang={language === 'en' ? 'hi' : 'en'} className="size-10 px-0 sm:size-auto sm:h-9 sm:px-3">
-              <Languages /><span className="hidden sm:inline">{nav.switchTo}</span>
-            </Button>
-          )}
           <ThemeToggle />
           {/* signed-out buttons while the session check runs: most visitors are signed out, and the prerendered home page
               can't know, so this is what it shows. a signed-in user sees them swap for the menu once /auth/me answers */}
@@ -127,11 +118,10 @@ function SiteHeader() {
 }
 
 function SiteFooter() {
-  const { language } = useLanguage()
-  const footer = homeCopy[language].footer
+  const footer = homeCopy.footer
 
   return (
-    <footer lang={language} className="border-t border-border/70">
+    <footer className="border-t border-border/70">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6">
         <div className="text-center sm:text-left">
           <p>© {new Date().getFullYear()} CKAuth · {footer.tagline}</p>
