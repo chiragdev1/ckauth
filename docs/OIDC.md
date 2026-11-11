@@ -287,7 +287,7 @@ These are the rules the implementation must meet. They come from the current OAu
 
 23. **Rate limits** with the existing limiter: `/oauth/authorize` per IP, `/oauth/token` per client and per IP, `/oauth/revoke` and `/oauth/userinfo` per client. The table in [API.md](API.md) gets them.
 24. **Audit events** in the same transaction as the change: app registered, secret rotated, app disabled, consent granted, consent revoked, refresh-token reuse detected. Tokens, codes and secrets are never logged. `/oauth/authorize` is logged by its route template, never with its query string.
-25. **CORS for public clients:** a single-page app on its own domain needs CORS on `/oauth/token`, `/oauth/userinfo` and `/oauth/revoke`, allowed only for the origins registered for that client. Discovery and the JWKS allow any origin. Today CKAuth has no CORS at all (Known gaps in [CLAUDE.md](../CLAUDE.md)). **(review)**
+25. **CORS for public clients:** a single-page app on its own domain needs CORS on `/oauth/token`, `/oauth/userinfo` and `/oauth/revoke`, allowed only for the origins registered for that client. Discovery and the JWKS allow any origin. Today CKAuth has no CORS at all ([known limitations](../README.md#known-limitations)). **(review)**
 26. **Prove it with the OpenID conformance suite.** The OpenID Foundation's free test suite runs hundreds of checks against a live provider, and passing its "Basic OP" profile is how providers show they meet the standard. Run it against a local server before the first release, and again after any change to these endpoints. **(review)**
 
 ### No exemptions for admin-registered apps

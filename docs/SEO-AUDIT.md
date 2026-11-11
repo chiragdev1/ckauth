@@ -8,7 +8,7 @@ A test passes only if it meets its threshold outright; there is no partial credi
 
 - **What it measures.** How easily people can find the site through search and shared links, and whether it's fast, accessible and trustworthy once they arrive. *SEO* (search engine optimisation) is the part about search.
 - **Two targets.** *Live site* is what runs at `ckauth.chiragdev.com` today. *This build* is the version with the SEO changes, not yet deployed.
-- **Test IDs.** Each test has an ID such as `C05`. The letter is the category (C crawlability, O on-page, P performance, A accessibility, B best practice and security, D domain trust, M measurement). DEVLOG's "Next up" uses the same IDs.
+- **Test IDs.** Each test has an ID such as `C05`. The letter is the category (C crawlability, O on-page, P performance, A accessibility, B best practice and security, D domain trust, M measurement). [ROADMAP.md](../ROADMAP.md)'s "Next up" uses the same IDs.
 - **"Quick".** A fix small enough for phase 1 of the plan, roughly two weeks.
 - **Scores.** Each category's score is the share of its tests that pass. The overall score combines the categories by weight, so crawlability counts twice as much as accessibility.
 - **Terms.** Unfamiliar words (LCP, canonical, DMARC…) are defined in the [glossary](GLOSSARY.md).
@@ -101,7 +101,7 @@ How quickly the page appears and becomes usable, especially on a phone over a sl
 | P06 | Initial JavaScript | 100 kB gzip or less | ❌ | ❌ | Live 150 KiB. 23 Oct build: 121 KiB (account menu lazy-loaded) | Lazy-load more of the router/UI code | no |
 | P07 | Unused JavaScript on the landing page | 20 KiB or less | ❌ | ❌ | Live 79 KiB. 23 Oct build: 56 KiB | Same as P06 | no |
 | P08 | No render-blocking resources | Nothing blocks first paint | ❌ | ✅ | Fixed 23 Oct: theme script inlined (CSP hash), home CSS inlined | Deploy | no |
-| P09 | Server response time from a distance | TTFB 200 ms or less including TLS | ❌ | ❌ | 212–345 ms from this machine; one VPS, no CDN | Cloudflare in front (already in Next up) | no |
+| P09 | Server response time from a distance | TTFB 200 ms or less including TLS | ❌ | ❌ | 212–345 ms from this machine; one VPS, no CDN | Cloudflare in front (already in ROADMAP's Next up) | no |
 | P10 | Real-user Core Web Vitals | Field data exists and passes | ❌ | ❌ | No field data (too few Chrome visitors) | Comes with traffic; track in Search Console | no |
 | P11 | Modern transport and caching | HTTP/2 + HTTP/3, compression, immutable assets | ✅ | ✅ | h2 + h3, zstd, 1-year immutable /assets | None needed | no |
 | P12 | Reachable over IPv6 | AAAA record | ❌ | ❌ | No AAAA for ckauth or chiragdev.com | Add the VPS IPv6 address in DNS | yes |
@@ -195,7 +195,7 @@ Head terms like "authentication" belong to Auth0, Clerk and Okta. The opening is
 ### Phase 3: months 3–12, authority and speed
 
 - Turn `docs/API.md` into indexable docs pages on the site (O06).
-- Put Cloudflare in front, for TTFB and the WAF already in DEVLOG's Next up (P09).
+- Put Cloudflare in front, for TTFB and the WAF already in ROADMAP's Next up (P09).
 - Get the landing bundle under 100 kB gzip by keeping Radix out of the signed-out header (P06, P07). Critical CSS is done (7 Nov 2026: the home page inlines only the CSS it uses, 22.5 → 19.0 KiB gzip); P03 still needs the CDN (P09).
 - Get listed in awesome-express, awesome-nodejs and auth example lists; answer Stack Overflow questions where an article fits.
 - Review Search Console monthly: which queries show us, which pages get impressions without clicks (M04).

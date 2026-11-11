@@ -281,7 +281,7 @@ New entries go at the bottom, under a dated heading.
 - **Search** by name or email, with `%` and `_` treated as plain characters.
 - **Not done, on purpose:**
   - **Soft delete:** the Privacy Policy promises deletion, and sudo mode makes a mistaken delete much harder.
-  - **MFA:** a feature of its own, still in Future scope.
+  - **MFA:** a feature of its own, still in [ROADMAP.md](ROADMAP.md)'s Future scope.
   - **The audit log:** built, then removed, because the logs feature covers it.
 - **Tests (103, plus 5 `test.todo`s, one per known gap):**
   - **Coverage minimum:** `pnpm test:coverage` fails below 95% lines, 83% branches and 85% functions. Today it's 97.7 / 85.9 / 87.6.
@@ -447,7 +447,7 @@ New entries go at the bottom, under a dated heading.
 ## 7 Nov 2026 · Hardening the activity log
 **In short:** the activity log can't be rewritten, can't be flooded, and a password change now tells the account owner.
 
-A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 800-63B found nine gaps; these went in now, the rest are in Next up.
+A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 800-63B found nine gaps; these went in now, the rest are in [ROADMAP.md](ROADMAP.md)'s Next up.
 - **Append-only, in the database.** Three triggers on `audit_events` refuse every `UPDATE`, and refuse `DELETE`/`TRUNCATE` unless the transaction opted in with `set local ckauth.audit_maintenance = 'on'`, which only `withAuditMaintenance` does (pruning, `seed:activity --clear`, the tests' reset). `set local` ends with the transaction, so the opt-in can't leak onto a pooled connection. A bug or an injected query can no longer rewrite history. Older API images keep working: their pruning is refused and logged. Proven by dropping the triggers in a throwaway database and watching three tests fail.
 - **The API has its own database role, `ckauth_api`,** instead of the owner `ckauth` (a superuser in the Postgres image). It can read and write every table, but on `audit_events` only `SELECT` and `INSERT`, and not owning the table it can't drop the triggers. So a leaked API password or code running in the API container can add events but never remove one. Pruning moved into `prune_audit_events()`, a `SECURITY DEFINER` function with no arguments and the retention periods written in, so the API can delete only what was due. `ensure_api_role()` makes the role and its grants; `migrate.ts` runs it on every deploy (roles belong to the Postgres server, so a backup restored onto a new one gets the role back) and sets its password from the new `API_DB_PASSWORD`. Checked with tests that act as the role (what it may and may not do, proven by over-granting it in a throwaway database), a real run of every account flow and `manage-users` as the role on port 8081, and a `check-repo.js` rule that the compose file's API connects as `ckauth_api` (proven once).
 - **`PATCH /auth/me` is rate-limited** (30 per hour per user). Each saved edit now writes a row kept for a year, so without a limit one session could fill the table and bury the account's real history.
@@ -461,7 +461,7 @@ A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 
 - **Critical CSS:** `frontend/scripts/critical-css.js` inlines only the rules the home page's markup and first-load JavaScript use (`index.html` 22.5 → 19.0 KiB gzip); the full stylesheet is preloaded in the head and linked at the end of `<body>`. `check-dist.js` proves no class lost its style, prints the CSS/markup split and warns before a budget runs out; budgets tightened (first-load JS 127 → 123.25 KiB, home HTML 22.5 → 18.75 KiB).
 - **Hindi removed:** the copy, the language switch, `lib/language.tsx`, the Noto Sans Devanagari font and the `:lang(hi)` styles (home JS 127.0 → 123.0 KiB). It cost every visitor though few switched. The Privacy Policy no longer mentions a stored language choice (dated 11 November 2026).
 - **Tests:** a quiet reporter (one summary line when everything passes, full detail for failures; `CI=1` gives the full list) and `pnpm test:only <names>` to run chosen files with the same environment and database as `pnpm test`. Critical CSS has its own unit test.
-- **Docs:** glossary (lazy rehashing, trickle migration), BRAND, SEO-AUDIT, CLAUDE.md, an "Import an existing user database" idea in Future scope.
+- **Docs:** glossary (lazy rehashing, trickle migration), BRAND, SEO-AUDIT, CLAUDE.md, an "Import an existing user database" idea in [ROADMAP.md](ROADMAP.md)'s Future scope.
 
 ## 7 Nov 2026 · A codebase index
 **In short:** AI assistants get a map of the code instead of searching it.
@@ -469,92 +469,20 @@ A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 
 - **The index:** `.claude/CONTEXT.md` lists, for each endpoint, its handler, rate limits, model, audit event, emails, frontend caller, test and `docs/API.md` section, plus "change recipes" naming every file one kind of change touches, and what's in progress or stale. The first draft was a plain file list; tried on five real tasks, it found the right files for none of them, because the slow part is finding everything one change touches. CLAUDE.md points to it, and `check-repo.js` warns when routes, the schema, `app.tsx`, the audit actions, the rate limits or the checks change without it (proven once by moving the file away).
 - **The activity log's missing events** went out on their own branch first (`fix/audit-events`, see its entry); the index's audit column already lists them. The glossary's Devanagari and `lang` entries now say Hindi was removed.
 
+## 11 Nov 2026 · Repo hygiene: fewer copies, more checks
+**In short:** each fact now lives in one place, and `pnpm check:pr` catches the drift that crept in.
+
+- **New `check-repo.js` rules:** (a) a committed doc may not link to or name (as a backticked `.md` path) a local-only file, and `docs:artifact` bundles only committable docs (tracked, or new and not ignored); (b) no `console.` in `src/` outside `src/scripts/` and `migrate.ts`; (c) `docs/API.md`'s rate-limit table must equal the limiters used in every `routes.ts` (endpoint, limit, window, key, failures-only), in both directions, with guards for an empty parse and for routes the parser can't read; (d) the branch is compared with `origin/main` when it exists, because local `main` lagged. Each was proven to fail once and pass after reverting.
+- **CLAUDE.md halved** (28.8K to 15.9K characters): the Layout bullets and the Tests paragraph moved word for word into `.claude/CONTEXT.md` section 11, and CLAUDE.md keeps only the rules. The email example now uses `req.log.error`, not `console.error`.
+- **One list of known gaps:** README's "Known limitations" (now with Redis fail-open and no MFA); CLAUDE.md, the index, OIDC rule 25 and the known-gaps test point to it.
+- **ROADMAP.md** created from this file's "Next up" and "Future scope", so DEVLOG is history only. Eight finished items were struck after checking the code.
+- **README:** a "Start here, by what you want to do" table; the stale test count ("103 tests") and an unsafe single-file `tsx --test` command replaced by `pnpm test:only`.
+- **Docs page schedule:** `pnpm docs:artifact` prints when the docs page was last published and when the next republish is due (3-day gap), from a local, ignored `published.json`; `--published` records a publish. The `/ship` skill uses it.
+
 ---
 
 ## Lessons
 Mistakes and the rules learned from them are kept topic by topic in [LEARNINGS.md](LEARNINGS.md).
 
-## Next up
-Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md).
-
-- **Observability, next layer:** ship the logs off the VPS (Grafana Alloy → Grafana Cloud) with alerts on error rate and sign-in failures, plus an external uptime check, so a dead VPS still raises an alarm. See Future scope, "Observability".
-- **Activity log, the rest of the 7 Nov review:** (1) alerts on bursts of `sign_in_failed` and `admin_reauth_failed`, and on a new device followed by an email or password change, best done with the log shipping above; (2) record sign-in attempts for unknown emails, unverified sign-ins and non-admins calling `/admin/*`; (3) say which device `sessions_revoked` signed out, and keep the user agent on events; (4) show account owners their own activity on the dashboard; (5) decide whether logout and the 11th-device eviction count as events.
-- Delete the old `tests` branch and the 23 Oct stash, now that both are folded in. Watch the first CI run with the Postgres service.
-- **SEO phase 1:**
-  - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].
-  - Have a lawyer review the Privacy Policy and Terms, and confirm the operator and Grievance Officer name, the ₹1,000 liability cap, and a city for "Governing law" (it says only "the courts of India").
-  - Make the last open retention promise concrete: delete unconfirmed sign-ups after a fixed period (e.g. 30 days). Logs and the activity log now have stated periods.
-  - Check that open and click tracking is off for the sending domain in Resend; then the policy can say emails aren't tracked.
-  - Decide whether the device list should show an approximate location (an offline GeoLite2 lookup at display time, nothing stored), and whether sessions should keep a sign-in history; either needs the Privacy Policy.
-  - Drop the unused `users.refresh_token` and `users.reauthenticated_at` columns, one release after the sessions deploy.
-  - Check the new header at 320, 360 and 390 px in a real phone or DevTools, and the skip link, focus moves and ticker pause with a screen reader (VoiceOver or NVDA); the review fixes were built and prerendered but not yet tried in a browser.
-  - Build the "Connect your website" flow the dashboard now announces (see Future scope, "Hosted sign-in for other apps"); until it ships, keep the FAQ saying a developer sets CKAuth up.
-  - Split the inlined CSS so the home page carries only its own classes, then lower the `homeHtml` budget back to 22.
-  - Count the whole sign-up funnel (visit → sign-up → verified) once analytics exist; tagged links (`?ref=`) are counted since 6 Nov. If analytics are added, update the Privacy Policy, which now describes only the link counters.
-  - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
-  - Pick the email theme (Ember / Midnight / Warm) at `/dev/emails`, make it `DEFAULT_EMAIL_THEME`, delete the others, and send a real email to a Gmail inbox on a phone in dark mode to check it.
-  - ~~Translate the app into Hindi~~: Hindi was removed on 7 Nov 2026. Any future translation loads on demand, not in the home page's first-load bundle (LEARNINGS, Languages).
-  - Verify `chiragdev.com` in Google Search Console and Bing Webmaster Tools (DNS TXT records cover every subdomain), submit `sitemap.xml`, request indexing, and check with Google's Rich Results Test [C10, C11]. Add an IndexNow ping to `deploy.sh` [C12].
-  - Replace the Hostinger parked page on `chiragdev.com` with a portfolio that links to CKAuth [D02].
-  - LCP is still ~2.2 s in the mobile lab [P02]: next steps are a smaller first-screen font load and a CDN [P09].
-  - Stop the `/auth/me` + `/auth/refresh` 401 errors on every visit by a signed-out user [B01].
-  - Add a CAA record, an AAAA (IPv6) record, COOP/CORP headers and a `/index.html` → `/` redirect [B06, P12, B07, C07].
-  - Set the GitHub repo's homepage, description and topics; link the repo and API docs from the footer; add Person JSON-LD with `sameAs`; add PNG icons and a `site.webmanifest` [D05, O11, O08, O09].
-  - Self-host Umami analytics, add an external uptime check, count the sign-up funnel, and extend the domain registration to 2+ years with auto-renew [M01–M03, D08].
-  - Add a DMARC report address (`rua`) now and move to `p=quarantine` after 2–4 clean weeks; register `mail.chiragdev.com` in Google Postmaster Tools [D07].
-  - Launch posts: Show HN, r/node, r/webdev, dev.to, LinkedIn [M05].
-- **SEO phase 2 (months 1–3):** two articles a month on `chiragdev.com/blog` based on LEARNINGS, cross-posted with canonical links, to earn the first links from other sites [O06, D03].
-- **SEO phase 3 (months 3–12):** API docs as site pages [O06]; landing-page JavaScript under 100 kB gzipped and critical CSS inlined [P03, P06–P08]; listings on curated "awesome" lists; a monthly Search Console review [M04]; HSTS `includeSubDomains` + preload once every subdomain is HTTPS-only [B03].
-- First production deploy to the VPS (follow `docs/DEPLOYMENT.md`).
-- Move the sender to a CKAuth-branded domain (only `EMAIL_FROM` changes; see "Changing the email domain" in the deployment guide).
-- Investigate why `drizzle-orm`'s release candidate costs about 200 MB of memory to load (upgrade when a fixed release ships).
-- Put Cloudflare (WAF/Turnstile) in front, against botnet-scale credential stuffing; it would also cut response times for distant visitors [P09].
-- Automated database backups stored off the server.
-- Return 400, not 500, for malformed JSON bodies.
-- Possibly let a password reset also mark the email as verified.
-
-## Future scope
-Larger directions beyond Next up, roughly in order of value. Each one says what in the current code it builds on or changes.
-
-**Accounts and sessions**
-- **Export data.** Editing the profile and deleting the account are done (2 Nov); a JSON export of everything stored would complete the basics of GDPR, the EU's data-protection law.
-- **Admin tools.** Filters on `/admin`, editing a user, resending an invite, and MFA for admins. A role rank (`user` < `admin` < `owner`) once more than one person administers CKAuth. Browser end-to-end tests (Playwright) of sign-up → verify → dashboard.
-- **Security emails.** "New sign-in" is done (2 Nov); still to come: "Your password was changed", "Your email was verified": sent in the background, like the existing emails.
-
-**Stronger sign-in**
-- **Two-factor authentication.** Six-digit codes from an authenticator app (TOTP), with hashed recovery codes; a second step after the password, with its own rate limit.
-- **Passkeys (WebAuthn).** Sign in with the device's fingerprint, face or PIN, with no password; the strongest protection against phishing.
-- **Breached-password check.** Reject passwords that appear in Have I Been Pwned's leak database at sign-up, reset and change. Its range API only receives the first five characters of the password's hash, never the password.
-- **Google and GitHub sign-in.** Link to an existing account by email only when the provider says the email is verified, and never to an unverified local account (LEARNINGS, "Pre-account takeover").
-- **Magic-link sign-in.** Sign in from an emailed link, reusing the existing single-use, hashed, 15-minute token pattern.
-
-**Authorization**
-- **Roles and permissions.** The landing page promises "decide what gets through": add roles (user, admin), a `requireRole()` middleware that runs after `authenticateToken`, and permission checks per route.
-- **Admin dashboard.** Search users, see sessions and rate-limit hits, resend verification emails, lock or unlock an account.
-- **Activity log for users.** Their own sign-ins, password changes and failed attempts on the dashboard. The `audit_events` table already holds them: it's `GET /admin/activity` filtered to the signed-in user.
-
-**CKAuth as a product for other apps**
-- **Hosted sign-in for other apps.** Register an app, get keys, send users to CKAuth's sign-in page and back. Built on OpenID Connect (the standard behind "Sign in with Google", using the authorization-code flow with PKCE), so any standard client library works.
-- **SDKs.** `@ckauth/react` (a provider, `useAuth` and protected routes; mostly `frontend/src/lib/auth.tsx` and `api.ts` today) and an Express middleware package.
-- **Webhooks.** Notify other apps of `user.created`, `user.verified` and `session.revoked`, signed with HMAC so they can prove the message came from CKAuth.
-- **CORS per registered app,** needed as soon as a frontend on another origin uses the API (see Known gaps in CLAUDE.md).
-- **Self-host kit.** The compose stack, edge proxy and setup script, packaged as a documented template for running your own copy.
-- **Import an existing user database.** Let a site that already has users move them to CKAuth without everyone signing up again. A `pnpm admin import <file>` command in `manage-users.ts` (the server-only CLI) reads a CSV or JSON export, with `--dry-run` printing what would happen first.
-  - **Passwords.** Existing bcrypt hashes (`$2a$`/`$2b$`, any cost) are copied as they are: `bcrypt.compare` already reads them, so those users sign in on day one. Other formats (Argon2, scrypt, PBKDF2, salted SHA) are stored in new `legacy_password_hash` and `legacy_password_algo` columns and checked by **lazy rehashing**: on the first successful sign-in, CKAuth verifies with the old algorithm, saves a bcrypt hash at `PASSWORD_HASH_ROUNDS` and clears the legacy columns in the same transaction. Unsalted MD5/SHA-1 hashes, or no hash at all, aren't trusted: those accounts get a "set your password" email through the existing reset flow, like admin invites.
-  - **Accounts.** Emails go through `emailModel` (trimmed, lowercased) and insert with `onConflictDoNothing`, so a duplicate or an existing CKAuth account is skipped and reported, never overwritten. Every import is `role: 'user'`, whatever the source says: admins stay made only out-of-band. The source's "verified" flag is kept only with `--trust-verified`; otherwise the first sign-in or reset verifies the inbox. Sessions aren't moved (everyone signs in once), and avatars are re-uploaded to ImageKit under random names rather than linked to the old host.
-  - **Records and privacy.** One `user_imported` audit event per account, in the insert's transaction, with the source name in `details`; the Privacy Policy gains a line on imported data. Batched inserts (about 1,000 rows each) keep a large import from holding one long transaction.
-  - **Later: trickle migration** for sites that can't export hashes: when an unknown email signs in, CKAuth checks the password against the old system's API once, creates the account on success, and the old system is switched off when the sign-ins stop.
-
-**Quality and operations**
-- **Automated tests.**
-  - ✅ **API and frontend unit tests, done 2 Nov 2026.** Integration tests of every flow against a real Postgres, run in CI with a coverage minimum (see "A test suite, and the pre-PR checks back").
-  - ✅ **Browser end-to-end tests, first part done 6 Nov 2026** (sign-up and sign-in in Chromium, Firefox and a phone profile). Still to do: password reset, the dashboard, sessions, admin, and running them in CI.
-- **OpenAPI from the Zod models.** Generate a machine-readable API description from `models.ts`, so `docs/API.md` and a typed client can't drift from the code.
-- **Observability: activity logs, alerts and a stats dashboard.** The foundation landed on 2 Nov 2026: structured logs with request IDs and the `audit_events` table. (Container logs were already capped by `setup-vps.sh`'s `daemon.json`, 3 × 10 MB, since 21 Oct.) The plan was layered, cheapest first:
-  - ✅ **Foundation (needed by every option), done 2 Nov 2026.** Docker log rotation (`logging: max-size/max-file`) in both compose files; structured JSON logs with pino, with `redact` stripping `password`/`token` fields so the "never log secrets" rule can't be broken by accident; request IDs; and an `audit_events` table (sign-up, sign-in success/failure, verify, reset, session ended, avatar change, rate-limit hit), written in the *same* transaction as the action, so an action can never happen without its record. This also feeds the user-facing **Activity log** above.
-  - **Dashboard and alerts (recommended): Grafana Cloud's free tier.** An agent on the VPS sends logs and metrics; alerts go to email/Telegram. Uses almost no VPS memory and still alerts when the VPS itself is down. Trade-offs: 14–30 day retention, and users' emails/IPs go to a third party (mention it in a privacy policy).
-  - **Security: CrowdSec** (~100 MB) reads Caddy and SSH logs, spots brute force and scans, and blocks attacking IPs for every site on the VPS.
-  - **Alternatives considered:** (1) *built into CKAuth*: an admin page charting `audit_events`, Uptime Kuma for uptime alerts and a scheduled query for "too many failed sign-ins"; the lightest and most private option, but basic charts, and it can't see server-level events. (2) *Self-hosted Grafana + Loki + Prometheus + Alloy*: the industry standard and private, but ~1–1.5 GB RAM on a VPS shared with other sites, four more services to maintain, and Grafana must be locked down. Move here later if the VPS is upgraded; the app side doesn't change. (3) *Wazuh* for file integrity monitoring: needs 4–8 GB RAM, too heavy for this VPS.
-  - Keep at least one check (uptime or alerting) *outside* the VPS: a monitor on the server it watches can't report that server's death.
-- **Email templates and languages.** Branded, tested email templates, and translations for emails and the web app.
-- **Accessibility pass.** A full WCAG 2.2 AA review of the forms and dashboard, beyond the landing page covered in `docs/SEO-AUDIT.md`.
+## What's next
+Plans ("Next up" and "Future scope") are in [ROADMAP.md](ROADMAP.md).
