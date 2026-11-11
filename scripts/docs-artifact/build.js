@@ -15,13 +15,14 @@ const repoUrl = 'https://github.com/chiragdev1/ckauth'
 const docs = [
   { key: 'readme', path: 'README.md', title: 'Overview', group: 'Start here', blurb: 'What CKAuth is, setup and scripts' },
   { key: 'api', path: 'docs/API.md', title: 'API reference', group: 'Build', blurb: 'Every endpoint, payload and error' },
-  { key: 'conventions', path: 'CLAUDE.md', title: 'Conventions', group: 'Build', blurb: 'Layout, code style and security rules' },
+  { key: 'conventions', path: 'CLAUDE.md', title: 'Conventions', group: 'Build', blurb: 'Where things live, code style and security rules' },
   { key: 'deployment', path: 'docs/DEPLOYMENT.md', title: 'Deployment', group: 'Run', blurb: 'From an empty VPS to live, plus operations' },
   { key: 'vps-access', path: 'docs/VPS-ACCESS.md', title: 'VPS access', group: 'Run', blurb: 'SSH keys, GitHub and the deploy user' },
   { key: 'glossary', path: 'docs/GLOSSARY.md', title: 'Glossary', group: 'Reference', blurb: 'Every term the docs use' },
   { key: 'brand', path: 'docs/BRAND.md', title: 'Brand guide', group: 'Reference', blurb: 'Name, crest, colours, voice and brand files' },
   { key: 'seo-audit', path: 'docs/SEO-AUDIT.md', title: 'SEO audit', group: 'Reference', blurb: '64 strict tests and the traffic plan' },
   { key: 'devlog', path: 'DEVLOG.md', title: 'Dev log', group: 'Journey', blurb: 'What changed, and when' },
+  { key: 'roadmap', path: 'ROADMAP.md', title: 'Roadmap', group: 'Journey', blurb: 'Next up, then the bigger directions' },
   { key: 'learnings', path: 'LEARNINGS.md', title: 'Learnings', group: 'Journey', blurb: 'Mistakes and the rules they taught' },
 ]
 
@@ -137,3 +138,56 @@ const page = readFileSync(join(here, 'template.html'), 'utf8')
 mkdirSync(dirname(outFile), { recursive: true })
 writeFileSync(outFile, page)
 console.log(`wrote ${posix.relative(root.split('\\').join('/'), outFile.split('\\').join('/'))} (${Math.round(page.length / 1024)} KiB, ${docs.length} docs, commit ${data.commit.slice(0, 7)}${data.uncommitted ? ' + uncommitted changes' : ''})`)
+
+// when to republish the page, decided by what changed rather than by the calendar. publishing happens through claude.ai,
+// which this script can't see, so `--published` records it: the date in published.json and a copy of every doc's
+// markdown in published-docs.json (both local, gitignored). each build compares against that copy:
+// - nothing changed: up to date, nothing to do
+// - a contract doc changed (what other developers build against): republish now, a wrong contract misleads them
+// - anything else changed: republish once REPUBLISH_GAP_DAYS have passed, so small edits batch into one publish
+const REPUBLISH_GAP_DAYS = 3
+const CONTRACT_DOCS = ['README.md', 'docs/API.md']
+const stampFile = join(root, '.docs-artifact', 'published.json')
+const snapshotFile = join(root, '.docs-artifact', 'published-docs.json')
+// local dates (YYYY-MM-DD), not UTC: a publish at 1:30 am in India is still that day's publish
+const day = date => date.toLocaleDateString('en-CA')
+const readJson = file => { try { return JSON.parse(readFileSync(file, 'utf8')) } catch { return null } }
+let published = readJson(stampFile)?.published ?? []
+const current = Object.fromEntries(data.docs.map(doc => [doc.path, doc.markdown]))
+if (process.argv.includes('--published')) {
+  published = [...published, day(new Date())].slice(-20)
+  writeFileSync(stampFile, `${JSON.stringify({ published }, null, 2)}\n`)
+  writeFileSync(snapshotFile, JSON.stringify(current))
+}
+// lines added and removed, counted as multisets: close enough to a real diff to size a change, and needs no library
+const lineChanges = (before = '', after = '') => {
+  const count = new Map()
+  for (const line of before.split('\n')) count.set(line, (count.get(line) ?? 0) + 1)
+  let added = 0
+  for (const line of after.split('\n')) {
+    if (count.get(line) > 0) count.set(line, count.get(line) - 1)
+    else added++
+  }
+  return { added, removed: [...count.values()].reduce((sum, left) => sum + left, 0) }
+}
+const last = published.at(-1)
+const snapshot = readJson(snapshotFile)
+if (!last || !snapshot) {
+  console.log('docs page: no publish recorded; after publishing, run `pnpm docs:artifact --published`')
+} else {
+  const changed = Object.keys({ ...snapshot, ...current }).filter(path => snapshot[path] !== current[path])
+  if (!changed.length) {
+    console.log(`docs page: up to date (published ${last}, nothing changed since)`)
+  } else {
+    const sizes = changed.map(path => ({ path, ...lineChanges(snapshot[path], current[path]) }))
+    const added = sizes.reduce((sum, size) => sum + size.added, 0)
+    const removed = sizes.reduce((sum, size) => sum + size.removed, 0)
+    const dueDate = new Date(`${last}T00:00:00`)
+    dueDate.setDate(dueDate.getDate() + REPUBLISH_GAP_DAYS)
+    const due = day(dueDate)
+    const contract = changed.filter(path => CONTRACT_DOCS.includes(path))
+    const verdict = contract.length ? `republish now: ${contract.join(' and ')} changed` : due <= day(new Date()) ? 'republish now' : `republish due ${due}`
+    console.log(`docs page: ${verdict} (published ${last}; ${changed.length} of ${data.docs.length} docs changed since, +${added} -${removed} lines)`)
+    for (const size of sizes) console.log(`  ${size.path}: +${size.added} -${size.removed}`)
+  }
+}
