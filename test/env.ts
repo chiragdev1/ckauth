@@ -24,3 +24,7 @@ process.env.ACCESS_TOKEN_SECRET_KEY = 'test-access-secret'
 process.env.REFRESH_TOKEN_SECRET_KEY = 'test-refresh-secret'
 process.env.ACCESS_TOKEN_EXPIRY = '15m'
 process.env.REFRESH_TOKEN_EXPIRY = '1d'
+
+// a throwaway es256 key made per run, so the oidc tests sign and verify with a real key and none is checked in
+import { generateKeyPairSync } from 'node:crypto'
+process.env.OIDC_SIGNING_KEY = generateKeyPairSync('ec', {namedCurve: 'P-256'}).privateKey.export({type: 'pkcs8', format: 'pem'}) as string

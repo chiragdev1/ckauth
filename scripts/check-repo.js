@@ -38,6 +38,17 @@ const apiSources = tracked.filter(file => file.startsWith('src/') && file.endsWi
 for(const file of apiSources) {
   const source = readFileSync(file, 'utf8')
   if(source.includes('bcryptjs')) failures.push(`${file}: use native bcrypt, never bcryptjs`)
+  // every jwt.verify names its algorithms (docs/OIDC.md, "Pinning today's algorithm"): an unpinned verify trusts the
+  // token's own header to pick the algorithm, which becomes algorithm confusion once a public key exists
+  // jose's jwtVerify too, which the oidc code will use. a call is read up to its first ")" at a line end, so options
+  // split over several lines still count, and a later call's algorithms can't vouch for this one
+  for(const match of source.matchAll(/\b(?:jwt\.verify|jwtVerify)\(/g)) {
+    const end = source.indexOf(')\n', match.index)
+    const call = source.slice(match.index, end === -1 ? undefined : end)
+    if(!call.includes('algorithms')) {
+      failures.push(`${file}:${source.slice(0, match.index).split('\n').length}: ${match[0]}…) must name its algorithms`)
+    }
+  }
   source.split('\n').forEach((line, index) => {
     if(/console\.\w+\(.*\b(password|newPassword|currentPassword|token|refreshToken|accessToken|secret)\b\s*[,)}]/.test(line)) {
       failures.push(`${file}:${index + 1}: logs a password, token or secret`)
@@ -74,6 +85,11 @@ if([...changed].some(file => /^src\/app\/[^/]+\/(routes|models)\.ts$/.test(file)
 }
 const featureTouched = [...changed].some(file => file.startsWith('frontend/src/pages/') || /^src\/app\/[^/]+\/routes\.ts$/.test(file))
 if(featureTouched && !changed.has('frontend/index.html')) warnings.push('a page or endpoint changed: does the search title/description still match? (frontend/index.html)')
+// .claude/CONTEXT.md indexes these files (endpoint matrix, tables, routes, audit actions, limiters, checks); a warning,
+// not a failure, since its line numbers are hints and not every edit moves what it indexes
+const indexed = [/^src\/app\/[^/]+\/routes\.ts$/, /^src\/db\/schema\.ts$/, /^frontend\/src\/app\.tsx$/, /^src\/app\/auth\/utils\/constants\.ts$/, /^src\/app\/middlewares\/rate-limit\.ts$/, /^scripts\/check-repo\.js$/, /^frontend\/scripts\/check-dist\.js$/]
+const indexTouched = [...changed].filter(file => indexed.some(pattern => pattern.test(file)))
+if(indexTouched.length && !changed.has('.claude/CONTEXT.md')) warnings.push(`${indexTouched.join(', ')} changed but .claude/CONTEXT.md did not: update its tables`)
 
 for(const warning of warnings) console.log(`  warn  ${warning}`)
 for(const failure of failures) console.log(`  FAIL  ${failure}`)

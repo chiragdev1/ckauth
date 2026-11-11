@@ -6,6 +6,7 @@ import { authRouter } from './auth/routes.js';
 import { adminRouter } from './admin/routes.js';
 import { metricsRouter } from './metrics/routes.js';
 import { devRouter } from './dev/routes.js';
+import { wellKnownRouter } from './oidc/routes.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { requestLogger } from './middlewares/request-logger.js';
 
@@ -25,6 +26,8 @@ export function createExpressApplication(): Express {
   app.use('/auth', authRouter)
   app.use('/admin', adminRouter)
   app.use('/metrics', metricsRouter)
+  // sign in with ckauth (docs/OIDC.md). not public yet: deploy/ckauth.caddy doesn't route /.well-known to the api
+  app.use('/.well-known', wellKnownRouter)
   // email previews for the dev-only /dev/emails page; never mounted in production (see dev/routes.ts)
   if(process.env.NODE_ENV !== 'production') {
     app.use('/dev', devRouter)
