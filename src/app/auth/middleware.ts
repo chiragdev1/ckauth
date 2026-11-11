@@ -36,7 +36,8 @@ export async function authenticateToken(
 
   let payload: string | jwt.JwtPayload
   try {
-    payload = jwt.verify(token, secret)
+    // named, not inferred: once sign in with ckauth adds a public key, an unpinned verify is open to algorithm confusion
+    payload = jwt.verify(token, secret, {algorithms: ['HS256']})
   } catch {
     throw ApiError.unauthorized("Invalid or expired token")
   }
