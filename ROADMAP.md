@@ -1,6 +1,6 @@
 # Roadmap: CKAuth
 
-What's planned, nearest first. Finished work moves to [DEVLOG.md](DEVLOG.md) as a dated entry, and its item here is struck (`~~…~~: done <date>`) in the same change. Design detail for Sign in with CKAuth is in [docs/OIDC.md](docs/OIDC.md); known gaps are listed once, in [README.md](README.md#known-limitations).
+What's planned, nearest first. Finished work moves to [DEVLOG.md](DEVLOG.md) as a dated entry, and its item here is struck (`~~…~~: done <date>`) in the same change. Design detail for Sign in with CKAuth is in docs/OIDC.md on the `feat/oidc-provider` branch; known gaps are listed once, in [README.md](README.md#known-limitations).
 
 Moved out of DEVLOG.md on 11 Nov 2026, so the dev log holds only history.
 
@@ -18,7 +18,7 @@ Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in
   - Decide whether the device list should show an approximate location (an offline GeoLite2 lookup at display time, nothing stored), and whether sessions should keep a sign-in history; either needs the Privacy Policy.
   - Drop the unused `users.refresh_token` and `users.reauthenticated_at` columns, one release after the sessions deploy.
   - Check the new header at 320, 360 and 390 px in a real phone or DevTools, and the skip link, focus moves and ticker pause with a screen reader (VoiceOver or NVDA); the review fixes were built and prerendered but not yet tried in a browser.
-  - Build the "Connect your website" flow the dashboard now announces: that's Sign in with CKAuth ([docs/OIDC.md](docs/OIDC.md)); until it ships, keep the FAQ saying a developer sets CKAuth up.
+  - Build the "Connect your website" flow the dashboard now announces: that's Sign in with CKAuth (docs/OIDC.md on the `feat/oidc-provider` branch); until it ships, keep the FAQ saying a developer sets CKAuth up.
   - ~~Split the inlined CSS so the home page carries only its own classes~~: critical CSS since 7 Nov 2026; `homeHtml` is now 18.75 KiB.
   - Count the whole sign-up funnel (visit → sign-up → verified) once analytics exist; tagged links (`?ref=`) are counted since 6 Nov. If analytics are added, update the Privacy Policy, which now describes only the link counters.
   - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
@@ -62,10 +62,10 @@ Larger directions beyond Next up, roughly in order of value. Each one says what 
 - **Activity log for users.** Their own sign-ins, password changes and failed attempts on the dashboard. The `audit_events` table already holds them: it's `GET /admin/activity` filtered to the signed-in user.
 
 **CKAuth as a product for other apps**
-- **Hosted sign-in for other apps** (Sign in with CKAuth): designed, being built. The design, the 33 security rules and what's later are in [docs/OIDC.md](docs/OIDC.md).
+- **Hosted sign-in for other apps** (Sign in with CKAuth): designed, being built. The design, the 33 security rules and what's later are in docs/OIDC.md on the `feat/oidc-provider` branch.
 - **SDKs.** `@ckauth/react` (a provider, `useAuth` and protected routes; mostly `frontend/src/lib/auth.tsx` and `api.ts` today) and an Express middleware package.
 - **Webhooks.** Notify other apps of `user.created`, `user.verified` and `session.revoked`, signed with HMAC so they can prove the message came from CKAuth.
-- **CORS per registered app:** part of Sign in with CKAuth ([docs/OIDC.md](docs/OIDC.md), rule 25).
+- **CORS per registered app:** part of Sign in with CKAuth (docs/OIDC.md on the `feat/oidc-provider` branch, rule 25).
 - **Self-host kit.** The compose stack, edge proxy and setup script, packaged as a documented template for running your own copy.
 - **Import an existing user database.** Let a site that already has users move them to CKAuth without everyone signing up again. A `pnpm admin import <file>` command in `manage-users.ts` (the server-only CLI) reads a CSV or JSON export, with `--dry-run` printing what would happen first.
   - **Passwords.** Existing bcrypt hashes (`$2a$`/`$2b$`, any cost) are copied as they are: `bcrypt.compare` already reads them, so those users sign in on day one. Other formats (Argon2, scrypt, PBKDF2, salted SHA) are stored in new `legacy_password_hash` and `legacy_password_algo` columns and checked by **lazy rehashing**: on the first successful sign-in, CKAuth verifies with the old algorithm, saves a bcrypt hash at `PASSWORD_HASH_ROUNDS` and clears the legacy columns in the same transaction. Unsalted MD5/SHA-1 hashes, or no hash at all, aren't trusted: those accounts get a "set your password" email through the existing reset flow, like admin invites.
