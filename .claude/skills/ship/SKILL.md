@@ -16,8 +16,8 @@ $ARGUMENTS
 
 ## 1. Find out what changed
 
-- Read `CLAUDE.md` (already loaded), then `DEVLOG.md` (latest entry, "Next up") and skim `LEARNINGS.md`'s topics.
-- `git status`, `git log --oneline main..HEAD`, `git diff main...HEAD --stat`, then the diff itself for anything uncommitted and anything the summary doesn't explain.
+- Read `CLAUDE.md` (already loaded), then `DEVLOG.md` (latest entry), `ROADMAP.md` ("Next up") and skim `LEARNINGS.md`'s topics.
+- `git fetch origin main`, then `git status`, `git log --oneline origin/main..HEAD`, `git diff origin/main...HEAD --stat` (never local `main`, which lags when nobody pulls it), then the diff itself for anything uncommitted and anything the summary doesn't explain.
 - The user's "commit" or "merge" means: do every applicable item below **without asking**.
 
 ## 2. Tests
@@ -27,9 +27,9 @@ $ARGUMENTS
 
 ## 3. Docs (only the files the change actually affects)
 
-- `DEVLOG.md`: a dated `## <date> · <title>` entry above the `---` before "Lessons"; short bullets with what changed and why; update "Next up" and "Future scope".
+- `DEVLOG.md`: a dated `## <date> · <title>` entry above the `---` before "Lessons"; short bullets with what changed and why. Then read every "Next up" and "Future scope" item in `ROADMAP.md` and strike (`~~…~~: done <date>`) each one this diff finishes, checked against the diff, not memory: on 11 Nov 2026 eight finished items (and two half-finished) were still listed as to-do.
 - `LEARNINGS.md`: each mistake or lesson under its topic, as *what went wrong → fix → **Rule:***, with the commit hash once known.
-- `docs/API.md` (endpoints, payloads, status codes, the rate-limit table), `CLAUDE.md` (layout, rules, known gaps: remove a gap once fixed), `README.md` (setup, scripts, env vars), `docs/DEPLOYMENT.md` + `deploy/api.env.sample` (env vars, deploy steps), `docs/GLOSSARY.md` (every new term).
+- `docs/API.md` (endpoints, payloads, status codes, the rate-limit table), `CLAUDE.md` (layout, rules), `README.md` (setup, scripts, env vars, and "Known limitations", the one list of gaps: remove a gap once fixed), `docs/DEPLOYMENT.md` + `deploy/api.env.sample` (env vars, deploy steps), `docs/GLOSSARY.md` (every new term).
 - Docs are for beginners but professional: keep the technical term and explain it on first use.
 - `frontend/src/pages/legal.tsx`: if stored fields, cookies, emails, processors or retention changed, update the policy and bump its date.
 - **Search copy:** if a user-visible feature shipped or was removed, update `<title>`, meta description, `og:title` and `og:description` in `frontend/index.html`. Title 50–60 characters, topic words first; description 140–160 with a call to action; both true to what the live site does. A new headline also means updating `og-image.svg` and `brand/social-header.svg` and running `pnpm brand:images`, which re-renders every brand PNG (`docs/BRAND.md` lists them).
@@ -39,13 +39,13 @@ $ARGUMENTS
 - `pnpm check:pr` must pass (`scripts/check-pr.js`; the rules live in `scripts/check-repo.js` and `frontend/scripts/check-dist.js`). A failure follows "When to stop" below: fix docs and doc links yourself, and report everything else. Never silence a check.
 - A new rule in CLAUDE.md gets a check there too, proven to fail once on a broken input. Raising a size budget in `check-dist.js` needs a dated reason next to it.
 - `pnpm docs:artifact`: fix every `broken link:` line. A new doc goes in the `docs` list in `scripts/docs-artifact/build.js`.
-- **Docs artifact** ("CKAuth Docs", https://claude.ai/artifact/KxwMJmZRKynEW54KKGzhaD): republish `.docs-artifact/ckauth-docs.html` to that URL only if the Artifact tool's `list` shows the last update was 3 or more days ago (at most twice a week). Read it with the Artifact tool first. Otherwise, say when the next republish is due.
+- **Docs artifact** ("CKAuth Docs", https://claude.ai/artifact/KxwMJmZRKynEW54KKGzhaD): `pnpm docs:artifact` ends with a `docs page:` line saying when the next republish is due (every 3 days at most). Republish `.docs-artifact/ckauth-docs.html` to that URL only if it says "allowed now", reading the artifact with the Artifact tool first; then run `pnpm docs:artifact --published` so the next build knows. Otherwise, say when it's due.
 
 ## When to stop instead of carrying on
 
 Check these in priority order; the first one that applies decides what happens. Whatever happens, you end with the developer report (step 6).
 
-1. **A security check fails: stop everything.** That means any failure in `test/sign-up`, `verify-email`, `sign-in`, `session`, `password`, `rate-limits`, `admin`, `upload-avatar`, `activity` or `redis-down`; any security-rule step of `scripts/check-repo.js` (secrets, token hashing, enumeration, logging rules); `pnpm audit --prod`; or a diff that weakens a rule in CLAUDE.md → Security rules. Don't edit, retry around it or commit; go straight to the report.
+1. **A security check fails: stop everything.** That means any failure in `test/sign-up`, `verify-email`, `sign-in`, `session`, `account`, `password`, `rate-limits`, `admin`, `upload-avatar`, `activity` or `redis-down`; any security-rule step of `scripts/check-repo.js` (secrets, token hashing, enumeration, logging rules); `pnpm audit --prod`; or a diff that weakens a rule in CLAUDE.md → Security rules. Don't edit, retry around it or commit; go straight to the report.
 2. **A change can't easily be undone: stop everything.** For example: a new or edited migration in `drizzle/` (rollbacks don't undo migrations), a schema change without its migration, deleting or rewriting data, a new env var the VPS needs before the deploy, a breaking API change, anything that needs a push or force-push, or a republish that would break the 3-day rule. Commit nothing; report.
 3. **Any other code problem: don't fix it, don't commit.** For example: a build or type error, a non-security test failure, a knip finding, a size budget, a diff much bigger than the summary describes. Finish the docs steps if they're safe on their own, then report.
 4. **Only docs need work: your call.** Make the edits, then do **two rounds of review and rewrite**. Round 1: is everything true to the code, nothing missing, every new term in the glossary? Round 2: is it clear to a beginner, short, and in the house style? Then commit and report.
@@ -72,6 +72,6 @@ If nothing stopped the run, add after the report:
 1. **What you did:** commits (hash + title), docs touched, tests added, `check:pr` result, artifact republished or when it's due.
 2. **PR title**, Conventional Commits style.
 3. **PR description:** Summary (what and why), Changes (grouped), How it was tested (real checks and their results), Deploy notes (env vars, migrations, which workflow runs, anything to do on the VPS first), Follow-ups / known gaps, then `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-4. **Merge commit title + description** for GitHub's "Create a merge commit": `Merge pull request #N from chiragdev1/<branch>`. Work out N as the highest real `#N` in `git log --merges` plus one (c92c5e3 was pasted with a literal `#<n>`, so count it as the one after #5), never a placeholder, and tell the user to check it against the PR page, since issues share the counter. Body: a short summary plus the commit list.
+4. **Merge commit title + description** for GitHub's "Create a merge commit": `Merge pull request #N from chiragdev1/<branch>`. N is the newest issue-or-PR number plus one, from `curl -sL "https://api.github.com/repos/chiragdev1/ckauth/issues?state=all&per_page=1&sort=created&direction=desc"` (issues and PRs share one counter, and that list holds both), never a placeholder. If the call fails, say so and leave `#N` marked for the user to fill in from the PR page. Body: a short summary plus the commit list.
 
 Put the PR and merge texts in fenced blocks so they can be pasted. `gh` isn't installed locally.
