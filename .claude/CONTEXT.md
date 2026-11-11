@@ -4,7 +4,7 @@ A map for Claude Code: where each thing lives and which files change together, s
 3–5 files instead of scanning. **CLAUDE.md holds the rules and is always loaded; this file never repeats it.** Read the
 section you need (the index below), then open the files it names.
 
-- **Snapshot:** 7 Nov 2026, `feat/oidc-provider` at `028bcb7` plus uncommitted work (§9). Line numbers are hints that
+- **Snapshot:** `main` as of `d08a4ba` (PR #16, 11 Nov 2026) plus the HS256 pin (§9). Line numbers are hints that
   drift by a few lines; symbol names are the stable key, so `grep -n <symbol>` when a line is off.
 - **Refresh:** §10 has the commands that regenerate every table here.
 
@@ -18,7 +18,7 @@ section you need (the index below), then open the files it names.
 6. [Change recipes](#6-change-recipes): "to do X, touch these files", the cross-file couplings
 7. [Tests, checks and CI](#7-tests-checks-and-ci): which test covers what, what each check enforces
 8. [Docs map](#8-docs-map): which doc answers what, with line numbers into the long ones
-9. [Current state and traps](#9-current-state-and-traps): branch work in progress, stale docs, things that surprise
+9. [Current state and traps](#9-current-state-and-traps): recent changes, things that surprise
 10. [Maintaining this file](#10-maintaining-this-file)
 
 ---
@@ -161,7 +161,7 @@ Migrations: `drizzle/<timestamp>_<name>/migration.sql` (+ snapshot.json), 15 so 
 | `/privacy`, `/terms` | pages/legal.tsx (`PrivacyPolicy` 208, `Terms` 348) | none |
 | `/dashboard` | pages/dashboard.tsx | `RequireAuth` |
 | `/admin` | pages/admin.tsx | `RequireAuth` → `RequireAdmin` |
-| `/dev/emails`, `/dev/oauth-consent` | pages/dev-emails.tsx, dev-oauth-consent.tsx | dev / `VITE_DESIGN_LAB=1` only |
+| `/dev/emails` | pages/dev-emails.tsx | dev / `VITE_DESIGN_LAB=1` only |
 | `*` | pages/not-found.tsx | |
 
 **Inside the big pages** (component → line):
@@ -181,14 +181,13 @@ Migrations: `drizzle/<timestamp>_<name>/migration.sql` (+ snapshot.json), 15 so 
 **lib/**: `api.ts` (`ApiRequestError` with `.code`, `User` type 21, `onSessionEnded`, `api`), `auth.tsx`
 (`AuthProvider`, `useAuth`: `user`, `reloadUser`, `sessionEnded`), `validation.ts` (`validate*` per field mirroring
 models.ts, `PASSWORD_MIN/MAX` 8/72, `parseInvalidFields`, `describeError` 80), `use-form.ts` (`useForm`), `theme.tsx`,
-`design-lab.tsx` (`looks`: `guard` + `consent-handshake`, `consent-sentence`), `referral.ts`, `device.ts`, `time.ts`
-(`timeAgo`), `password-strength.ts`, `oauth-scopes.ts` (`describeScopes`), `use-url-token.ts`, `use-document-title.ts`.
+`design-lab.tsx` (`looks`: `guard`), `referral.ts`, `device.ts`, `time.ts`
+(`timeAgo`), `password-strength.ts`, `use-url-token.ts`, `use-document-title.ts`.
 
 **components/**: `layout.tsx` (`Layout` 14, `SiteHeader` 77, `SiteFooter` 120, guards 143–162), `auth-shell.tsx`
 (`AuthShell`, `badge` prop), `form.tsx` (`TextField`, `PasswordField` with strength, `FormAlert`), `resend-email.tsx`,
 `avatar-cropper.tsx`, `avatar-lightbox.tsx`, `user-avatar.tsx`, `user-menu.tsx` (lazy, default export), `pager.tsx`,
-`brand.tsx` (`Crest`, `Logo`, `Spinner`), `theme-toggle.tsx`, `design-lab-panel.tsx`, `oauth-consent.tsx`
-(`ConsentScreen`), `beta-badge.tsx`, `ui/` (shadcn).
+`brand.tsx` (`Crest`, `Logo`, `Spinner`), `theme-toggle.tsx`, `design-lab-panel.tsx`, `ui/` (shadcn).
 
 **Build scripts** (`frontend/scripts/`): `prerender.js` (renders `/` → `dist/index.html`, writes `dist/app.html`),
 `critical-css.js` (home-page CSS subset), `check-dist.js` (built-site rules, §7), `email-icons.mjs`.
@@ -259,20 +258,18 @@ commit the PNGs (check-dist compares the embedded SHA-256) → `docs/BRAND.md` "
 | mail failures don't fail requests | mail-failure; email rendering: emails |
 | units | models, jwt-token, error-handler, request-logger; `test.todo` gaps: known-gaps |
 
-**Frontend unit tests** `frontend/test/` (`cd frontend && pnpm test`): api, device, time, validation, oauth-scopes,
-critical-css. **Browser tests** `e2e/` (`pnpm e2e`): sign-up.spec, sign-in.spec; `fixtures.ts`, `start-api.ts`,
+**Frontend unit tests** `frontend/test/` (`cd frontend && pnpm test`): api, device, time, validation, critical-css. **Browser tests** `e2e/` (`pnpm e2e`): sign-up.spec, sign-in.spec; `fixtures.ts`, `start-api.ts`,
 `playwright.config.ts` (API :8090, preview :4180).
 
 **`pnpm check:pr`** (`scripts/check-pr.js`) runs in order: api build → knip → audit → test types → test:coverage →
 web build → web tests → web knip → web audit → `frontend/scripts/check-dist.js` → `scripts/check-repo.js` →
 docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
-- `check-repo.js` [83]: secrets in added lines; no `bcryptjs`; every `jwt.verify`/`jwtVerify` names `algorithms`;
-  no `res.status(4xx/5xx).json(` in controllers; Caddyfile `@app` = app.tsx routes; schema.ts needs a drizzle/ change;
+- `check-repo.js` [83]: secrets in added lines; no `bcryptjs`; no `res.status(4xx/5xx).json(` in controllers; Caddyfile `@app` = app.tsx routes; schema.ts needs a drizzle/ change;
   warnings: code without DEVLOG, routes/models without API.md, pages/routes without `frontend/index.html`, and
   routes/schema/app.tsx/constants/rate-limit/check scripts without `.claude/CONTEXT.md`.
 - `check-dist.js` [133+]: title 50–60 chars with "sign-in", description 140–160, OG tags, one h1, prerendered home,
   empty app.html shell, robots/sitemap, og.png 1200×630, brand PNG hashes, no render-blocking CSS/JS, size budgets
-  (`budgets` near line 18: initialJs 127 KiB, homeHtml 19.25 KiB), critical-CSS coverage, no dev pages shipped.
+  (`budgets` near line 25: initialJs 123.25 KiB, homeHtml 18.75 KiB), critical-CSS coverage, no dev pages shipped.
 
 **CI** `.github/workflows/`: `api.yml` / `web.yml` (path filters at line 5) → reusable `deploy.yml` →
 `deploy/deploy.sh` on the VPS. `perf.yml` weekly → `scripts/perf/`.
@@ -284,11 +281,8 @@ docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
 | Endpoint contract, response format, errors, rate-limit table | `docs/API.md`: Basics 28, rate limits 112, email-link pages 150, endpoints 165, metrics 664, admin 687, flows 915 |
 | Production, VPS, deploy, rollback, secrets, backups | `docs/DEPLOYMENT.md`: how it works 52, first-time setup 114, everyday ops 453 (deploy 457, rollback 472, settings 487, migrations 540, admins 550, logs 586, restore 612), troubleshooting 718, reference 774 |
 | SSH, GitHub deploy keys | `docs/VPS-ACCESS.md` |
-| OIDC design (unbuilt) | `docs/OIDC.md`: decisions 24, flow 56, tokens 167, endpoints 217, storage 233, the 33 security rules 245, code impact 305 |
-| OIDC build plan and checklist | `TASKS.md` (Active: housekeeping → before OIDC code → build API → testing) |
-| A term | `docs/GLOSSARY.md` (sections: web 21, security 70, OIDC 146, database 216, server 258, frontend 312, hosting 352, logs 405, email 435, SEO 449, legal 534) |
+| A term | `docs/GLOSSARY.md` (sections: web 21, security 70, database 216, server 258, frontend 312, hosting 352, logs 405, email 435, SEO 449, legal 534) |
 | SEO scores, tests, plan | `docs/SEO-AUDIT.md` (tests 49, plan 166) |
-| Rating, competitors, pricing, go-to-market | `docs/MARKET.md` (11 Nov 2026 snapshot) |
 | Name, colours, voice, brand files | `docs/BRAND.md` (colours 40, files 87, emails 120) |
 | Why something is the way it is | `LEARNINGS.md` (passwords 13, tokens 22, enumeration 39, concurrency 65, uploads 76, tooling 84, testing 127, performance 176, logging 206, SEO 215, frontend UX 237, process 265) |
 | When something changed; what's next | `DEVLOG.md` (dated entries, "Next up" 444, "Future scope" 482) |
@@ -297,18 +291,14 @@ docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
 
 ## 9. Current state and traps
 
-**In progress on `feat/oidc-provider` (uncommitted, as of 7 Nov):**
-- JWTs pinned to HS256 (`jwt-token.ts`, `middleware.ts`) + a check-repo rule for it; tests in `jwt-token`/`session`.
-- Consent-screen UI only, no endpoints: `components/oauth-consent.tsx`, `beta-badge.tsx`, `lib/oauth-scopes.ts`,
-  `pages/dev-oauth-consent.tsx`, design-lab looks; tests `frontend/test/oauth-scopes.test.ts`.
+**Recent changes (main):**
+- JWTs are pinned to HS256 (`jwt-token.ts`, `middleware.ts`); tests in `jwt-token`/`session`. No `check-repo.js` rule enforces it yet.
 - Critical CSS: `frontend/scripts/critical-css.js` + `prerender.js` + check-dist rules + `frontend/test/critical-css.test.ts`.
-- **Hindi removed:** `frontend/src/lib/language.tsx` deleted, `home-copy.ts` now exports `homeCopy = en` only, the
-  Devanagari `@font-face` gone from `index.css`. CLAUDE.md, `docs/BRAND.md` and `docs/GLOSSARY.md`
-  are updated (the glossary keeps Devanagari and `lang` as history, since DEVLOG.md uses them).
-- Audit events added for profile edits, photo changes, device sign-outs and email-change requests (§2), with tests in
-  `test/activity.test.ts`, labels in `lib/admin.ts`, the table in `docs/API.md` and the Privacy Policy's activity-log line.
-- New docs: `docs/OIDC.md`, `TASKS.md`. Next OIDC steps are in `TASKS.md` (home-page JS budget is at 127.0/127 KiB,
-  so any new code on the home page's first load fails check-dist).
+  The home-page budgets are tight on purpose (initialJs 123.25, homeHtml 18.75 KiB), so new first-load code can fail check-dist.
+- Hindi is gone: `frontend/src/lib/language.tsx` deleted, `home-copy.ts` exports `homeCopy = en` only, no Devanagari font.
+  The glossary keeps Devanagari and `lang` as history, since DEVLOG.md uses them.
+- Audit events exist for profile edits, photo changes, device sign-outs and email-change requests (§2); the table is
+  append-only in the database (`withAuditMaintenance`, the `ckauth_api` role).
 
 **Traps:**
 - Sign-up writes no audit event on purpose (dropped 6 Nov 2026); every other account change does (§2, Audit column).
