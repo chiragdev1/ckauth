@@ -58,7 +58,6 @@ Rules:
 ## Type
 
 - **Inter Variable** for everything on the site and in brand images: 800 for big headlines, 700 for titles and the wordmark, 500–600 for labels, 400 for body text. Headlines are tracked slightly tight (`letter-spacing` about −2%).
-- **Noto Sans Devanagari** for Hindi, bundled with the site.
 - **Emails use the system font stack** (`-apple-system, Segoe UI, Roboto…`), because most email apps can't load web fonts.
 
 ## Voice and taglines

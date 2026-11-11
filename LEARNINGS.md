@@ -199,6 +199,9 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 - **A 0.5 KiB helper pushed the home page over its JavaScript budget.** The `?ref=` capture was imported in `main.tsx`, so every visitor downloaded it, though only visitors from a tagged link use it. The home bundle went from 127.0 to 127.1 KiB, over its 127 KiB budget, and `check-dist.js` failed.
   → `main.tsx` imports it with a dynamic `import()` only when the address has `?ref=` (938dd21).
   **Rule:** code that only some visits need loads behind the condition that needs it, not in the entry file. Don't raise a budget for it.
+- **The home page paid for every page's CSS, and the cause was guessed wrong.** Tailwind builds one stylesheet from every source file and the home page inlined all of it, so the dashboard, admin and consent screen grew the landing page until it sat 8 bytes under its 22.5 KiB budget. The task list blamed the dev-only preview pages; measuring showed they were 1.3 of about 18 KiB of CSS the home page never uses. The budget gave no notice before it was used up.
+  → Critical CSS (`scripts/critical-css.js`): the home page inlines only the rules its markup and first-load JavaScript use (22.5 → 19.0 KiB), and loads the full sheet at the end of `<body>`. `check-dist.js` proves no class lost its style, prints the CSS/markup split, and warns before a budget runs out. Compared pixel for pixel against the old page in Chromium and Firefox, light and dark, phone and desktop, signed in and out.
+  **Rule:** budget what a page uses, not what the site has. Measure the breakdown before naming a cause. Every size optimisation gets a check that it can't cost behaviour, and every budget warns before it fails.
 
 ## Logging
 
@@ -229,6 +232,9 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 - **Hindi was harder to read than the English beside it.** Same font size, line height and letter-spacing as English, with the system's fallback font. Devanagari letters hang from a top line and carry marks above and below, so at the same size they looked a size smaller, the lines crowded each other, and letter-spacing cut the top line into pieces.
   → Bundle Noto Sans Devanagari, scale it with `size-adjust: 112%`, load it only for Devanagari characters (`unicode-range`), and give `:lang(hi)` taller lines, no letter-spacing, slightly bigger small text and darker grey text.
   **Rule:** a second script needs its own typography, not just a translation. Mark the text with `lang`, and tune size, line height and spacing for that script.
+- **Hindi cost every visitor, though few switched.** The Hindi copy shipped in the home page's first-load JavaScript for everyone (about 3.3 KiB gzip of the 4 KiB it saved, with the switch and its provider), and the home page sat at its 127 KiB budget.
+  → Removed on 7 Nov 2026 (copy, switch, font, `:lang(hi)` styles), checked pixel for pixel against the English page before it.
+  **Rule:** a translation that comes back loads on demand (a dynamic `import()` when the language is chosen), never in the first-load bundle.
 
 
 ## Frontend UX & accessibility

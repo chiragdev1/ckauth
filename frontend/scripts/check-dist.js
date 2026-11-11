@@ -9,15 +9,22 @@ const SITE_URL = 'https://ckauth.chiragdev.com'
 const dist = new URL('../dist/', import.meta.url)
 const read = path => readFile(new URL(path, dist), 'utf8')
 const failures = []
+// warnings don't fail the build; they say a budget is nearly used up while there's still time to plan for it
+const warnings = []
 const check = (ok, message) => { if(!ok) failures.push(message) }
 const decode = text => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#39;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>')
 const kib = bytes => (bytes / 1024).toFixed(1)
 
 // size limits in KiB, gzip. set just above today's numbers, so a regression fails the PR instead of slipping through.
 // initialJs went 125 → 127 on 2 Nov 2026: the 24–27 Oct landing pages grew it to 127.0 on main before this check was committed
-// homeHtml went 22 → 22.5 on 2 Nov 2026: the inlined css carries every tailwind class in the app, not only the home page's,
-// and the dashboard's device list, profile details and avatar viewer added 0.1 KiB of them
-const budgets = { initialJs: 127, lazyChunk: 30, homeHtml: 22.5 }
+// homeHtml went 22 → 22.5 on 2 Nov 2026, when the inlined css carried every tailwind class in the app. since 7 Nov the
+// home page inlines only the css it uses (scripts/critical-css.js), which took it from 22.49 to 18.97 KiB. the same day the
+// hindi version was removed (copy, language switch, font): home JS 127.0 → 123.0 KiB, index.html 18.97 → 18.54 KiB.
+// both budgets were then set tight on purpose, a quarter KiB above the new sizes, so growth is a decision, not drift:
+// initialJs 127 → 123.25, homeHtml 22.5 → 18.75. raising one needs a reason in this comment, like the entries above
+const budgets = { initialJs: 123.25, lazyChunk: 30, homeHtml: 18.75 }
+// with tight budgets the warning has to come early: 0.1 KiB is about one new section's worth of classes
+const warnWhenLeft = 0.1
 
 const home = await read('index.html')
 const shell = await read('app.html')
@@ -82,6 +89,25 @@ const homeGzip = gzipSync(home).length / 1024
 check(homeGzip <= budgets.homeHtml, `index.html is ${homeGzip.toFixed(1)} KiB gzip (css inlined), budget ${budgets.homeHtml}`)
 check((head.match(/rel="preload"/g) ?? []).length <= 2, 'more than two preloads compete with the page itself')
 
+// --- critical css (scripts/critical-css.js): the home page inlines only the rules it can use, so these prove the
+// optimisation can't cost a style. independent of critical-css.js on purpose: the same code checking itself proves nothing
+const inlineCss = home.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
+const fullSheet = shell.match(/<link rel="stylesheet" crossorigin href="\/assets\/([^"]+\.css)">/)?.[1]
+const fullCss = fullSheet ? await read(`assets/${fullSheet}`) : ''
+const cssClasses = text => new Set([...text.matchAll(/\.((?:\\[0-9a-fA-F]{1,6}\s?|\\.|[\w-])+)/g)]
+  .map(match => match[1].replace(/\\(?:([0-9a-fA-F]{1,6})\s?|(.))/g, (_, hex, char) => hex ? String.fromCodePoint(parseInt(hex, 16)) : char)))
+const fullClasses = cssClasses(fullCss)
+const inlineClasses = cssClasses(inlineCss)
+const markupClasses = new Set([...home.matchAll(/\sclass="([^"]*)"/g)].flatMap(match => decode(match[1]).split(/\s+/)).filter(Boolean))
+const unstyled = [...markupClasses].filter(name => fullClasses.has(name) && !inlineClasses.has(name))
+check(!unstyled.length, `the inlined css dropped classes the home page uses: ${unstyled.slice(0, 8).join(' ')}`)
+check(fullCss && inlineCss.length < fullCss.length, 'the home page should inline only its own css, not the full stylesheet')
+// the full sheet must still arrive, after the markup (not render-blocking) and preloaded, or the lazy user menu and
+// in-app navigation lose their styles. app.html carries the same file, so both pages share one cached download
+const body = home.slice(home.indexOf('</head>'))
+check(Boolean(fullSheet) && body.includes(`<link rel="stylesheet" crossorigin href="/assets/${fullSheet}">`), 'the home page must link the full stylesheet at the end of <body>')
+check(Boolean(fullSheet) && head.includes(`<link rel="preload" href="/assets/${fullSheet}" as="style" crossorigin>`), 'the home page must preload the full stylesheet in <head>')
+
 // --- security: no source maps, secrets or plain-http resources in what's served
 check(!assets.some(name => name.endsWith('.map')), 'source maps are in dist (they publish the source)')
 for(const name of ['index.html', 'app.html', ...assets.filter(name => /\.(js|css)$/.test(name)).map(name => `assets/${name}`)]) {
@@ -92,6 +118,15 @@ for(const name of ['index.html', 'app.html', ...assets.filter(name => /\.(js|css
   if(text.includes('/api/dev/emails')) failures.push(`${name} ships the dev-only email designs page`)
 }
 
+// measure before naming a cause: when a budget is tight, these say which part grew (7 Nov 2026: the guess was the
+// dev-only pages, the measurement said the dashboard and admin css the home page never shows)
+for(const [name, used, budget] of [['home page JavaScript', initialJs, budgets.initialJs], ['index.html', homeGzip, budgets.homeHtml]]) {
+  if(used <= budget && budget - used < warnWhenLeft) warnings.push(`${name} is ${used.toFixed(1)} of ${budget} KiB gzip: plan the next win before a change fails`)
+}
+const gzipAlone = text => (gzipSync(text).length / 1024).toFixed(1)
+const homeBreakdown = `inlined css ${gzipAlone(inlineCss)} KiB (${Math.round(100 * inlineCss.length / fullCss.length)}% of the full sheet), markup ${gzipAlone(home.replace(inlineCss, ''))} KiB, each gzipped alone`
+
+for(const warning of warnings) console.log(`  warn  ${warning}`)
 for(const failure of failures) console.log(`  FAIL  ${failure}`)
-console.log(`dist checks: ${failures.length} failed · home JS ${initialJs.toFixed(1)} KiB, largest lazy chunk ${largestLazy.size.toFixed(1)} KiB (${largestLazy.name}), index.html ${homeGzip.toFixed(1)} KiB gzip, ${kib(ogImage.length)} KiB og.png`)
+console.log(`dist checks: ${failures.length} failed, ${warnings.length} warnings · home JS ${initialJs.toFixed(1)} KiB, largest lazy chunk ${largestLazy.size.toFixed(1)} KiB (${largestLazy.name}), index.html ${homeGzip.toFixed(1)} KiB gzip (${homeBreakdown}), ${kib(ogImage.length)} KiB og.png`)
 process.exit(failures.length ? 1 : 0)

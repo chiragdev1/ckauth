@@ -4,7 +4,6 @@ import { RouterProvider } from 'react-router/dom'
 import { AuthProvider } from './lib/auth.tsx'
 import { ThemeProvider } from './lib/theme.tsx'
 import { LookProvider } from './lib/design-lab.tsx'
-import { LanguageProvider } from './lib/language.tsx'
 import { GuestOnly, Layout, RequireAdmin, RequireAuth } from './components/layout.tsx'
 import { Home } from './pages/home.tsx'
 import { NotFound } from './pages/not-found.tsx'
@@ -76,12 +75,10 @@ export function App({ router }: { router: ComponentProps<typeof RouterProvider>[
     <StrictMode>
       <ThemeProvider>
         <LookProvider>
-          <LanguageProvider>
-            <AuthProvider>
-              <RouterProvider router={router} />
-              <DesignLabPanel />
-            </AuthProvider>
-          </LanguageProvider>
+          <AuthProvider>
+            <RouterProvider router={router} />
+            <DesignLabPanel />
+          </AuthProvider>
         </LookProvider>
       </ThemeProvider>
     </StrictMode>

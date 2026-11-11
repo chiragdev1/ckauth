@@ -102,6 +102,10 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **bcrypt.** A password-hashing function that is deliberately slow, so an attacker with a leaked hash can try far fewer guesses per second. `bcrypt` is the fast native version; `bcryptjs` is pure JavaScript and blocks the server while it runs.
 
+**Lazy rehashing.** Upgrading a password hash at the moment the user next signs in, because that's the only time the server sees the plain password. Planned for importing users whose old system used a different hash function: check the old hash once, then store a bcrypt one.
+
+**Trickle migration.** Moving users from an old system one at a time, as each signs in, instead of all at once: the new system asks the old one to check the password, then creates the account. Used when the old hashes can't be exported.
+
 **SHA-256.** A fast hash function. It's fine for long random tokens, but unsafe for passwords, because people choose guessable passwords.
 
 **HMAC.** A hash mixed with a secret key, used to prove a message wasn't changed. It's too fast to be safe for passwords.
@@ -208,7 +212,7 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Dependency audit.** Checking the libraries a project uses against a list of known security holes (`pnpm audit`), so a vulnerable version gets updated.
 
-**Performance budget.** A size limit, such as "the home page's JavaScript stays under 127 KiB", that fails the checks when a change goes over it, so the site can't get slower unnoticed.
+**Performance budget.** A size limit, such as "the home page's JavaScript stays under 127 KiB", that fails the checks when a change goes over it, so the site can't get slower unnoticed. CKAuth's checks also warn when a budget is nearly used up, so there's time to plan before a change fails.
 
 **Main thread / event loop.** Node runs your JavaScript on one thread. Anything slow on that thread, like a long calculation, makes every other request wait.
 
@@ -254,15 +258,17 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Render-blocking request.** A file (usually CSS or a script in `<head>`) the browser must download before it draws anything. Each one adds a network round trip before the first paint; inlining a small one into the HTML removes it.
 
+**Critical CSS.** Only the styles a page needs for what it shows, inlined into its HTML so it can draw at once; the rest of the stylesheet loads afterwards. CKAuth's home page inlines the rules its own markup and first-load JavaScript use (`frontend/scripts/critical-css.js`), about two thirds of the full sheet, and loads the full sheet at the end of the page for everything else.
+
 **Prerendering.** Turning a page into finished HTML at build time. Visitors and crawlers then get the content without running JavaScript first.
 
 **Hydration.** React taking over prerendered HTML in the browser and making it interactive. The browser's first render must match the HTML exactly, or React reports a *hydration mismatch*.
 
 **Design lab.** CKAuth's development-only switcher for comparing candidate designs on the real pages (`frontend/src/lib/design-lab.tsx`).
 
-**Devanagari.** The script Hindi is written in. Its letters hang from a line along the top (the *shirorekha*) and carry marks above and below, so it needs taller lines than English.
+**Devanagari.** The script Hindi is written in. Its letters hang from a line along the top (the *shirorekha*) and carry marks above and below, so it needs taller lines than English. The landing page had a Hindi version from 24 Oct to 7 Nov 2026 (see DEVLOG.md).
 
-**`lang` attribute.** Tells the browser (and screen readers) which language a piece of the page is in, e.g. `lang="hi"`. CSS can then style that language with `:lang(hi)`.
+**`lang` attribute.** Tells the browser (and screen readers) which language a piece of the page is in, e.g. `lang="en"` on CKAuth's pages (`lang="hi"` while the Hindi version existed). CSS can then style that language with `:lang(…)`.
 
 **Error boundary.** A component that catches a crash in the pages below it and shows a friendly screen instead of a blank or raw error page. CKAuth's is `pages/route-error.tsx`, set as the router's `errorElement`.
 
@@ -272,7 +278,7 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Focus / focus management.** The focused element is the one that receives the keyboard. When an SPA swaps a page or a view, it must move focus on purpose (CKAuth moves it to `<main>` or the new heading), or keyboard and screen-reader users are left on something that has vanished.
 
-**`unicode-range` / `size-adjust`.** Two `@font-face` settings. `unicode-range` makes the browser download a font only when the page shows characters in that range (here, Hindi). `size-adjust` scales one font so it matches the size of the fonts around it.
+**`unicode-range` / `size-adjust`.** Two `@font-face` settings. `unicode-range` makes the browser download a font only when the page shows characters in that range (CKAuth used it for its Hindi font until Hindi was removed on 7 Nov 2026). `size-adjust` scales one font so it matches the size of the fonts around it.
 
 ---
 

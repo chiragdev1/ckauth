@@ -2,19 +2,6 @@
 @import "tw-animate-css";
 @import "@fontsource-variable/inter";
 
-/* hindi letters (inter has none). the unicode-range means only pages showing hindi download it, and
-   size-adjust lifts it to match inter: at the same font-size, devanagari looks a size smaller than latin.
-   not @fontsource's own css, which would also load its latin files */
-@font-face {
-  font-family: "Noto Sans Devanagari";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url("../node_modules/@fontsource-variable/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-wght-normal.woff2") format("woff2-variations");
-  unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09;
-  size-adjust: 112%;
-}
-
 /* theme.tsx puts .dark on <html>, so dark: follows the toggle instead of the os setting */
 @custom-variant dark (&:is(.dark *));
 
@@ -74,7 +61,7 @@
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-sans);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -132,28 +119,6 @@
   }
   .eyebrow {
     @apply font-display text-xs font-semibold tracking-[0.15em] text-primary uppercase;
-  }
-
-  /* hindi reads worse than english at the same settings: its letters hang from a top line (shirorekha) and carry
-     marks above and below, so it needs taller lines, no letter-spacing (which breaks the top line into pieces),
-     slightly bigger small text and stronger grey text. the font itself is scaled up in the @font-face below */
-  :lang(hi) {
-    line-height: 1.8;
-  }
-  :lang(hi) :is(h1, h2, h3, .font-display) {
-    line-height: 1.45;
-  }
-  :lang(hi) :is(.font-display, .eyebrow, [class*="tracking-"]) {
-    letter-spacing: normal;
-  }
-  :lang(hi) .text-xs {
-    font-size: 0.8125rem;
-  }
-  :lang(hi) .text-sm {
-    font-size: 0.9375rem;
-  }
-  :lang(hi) .text-muted-foreground {
-    color: color-mix(in oklab, var(--muted-foreground) 70%, var(--foreground));
   }
 
   /* a soft ember glow from the top of a section */
