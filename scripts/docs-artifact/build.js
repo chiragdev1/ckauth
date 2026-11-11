@@ -139,26 +139,55 @@ mkdirSync(dirname(outFile), { recursive: true })
 writeFileSync(outFile, page)
 console.log(`wrote ${posix.relative(root.split('\\').join('/'), outFile.split('\\').join('/'))} (${Math.round(page.length / 1024)} KiB, ${docs.length} docs, commit ${data.commit.slice(0, 7)}${data.uncommitted ? ' + uncommitted changes' : ''})`)
 
-// the published page is republished at most every 3 days ("twice a week or on a 3 day gap"). publishing happens through
-// claude.ai, which this script can't see, so `--published` records it here (local, gitignored) and every build says
-// when the next one is due, instead of someone looking the date up
+// when to republish the page, decided by what changed rather than by the calendar. publishing happens through claude.ai,
+// which this script can't see, so `--published` records it: the date in published.json and a copy of every doc's
+// markdown in published-docs.json (both local, gitignored). each build compares against that copy:
+// - nothing changed: up to date, nothing to do
+// - a contract doc changed (what other developers build against): republish now, a wrong contract misleads them
+// - anything else changed: republish once REPUBLISH_GAP_DAYS have passed, so small edits batch into one publish
 const REPUBLISH_GAP_DAYS = 3
+const CONTRACT_DOCS = ['README.md', 'docs/API.md']
 const stampFile = join(root, '.docs-artifact', 'published.json')
+const snapshotFile = join(root, '.docs-artifact', 'published-docs.json')
 // local dates (YYYY-MM-DD), not UTC: a publish at 1:30 am in India is still that day's publish
 const day = date => date.toLocaleDateString('en-CA')
-let published = []
-try { published = JSON.parse(readFileSync(stampFile, 'utf8')).published ?? [] } catch {}
+const readJson = file => { try { return JSON.parse(readFileSync(file, 'utf8')) } catch { return null } }
+let published = readJson(stampFile)?.published ?? []
+const current = Object.fromEntries(data.docs.map(doc => [doc.path, doc.markdown]))
 if (process.argv.includes('--published')) {
   published = [...published, day(new Date())].slice(-20)
   writeFileSync(stampFile, `${JSON.stringify({ published }, null, 2)}\n`)
+  writeFileSync(snapshotFile, JSON.stringify(current))
+}
+// lines added and removed, counted as multisets: close enough to a real diff to size a change, and needs no library
+const lineChanges = (before = '', after = '') => {
+  const count = new Map()
+  for (const line of before.split('\n')) count.set(line, (count.get(line) ?? 0) + 1)
+  let added = 0
+  for (const line of after.split('\n')) {
+    if (count.get(line) > 0) count.set(line, count.get(line) - 1)
+    else added++
+  }
+  return { added, removed: [...count.values()].reduce((sum, left) => sum + left, 0) }
 }
 const last = published.at(-1)
-if (!last) {
+const snapshot = readJson(snapshotFile)
+if (!last || !snapshot) {
   console.log('docs page: no publish recorded; after publishing, run `pnpm docs:artifact --published`')
 } else {
-  const dueDate = new Date(`${last}T00:00:00`)
-  dueDate.setDate(dueDate.getDate() + REPUBLISH_GAP_DAYS)
-  const due = day(dueDate)
-  const today = day(new Date())
-  console.log(`docs page: last published ${last}; next republish ${due <= today ? `allowed now (due since ${due})` : `due ${due}`}`)
+  const changed = Object.keys({ ...snapshot, ...current }).filter(path => snapshot[path] !== current[path])
+  if (!changed.length) {
+    console.log(`docs page: up to date (published ${last}, nothing changed since)`)
+  } else {
+    const sizes = changed.map(path => ({ path, ...lineChanges(snapshot[path], current[path]) }))
+    const added = sizes.reduce((sum, size) => sum + size.added, 0)
+    const removed = sizes.reduce((sum, size) => sum + size.removed, 0)
+    const dueDate = new Date(`${last}T00:00:00`)
+    dueDate.setDate(dueDate.getDate() + REPUBLISH_GAP_DAYS)
+    const due = day(dueDate)
+    const contract = changed.filter(path => CONTRACT_DOCS.includes(path))
+    const verdict = contract.length ? `republish now: ${contract.join(' and ')} changed` : due <= day(new Date()) ? 'republish now' : `republish due ${due}`
+    console.log(`docs page: ${verdict} (published ${last}; ${changed.length} of ${data.docs.length} docs changed since, +${added} -${removed} lines)`)
+    for (const size of sizes) console.log(`  ${size.path}: +${size.added} -${size.removed}`)
+  }
 }

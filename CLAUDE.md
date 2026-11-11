@@ -26,7 +26,7 @@ pnpm db:generate    # create a migration after editing src/db/schema.ts
 pnpm db:migrate     # apply migrations
 cd frontend && pnpm build   # frontend type check + build (also run before every commit if frontend/ changed)
 pnpm brand:images   # render the brand SVGs: og.png, app icons, README banner, social kit (dark + light)
-pnpm docs:artifact  # bundle the docs into .docs-artifact/ckauth-docs.html, warn about broken links, say when a republish is due (--published records one)
+pnpm docs:artifact  # bundle the docs into .docs-artifact/ckauth-docs.html, warn about broken links, say whether the published copy needs a republish (--published records one)
 pnpm test           # the test suite (needs Postgres; uses its own ckauth_test database)
 pnpm test:only session sign-in   # only those files (test/<name>.test.ts), same env and database as pnpm test; never tsx --test a file directly
 pnpm e2e            # browser end-to-end tests (Playwright; needs Postgres; builds both apps first)
