@@ -133,6 +133,7 @@ Every response from a limited endpoint carries the standard `RateLimit-Policy` a
 | `POST /auth/reset-password/:token` | 20 per 15 min | IP address |
 | `POST /auth/refresh` | 60 per minute | IP address |
 | `POST /auth/change-password` | 5 per 15 min | Signed-in user |
+| `PATCH /auth/me` | 30 per hour | Signed-in user |
 | `POST /auth/upload-avatar` and `DELETE /auth/avatar` | 10 per hour, shared | Signed-in user |
 | `DELETE /auth/me` | 5 **wrong passwords** per 15 min | Signed-in user |
 | `POST /auth/change-email` | 5 per hour, right password or not | Signed-in user |
@@ -337,7 +338,7 @@ Ends this device's session and clears both cookies. Other devices stay signed in
 
 ### `PATCH /auth/me`
 
-🔒 **Auth required.** Edits the signed-in user's profile. Only the fields you send change.
+🔒 **Auth required.** Edits the signed-in user's profile. Only the fields you send change. A save that changes a stored value writes a `profile_updated` event naming the changed fields; a save that changes nothing records nothing. Limited to 30 per hour ([Rate limits](#rate-limits)), because each event is kept for a year.
 
 **Body** (at least one field)
 
@@ -606,7 +607,7 @@ Sends a password reset email. The link is valid for 15 minutes.
 
 ### `POST /auth/reset-password/:token`
 
-Sets a new password. `:token` comes from the `?token=` in the reset link.
+Sets a new password. `:token` comes from the `?token=` in the reset link. Afterwards the account is emailed a "your password was reset" notice, except when an invited user sets their first password.
 
 **Body**
 
@@ -635,7 +636,7 @@ Sets a new password. `:token` comes from the `?token=` in the reset link.
 
 ### `POST /auth/change-password`
 
-🔒 **Auth required.** Changes the password of the signed-in user.
+🔒 **Auth required.** Changes the password of the signed-in user. Afterwards the account is emailed a "your password was changed" notice with a reset link (never the password), so a change the owner didn't make doesn't go unnoticed.
 
 **Body**
 
@@ -776,6 +777,8 @@ Passwords, token hashes and internal file IDs are never returned. A `page` past 
 
 One page of the **activity log** (an [audit log](GLOSSARY.md#logs-and-monitoring): who did what, to whose account, and when), newest first. Each event was written in the same database transaction as the action it records.
 
+The log is **append-only**: the database refuses to edit any event, and refuses to delete one except when old events are pruned on schedule (90 days or a year, see the Privacy Policy). This is enforced by the database, not just by the code: the API connects as a [role](GLOSSARY.md#database) that may only add and read events, and a [trigger](GLOSSARY.md#database) on the table refuses edits from anyone. So a bug, a stray query or a stolen API database password can't rewrite history.
+
 **Query parameters**
 
 | Parameter | Type | Rules |
@@ -796,7 +799,7 @@ One page of the **activity log** (an [audit log](GLOSSARY.md#logs-and-monitoring
 | `password_reset` | a reset link is used | the user → themselves | `firstPassword`: `true` when it finished an invite |
 | `email_change_requested` | `POST /auth/change-email` with the right password, whether or not the new address is taken (so the log can't tell) | the user → themselves | none: the new address may belong to someone else |
 | `email_changed` | a new email is confirmed | the user → themselves | `previousEmail` |
-| `profile_updated` | `PATCH /auth/me` | the user → themselves | which fields changed |
+| `profile_updated` | `PATCH /auth/me` that changed a stored value | the user → themselves | `firstName`, `lastName`, `age`: `true` for each field whose value changed; never the values |
 | `avatar_changed` | a photo is uploaded, or removed (removing one that's already gone records nothing) | the user → themselves | `removed`: `true` for a removal |
 | `sessions_revoked` | `DELETE /auth/sessions/:id`, or `DELETE /auth/sessions` that signed at least one device out | the user → themselves | `count`: devices signed out; `current`: whether it was this device |
 | `account_deleted` | `DELETE /auth/me` | the user → themselves | `email`, kept since the account is gone |

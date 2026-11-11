@@ -108,3 +108,40 @@ describe('POST /auth/change-password', () => {
     assert.equal(response.status, 401)
   })
 })
+
+describe('the "your password was changed" notice', () => {
+  const notices = (email: string) => mailsTo(email).filter(mail => /password was (changed|reset)/.test(mail.subject))
+
+  test('a change from a signed-in device mails the account, with a reset link and never the password', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    assert.equal((await client.post('/auth/change-password', {currentPassword: user.password, newPassword: 'brand-new-password'})).status, 200)
+
+    const [notice, ...more] = notices(user.email)
+    assert.equal(more.length, 0)
+    assert.match(notice!.subject, /password was changed/)
+    assert.match(notice!.text, /\/forgot-password/)
+    assert.doesNotMatch(notice!.text + notice!.html, /brand-new-password/)
+  })
+
+  test('a reset mails the account too', async () => {
+    const user = await createUser()
+    const token = await requestReset(user.email)
+    assert.equal((await new Client(baseUrl).post(`/auth/reset-password/${token}`, {newPassword: 'brand-new-password'})).status, 200)
+    assert.match(notices(user.email)[0]?.subject ?? '', /password was reset/)
+  })
+
+  test('nothing is sent for a wrong current password, or for an invited user choosing a first password', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    assert.equal((await client.post('/auth/change-password', {currentPassword: 'not-the-password', newPassword: 'brand-new-password'})).status, 400)
+
+    const invited = await createUser()
+    const token = await requestReset(invited.email)
+    await db.update(usersTable).set({password: null}).where(eq(usersTable.id, invited.id))
+    assert.equal((await new Client(baseUrl).post(`/auth/reset-password/${token}`, {newPassword: 'first-password'})).status, 200)
+
+    assert.equal(notices(user.email).length, 0)
+    assert.equal(notices(invited.email).length, 0)
+  })
+})

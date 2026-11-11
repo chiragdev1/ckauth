@@ -57,6 +57,15 @@ if(routes.join(' ') !== caddyRoutes.join(' ')) {
   failures.push(`frontend/Caddyfile @app (${caddyRoutes.join(' ')}) doesn't match app.tsx routes (${routes.join(' ')})`)
 }
 
+// the api connects as ckauth_api, never as the owner (CLAUDE.md → Deploys): the owner can edit and delete the activity log
+// and drop its triggers. the api service's block runs from "  api:" to the next service at the same indent
+const composeFile = readFileSync('deploy/compose.yml', 'utf8')
+const apiService = composeFile.match(/\n  api:\n([\s\S]*?)(?=\n  [a-z][\w-]*:\n)/)?.[1] ?? ''
+const apiDatabaseUrl = apiService.match(/DATABASE_URL:\s*(\S+)/)?.[1] ?? ''
+if(!/^postgres(ql)?:\/\/ckauth_api:/.test(apiDatabaseUrl)) {
+  failures.push(`deploy/compose.yml: the api service must connect as ckauth_api, not ${apiDatabaseUrl.split(':')[1]?.replace('//', '') || 'nothing'} (CLAUDE.md, least privilege)`)
+}
+
 // files that must change together (CLAUDE.md → Workflow)
 if(changed.has('src/db/schema.ts') && !changedUnder('drizzle/')) failures.push('schema.ts changed without a migration in drizzle/')
 if((changedUnder('src/') || changedUnder('frontend/src/')) && !changed.has('DEVLOG.md')) warnings.push('code changed but DEVLOG.md did not')

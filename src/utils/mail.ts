@@ -76,6 +76,10 @@ export async function sendNewSignInMail(to: string, firstName: string, device: s
   return await sendMail(to, emails.newSignIn(firstName, device, ipAddress, devicesUrl, resetUrl))
 }
 
+export async function sendPasswordChangedMail(to: string, firstName: string, how: 'changed' | 'reset', resetUrl: string) {
+  return await sendMail(to, emails.passwordChanged(firstName, how, resetUrl))
+}
+
 export async function sendConfirmEmailChangeMail(to: string, firstName: string, confirmUrl: string, expiresInMinutes: number) {
   return await sendMail(to, emails.confirmEmailChange(firstName, confirmUrl, expiresInMinutes))
 }

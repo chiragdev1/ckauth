@@ -17,7 +17,7 @@ authRouter.post('/verify-email/:token', rateLimits.verifyEmailPerIp, authControl
 authRouter.post('/resend-verification', rateLimits.resendVerificationPerIp, rateLimits.resendVerificationPerEmail, authController.handleResendVerification.bind(authController))
 authRouter.post('/refresh', rateLimits.refreshPerIp, authController.handleRefresh.bind(authController))
 authRouter.get('/me', authenticateToken, authController.handleMe.bind(authController))
-authRouter.patch('/me', authenticateToken, authController.handleUpdateProfile.bind(authController))
+authRouter.patch('/me', authenticateToken, rateLimits.updateProfilePerUser, authController.handleUpdateProfile.bind(authController))
 authRouter.post('/forgot-password', rateLimits.forgotPasswordPerIp, rateLimits.forgotPasswordPerEmail, authController.handleForgotPassword.bind(authController))
 authRouter.post('/reset-password/:token', rateLimits.resetPasswordPerIp, authController.handleResetPassword.bind(authController))
 // per-user limits run after authentication, so they key on the signed in user

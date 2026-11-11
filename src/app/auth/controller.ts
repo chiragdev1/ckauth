@@ -16,7 +16,7 @@ import { ApiResponse } from '../../utils/api-response.js';
 import { parseOrThrow } from '../../utils/validate.js';
 import { auditActions, getFrontendUrl, PASSWORD_HASH_ROUNDS, userRolesEnum } from './utils/constants.js';
 import { recordEvent } from './utils/audit.js';
-import { sendAccountDeletedMail, sendAccountExistsMail, sendConfirmEmailChangeMail, sendEmailChangedMail, sendEmailChangeRequestedMail, sendEmailTakenMail, sendNewSignInMail, sendEmailVerificationMail, sendResetPasswordMail, sendWelcomeMail } from '../../utils/mail.js';
+import { sendAccountDeletedMail, sendAccountExistsMail, sendConfirmEmailChangeMail, sendEmailChangedMail, sendPasswordChangedMail, sendEmailChangeRequestedMail, sendEmailTakenMail, sendNewSignInMail, sendEmailVerificationMail, sendResetPasswordMail, sendWelcomeMail } from '../../utils/mail.js';
 import { deleteImage, uploadImage } from '../../utils/imagekit.js';
 import { describeDevice } from '../../utils/device.js';
 
@@ -43,13 +43,14 @@ function verificationUrl(token: string) {
 
 type ProfileChanges = {firstName?: string, lastName?: string | null, age?: number | null}
 
-// what a profile_updated event keeps in details. admins read it in the activity log, and it's kept for a year, so it
-// names the fields sent and never their values (the privacy policy promises "which fields, not what you typed").
-// a name change is a common sign of a takeover, so which field it was is worth keeping; the age itself isn't
-function profileChangeDetails(changes: ProfileChanges): Record<string, string | number | boolean> | undefined {
+// what a profile_updated event keeps in details: the fields whose stored value really changed, by name, never the value.
+// admins read it and it's kept for a year (the privacy policy promises "which fields, not what you typed"); a name change
+// is a common sign of a takeover, so which field it was is worth keeping, the age itself isn't.
+// undefined when nothing changed (the same name saved again), so a no-op save records nothing
+function profileChangeDetails(changes: ProfileChanges, before: Required<ProfileChanges>): Record<string, boolean> | undefined {
   const details: Record<string, boolean> = {}
   for(const field of ['firstName', 'lastName', 'age'] as const) {
-    if(changes[field] !== undefined) details[field] = true
+    if(changes[field] !== undefined && changes[field] !== before[field]) details[field] = true
   }
   return Object.keys(details).length ? details : undefined
 }
@@ -473,6 +474,13 @@ export class AuthController {
       throw ApiError.notFound('Invalid or expired reset password token')
     }
 
+    // an invited user choosing their first password isn't a change to tell them about
+    if(userInDb.password) {
+      sendPasswordChangedMail(userInDb.email, userInDb.firstName, 'reset', `${getFrontendUrl()}/forgot-password`).catch((error) => {
+        req.log.error({err: error, mail: 'password-changed', userId: userInDb.id}, 'mail failed')
+      })
+    }
+
     return ApiResponse.ok(res, 'Password reset successfully', {id: result.id})
   }
 
@@ -510,6 +518,11 @@ export class AuthController {
     })
 
     setSessionCookies(res, result.tokens)
+
+    // after the commit, never inside it: a mail is a network call, and a failed one must not undo the change
+    sendPasswordChangedMail(userInDb.email, userInDb.firstName, 'changed', `${getFrontendUrl()}/forgot-password`).catch((error) => {
+      req.log.error({err: error, mail: 'password-changed', userId: userInDb.id}, 'mail failed')
+    })
 
     return ApiResponse.ok(res, 'Password changed successfully', {id: result.id})
   }
@@ -606,9 +619,15 @@ export class AuthController {
     }
 
     const updatedUser = await db.transaction(async (tx) => {
+      // locked, so two edits at once each compare against what the other saved
+      const [before] = await tx.select({firstName: usersTable.firstName, lastName: usersTable.lastName, age: usersTable.age}).from(usersTable).where(eq(usersTable.id, userId)).for('update')
+      if(!before) {
+        return undefined
+      }
       const [updated] = await tx.update(usersTable).set(changes).where(eq(usersTable.id, userId)).returning(safeUserColumns)
-      if(updated) {
-        await recordEvent(tx, req, {action: auditActions.PROFILE_UPDATED, actorId: userId, targetId: userId, details: profileChangeDetails(changes)})
+      const changed = profileChangeDetails(changes, before)
+      if(updated && changed) {
+        await recordEvent(tx, req, {action: auditActions.PROFILE_UPDATED, actorId: userId, targetId: userId, details: changed})
       }
       return updated
     })

@@ -256,10 +256,11 @@ A **502** is a success here. A certificate error means DNS or ports 80/443 aren'
 | `/opt/ckauth/.env` | Docker Compose | The domain, database password, and which version is running |
 | `/opt/ckauth/api.env` | The API | Session secrets, email and ImageKit keys |
 
-**6a. Generate the secrets.** 🖥️ VPS. Run this three times, and save each output in your notes with its label:
+**6a. Generate the secrets.** 🖥️ VPS. Run this four times, and save each output in your notes with its label:
 
 ```bash
 openssl rand -hex 32      # → POSTGRES_PASSWORD
+openssl rand -hex 32      # → API_DB_PASSWORD            (must differ from the one above)
 openssl rand -hex 64      # → ACCESS_TOKEN_SECRET_KEY
 openssl rand -hex 64      # → REFRESH_TOKEN_SECRET_KEY   (must differ from the one above)
 ```
@@ -273,16 +274,19 @@ cd /opt/ckauth
 nano .env
 ```
 
-Paste this, and put your database password after `POSTGRES_PASSWORD=`:
+Paste this, and put your two database passwords after `POSTGRES_PASSWORD=` and `API_DB_PASSWORD=`:
 
 ```bash
 DOMAIN=ckauth.chiragdev.com
 POSTGRES_PASSWORD=<paste the 64-character value from 6a>
+API_DB_PASSWORD=<paste the other 64-character value from 6a>
 API_TAG=latest
 WEB_TAG=latest
 ```
 
 Save with **Ctrl+O, Enter**, and exit with **Ctrl+X**. Leave `API_TAG` and `WEB_TAG` as they are; deploys update them.
+
+> **Two database passwords, two roles.** `POSTGRES_PASSWORD` belongs to `ckauth`, the database's owner, used only by migrations, backups and you. `API_DB_PASSWORD` belongs to `ckauth_api`, the [role](GLOSSARY.md#database) the API connects as: it can read and write the tables, but can only add to the activity log, never edit or delete it. So a leaked API password, or an attacker running code in the API container, can't erase the record of what they did. Every deploy's migrate step creates `ckauth_api` if it's missing and sets its password from `.env`.
 
 > ⚠️ **`POSTGRES_PASSWORD` is fixed after the first deploy.** Postgres stores it when the database is first created. Changing it later in `.env` alone breaks the connection ([how to change it](#rotating-secrets)).
 
@@ -526,6 +530,7 @@ Change a secret if it may have leaked, or as routine hygiene.
 | `RESEND_API_KEY` | Create a new key in Resend → update `api.env` → `up -d api` → delete the old key in Resend | None |
 | `IMAGEKIT_PRIVATE_KEY` | Same pattern | None |
 | `POSTGRES_PASSWORD` | See below (two places must change together) | A few seconds of downtime |
+| `API_DB_PASSWORD` | New value (`openssl rand -hex 32`) in `.env` → `docker compose run --rm migrate` (sets it in the database) → `docker compose up -d api` | A few seconds of API errors between the two commands |
 | The GitHub deploy key | [VPS-ACCESS.md, Part 3](VPS-ACCESS.md#part-3-github-actions--vps) with a new key, update `VPS_SSH_KEY`, remove the old line from `/home/deploy/.ssh/authorized_keys` | None |
 
 Changing `POSTGRES_PASSWORD` (🖥️ VPS):
@@ -575,6 +580,8 @@ Locally it's the same script: `pnpm build`, then `pnpm admin role you@example.co
 
 `role` and `delete` are recorded in the activity log like any other change, as done "by the server", since the script has no signed-in admin.
 
+**The activity log is append-only, twice over.** The API connects as `ckauth_api`, which has no `UPDATE`, `DELETE` or `TRUNCATE` right on `audit_events` and, not being the owner, can't remove the table's triggers (migration `20261107081824_api_database_role`). The triggers (migration `20261107063859_audit_events_append_only`) also refuse every `UPDATE` from anyone, and refuse `DELETE`/`TRUNCATE` unless the transaction first runs `set local ckauth.audit_maintenance = 'on'`. Daily pruning goes through `prune_audit_events()`, a database function with the retention periods written into it, so the API can delete only events that were due anyway. If you ever have to remove events by hand (a court order, a data-erasure request), connect as the owner (`docker compose exec db psql -U ckauth`), run `begin; set local ckauth.audit_maintenance = 'on';`, delete, `commit;`, and write down why. Only someone with the `ckauth` password can do that, so keep it in `/opt/ckauth/.env` and nowhere else.
+
 ### Performance measurements
 
 A weekly GitHub workflow (`.github/workflows/perf.yml`, Mondays 03:30 UTC, or run it by hand from the Actions tab) loads the live home page and `/sign-in` in Chromium on a desktop profile and a phone on slow 4G, and times 20 `GET /api/` calls. It only reads: no sign-ins, no email. Nothing needs setting up on the VPS or in secrets.
@@ -621,10 +628,13 @@ bash backup.sh                                        # 1. back up the current s
 ls -lh backups/                                       # 2. choose the file to restore
 docker compose stop api                               # 3. nobody writes while restoring
 gunzip -c backups/ckauth-2026-10-21-0230.sql.gz | docker compose exec -T db psql -U ckauth -d ckauth
-docker compose up -d api                              # 4. back online
+docker compose run --rm migrate                       # 4. re-creates ckauth_api and its rights
+docker compose up -d api                              # 5. back online
 ```
 
 To restore from your laptop's copy, first run `scp ~/ckauth-backups/<file> vps:/opt/ckauth/backups/`.
+
+Step 4 matters on a new server: database roles belong to the Postgres server, not to the backup, so a fresh server has no `ckauth_api` until migrate makes it (expect a few `role "ckauth_api" does not exist` errors from step 3 there; they're harmless).
 
 ### Adding another site to the VPS
 
