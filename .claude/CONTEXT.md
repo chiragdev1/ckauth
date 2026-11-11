@@ -4,7 +4,7 @@ A map for Claude Code: where each thing lives and which files change together, s
 3–5 files instead of scanning. **CLAUDE.md holds the rules and is always loaded; this file never repeats it.** Read the
 section you need (the index below), then open the files it names.
 
-- **Snapshot:** `main` as of `d08a4ba` (PR #16, 11 Nov 2026) plus the HS256 pin (§9). Line numbers are hints that
+- **Snapshot:** `main` as of `d08a4ba` (PR #16, 11 Nov 2026) plus the HS256 pin. Line numbers are hints that
   drift by a few lines; symbol names are the stable key, so `grep -n <symbol>` when a line is off.
 - **Refresh:** §10 has the commands that regenerate every table here.
 
@@ -18,8 +18,9 @@ section you need (the index below), then open the files it names.
 6. [Change recipes](#6-change-recipes): "to do X, touch these files", the cross-file couplings
 7. [Tests, checks and CI](#7-tests-checks-and-ci): which test covers what, what each check enforces
 8. [Docs map](#8-docs-map): which doc answers what, with line numbers into the long ones
-9. [Current state and traps](#9-current-state-and-traps): recent changes, things that surprise
+9. [Traps](#9-traps): things that surprise. Work in progress lives in git (branches, `git log`), not here
 10. [Maintaining this file](#10-maintaining-this-file)
+11. [Subsystem details](#11-subsystem-details): what each area of the code does, and the test setup, in full (moved from CLAUDE.md)
 
 ---
 
@@ -221,7 +222,7 @@ The files that must move together. Each list is in the order you'd edit them.
 pathless route in `app.tsx` → `frontend/Caddyfile` `@app` list (check-repo fails otherwise) → if an email links to it,
 `docs/API.md` "Frontend pages the emails link to" (150). UI look: `/ui-change` + `design-lab.tsx` `looks`.
 
-**New rate limit**: `rateLimits` entry in `middlewares/rate-limit.ts` → `routes.ts` → `docs/API.md` table (112) and
+**New rate limit**: `rateLimits` entry in `middlewares/rate-limit.ts` → `routes.ts` → `docs/API.md` table (112; `check-repo.js` fails until it matches) and
 `docs/DEPLOYMENT.md` "Rate limits" (741) → `test/rate-limits.test.ts`.
 
 **New audit action**: `auditActions` → `recordEvent(tx, …)` in the transaction → retention bucket in
@@ -264,7 +265,10 @@ commit the PNGs (check-dist compares the embedded SHA-256) → `docs/BRAND.md` "
 **`pnpm check:pr`** (`scripts/check-pr.js`) runs in order: api build → knip → audit → test types → test:coverage →
 web build → web tests → web knip → web audit → `frontend/scripts/check-dist.js` → `scripts/check-repo.js` →
 docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
-- `check-repo.js` [83]: secrets in added lines; no `bcryptjs`; no `res.status(4xx/5xx).json(` in controllers; Caddyfile `@app` = app.tsx routes; schema.ts needs a drizzle/ change;
+- `check-repo.js` [83]: secrets in added lines; no `bcryptjs`; no `res.status(4xx/5xx).json(` in controllers; no `console.` in `src/` outside `src/scripts/` and `migrate.ts`;
+  docs/API.md's rate-limit table = the limiters in every `routes.ts` (endpoint, limit, window, key, failures-only);
+  committed docs never link to or name an ignored (local-only) file, and `build.js` bundles only committed docs;
+  compares against `origin/main`; Caddyfile `@app` = app.tsx routes; schema.ts needs a drizzle/ change;
   warnings: code without DEVLOG, routes/models without API.md, pages/routes without `frontend/index.html`, and
   routes/schema/app.tsx/constants/rate-limit/check scripts without `.claude/CONTEXT.md`.
 - `check-dist.js` [133+]: title 50–60 chars with "sign-in", description 140–160, OG tags, one h1, prerendered home,
@@ -285,27 +289,21 @@ docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
 | SEO scores, tests, plan | `docs/SEO-AUDIT.md` (tests 49, plan 166) |
 | Name, colours, voice, brand files | `docs/BRAND.md` (colours 40, files 87, emails 120) |
 | Why something is the way it is | `LEARNINGS.md` (passwords 13, tokens 22, enumeration 39, concurrency 65, uploads 76, tooling 84, testing 127, performance 176, logging 206, SEO 215, frontend UX 237, process 265) |
-| When something changed; what's next | `DEVLOG.md` (dated entries, "Next up" 444, "Future scope" 482) |
+| When something changed | `DEVLOG.md` (dated entries, history only) |
+| What's next | `ROADMAP.md` ("Next up", then "Future scope") |
 | Setup, scripts, structure for humans | `README.md` |
 | Skills | `.claude/skills/ship/SKILL.md` (commit/PR), `.claude/skills/ui-change/SKILL.md` |
 
-## 9. Current state and traps
+## 9. Traps
 
-**Recent changes (main):**
-- JWTs are pinned to HS256 (`jwt-token.ts`, `middleware.ts`); tests in `jwt-token`/`session`. No `check-repo.js` rule enforces it yet.
-- Critical CSS: `frontend/scripts/critical-css.js` + `prerender.js` + check-dist rules + `frontend/test/critical-css.test.ts`.
-  The home-page budgets are tight on purpose (initialJs 123.25, homeHtml 18.75 KiB), so new first-load code can fail check-dist.
-- Hindi is gone: `frontend/src/lib/language.tsx` deleted, `home-copy.ts` exports `homeCopy = en` only, no Devanagari font.
-  The glossary keeps Devanagari and `lang` as history, since DEVLOG.md uses them.
-- Audit events exist for profile edits, photo changes, device sign-outs and email-change requests (§2); the table is
-  append-only in the database (`withAuditMaintenance`, the `ckauth_api` role).
-
-**Traps:**
+- JWTs are pinned to HS256 (`jwt-token.ts`, `middleware.ts`; tests in `jwt-token`/`session`), but on `main` no `check-repo.js`
+  rule enforces it yet (the OIDC branch adds one).
+- The home-page budgets in `frontend/scripts/check-dist.js` are tight on purpose (initialJs 123.25, homeHtml 18.75 KiB),
+  so new first-load code can fail the build.
 - Sign-up writes no audit event on purpose (dropped 6 Nov 2026); every other account change does (§2, Audit column).
 - `handleSignin` sends the verification mail again for an unverified user (line ~176), not only sign-up.
 - Admin delete mails only verified users; admins can't delete admins or themselves (controller line ~190).
 - `/dev/*` exists only when `NODE_ENV !== 'production'`; `/dev/outbox` also needs `MAIL_TRANSPORT=memory`.
-- Malformed/oversized JSON returns 500 (known gap, `errorHandler` only knows `ApiError`).
 - Production stack lives in `/opt/ckauth`, not `~/Authentication` (that's just a clone) on the VPS.
 - The user's dev server is on 8080; use `PORT=8081` for manual runs. Docker commands hang locally: probe ports instead.
 
@@ -316,7 +314,7 @@ Rules learned from building it (the first draft was a plain file list and failed
   file. A new endpoint, table, route or check updates them.
 - **Don't repeat CLAUDE.md.** It's loaded every session; duplicated rules cost tokens twice and drift apart.
 - **Symbols first, lines second.** Lines are hints; keep the symbol name next to every line number.
-- **Say what's stale.** §9 lists docs that disagree with the code, so nobody trusts the wrong one.
+- **Only what stays true.** §9 holds traps, never "in progress" notes: those go stale with the next commit (one did, 7–11 Nov 2026).
 - **Test it:** pick a real task, answer "which files?" from this file alone, then grep to see what it missed.
 
 Regenerate the tables:
@@ -329,3 +327,46 @@ grep -nE '^function [A-Z]|^export function [A-Z]' frontend/src/pages/*.tsx   # �
 grep -nE '^#{2,3} ' docs/*.md LEARNINGS.md DEVLOG.md                # §8 doc lines
 git ls-files | xargs wc -l | sort -n | tail -30                     # file sizes
 ```
+
+## 11. Subsystem details
+
+Moved here from CLAUDE.md on 11 Nov 2026, word for word, so the file loaded every session holds only the rules (CLAUDE.md →
+"Where things live" keeps one line per rule). Read the bullet for the part you're changing.
+
+**Test setup.** (`test/`, Node's built-in `node:test` run through `tsx`, no test framework): one file per area (`sign-up`, `verify-email`, `sign-in`, `session` (incl. the device list), `account` (profile, avatar removal, self-delete, resend, change email), `mail-failure` (every mail-sending endpoint still answers when its mail fails: any address at `@mail-fails.test` fails in memory mode), `password`, `upload-avatar`, `rate-limits`, `admin`, `activity` (every audit event, the rollback guarantee, `/admin/activity`, pruning), `metrics` (referral tags, the visit counter, sign-up sources, the stats' `referrals`), `redis-down`), plus unit tests for the Zod models, JWT helpers, error handler and `request-logger` (route templates, the allow-list, log levels), and `known-gaps.test.ts` (`test.todo` for each known gap below). `pnpm test:coverage` fails below 95% lines / 83% branches / 85% functions; CI runs it (`api.yml`, with a Postgres service) before building an image. Frontend unit tests (`frontend/test/`, run by Node directly) cover `validation.ts`, `device.ts`, `time.ts`, `scripts/critical-css.js` and `api.ts`'s single-flight refresh and session-ended signal. **Browser tests** (`e2e/`, Playwright, `pnpm e2e`; sign-up and sign-in so far, not in CI yet): `playwright.config.ts` starts the API on 8090 through `e2e/start-api.ts` (its own `ckauth_e2e` database made by `prepareDatabase` from `test/global-setup.ts`, `MAIL_TRANSPORT=memory`, no Redis) and `vite preview` on 4180, and runs chromium, firefox, webkit and a Pixel 7 project. `e2e/fixtures.ts` gives each test a fake `X-Forwarded-For` (so per-IP limits don't trip), a fresh `email`, a `verifiedUser` and an `inbox` that reads the dev-only `GET /dev/outbox?to=` (404 unless `MAIL_TRANSPORT=memory`). Every integration test drives the real Express app over HTTP against a separate `ckauth_test` database, which `test/global-setup.ts` creates and migrates; `TEST_DATABASE_URL` overrides it. `test/env.ts` fixes the environment first: `MAIL_TRANSPORT=memory` keeps mails in `outbox` (`src/utils/mail.ts`) so a test reads the link a user would click, no Redis (fresh in-memory rate limits per file), no ImageKit, fixed secrets, `LOG_LEVEL=silent`. Helpers in `test/helpers.ts`: `Client` (cookies, plus its own IP per client so per-IP limits behave), `createUser`, `signIn`, `signUp`, `lastMailTo`, `tokenFrom`, `findUser`, `sessionsOf`. Call `startApp()` at a test file's top level, never inside a hook. Output goes through `test/quiet-reporter.ts`: one summary line when everything passes, full detail for each failure plus the stderr of its file, and every `todo` (known gap) and skipped test by name; `CI=1` (set by GitHub Actions) gives Node's full spec output instead. `pnpm test <file>` does not narrow the run (the file is added to the full glob); use `pnpm test:only`. One test run at a time: two runs (two sessions) share `ckauth_test` and truncate each other's tables. A new endpoint or rule gets tests in the same change, and a check that can't fail proves nothing: break the code once and watch the test fail.
+
+**Layout, area by area.**
+
+- `src/app/auth/routes.ts`: route → middleware → `authController.handleX.bind(authController)`
+- `src/app/auth/controller.ts`: `AuthController` class, one `handleX` method per endpoint
+- `src/app/auth/models.ts`: Zod schemas named `<thing>PayloadModel`
+- `src/app/auth/middleware.ts`: `authenticateToken` (sets `req.user`, including `role`, and `req.sessionId`, read from the database on every request; 401 once the token's session row is gone; rejects unverified users) and `authorizeRoles(...roles)` (403 unless `req.user.role` is listed; always after `authenticateToken`)
+- `src/app/auth/utils/sessions.ts`: `startSession(executor, userId, req)` is the only way to start a session (one `sessions` row per device, max 10 per user, the access token carries its `sid`); `setSessionCookies`/`clearSessionCookies`. Ending a session = deleting its row. `user-columns.ts`'s `safeUserColumns` is the one list of user fields a client may see (`req.user`, profile edits, the admin list); select through it, never by hand. `users.refresh_token`/`reauthenticated_at` are unused leftovers kept for rollbacks; sudo mode lives on `sessions.reauthenticated_at`
+- `src/app/auth/utils/constants.ts`: `userRolesEnum` (`user`, `admin`) is the single source of the role values; `schema.ts`'s `user_role` Postgres enum and the Zod models are built from it. `PASSWORD_HASH_ROUNDS` lives here too
+- `src/app/admin/`: same layout as `auth/` (routes, controller, models, `middleware.ts` with `requireRecentReauth`), mounted at `/admin`; `router.use(authenticateToken, authorizeRoles('admin'))` guards every route. Endpoints: stats, users (paged, `?search=`), `reauth` (sudo mode), invite (`POST /users`, a 72-hour set-password link through the reset flow) and delete (emails a verified user). Admins can't delete themselves or other admins through the API. `GET /activity` reads the audit log (filters `?action=`, `?userId=`; never returns IPs)
+- `src/app/metrics/`: `POST /metrics/visit` (no auth) counts visits from our own tagged links (`?ref=x`) in `referral_visits`, one counter per tag per day, with no IP, cookie or user. `sources.ts`'s `referralSources` is the only list of tags and `normalizeRefSource` the only way in: unknown tags are dropped, never stored. Sign-up's optional `ref` sets `users.signup_source` on insert only. The frontend half is `frontend/src/lib/referral.ts` (`captureReferral()` in `main.tsx`)
+- **Audit log:** `audit_events` (`schema.ts`), written only through `recordEvent(tx, req, event)` (`src/app/auth/utils/audit.ts`) with the transaction that makes the change, so the row commits or rolls back with it; failures with nothing to roll back (`sign_in_failed`, `admin_reauth_failed`) use `db`. Actions are `auditActions` in `constants.ts`. The table is **append-only in the database**: triggers (`20261107063859_audit_events_append_only`) refuse `UPDATE` always and `DELETE`/`TRUNCATE` outside `withAuditMaintenance` (`audit.ts`; `seed:activity --clear` and the tests' `resetDatabase`, as the owner), and in production the API connects as **`ckauth_api`** (`20261107081824_api_database_role`), which has only `SELECT`/`INSERT` on `audit_events` and can't drop triggers. Pruning calls `prune_audit_events()`, a `SECURITY DEFINER` function with the retention periods written in (keep them equal to `audit.ts`'s constants). `ensure_api_role()` (re)creates the role and its grants; `migrate.ts` runs it on every deploy and sets the role's password from `API_DB_PASSWORD`. Never edit or delete an event any other way, and a new append-only table needs its own `REVOKE` in `ensure_api_role()`. An event that writes on every call needs a rate limit on its endpoint (`PATCH /auth/me` has one for `profile_updated`), or one session can flood a year-long table. Actor and target are plain ids (no foreign keys) so rows outlive accounts; a deleted account's email goes in `details`. `pruneAuditEvents` (90 days for `sign_in`/`sign_in_failed`/`admin_reauth`, a year for the rest; the Privacy Policy states both) runs at start-up and daily from `src/index.ts`. `src/scripts/seed-activity.ts` fakes data for development
+- `src/scripts/manage-users.ts` (`pnpm admin …` locally, `docker exec ckauth-api-1 node dist/scripts/manage-users.js …` on the VPS, from any folder; `~/Authentication` there is only a git clone, the stack is `/opt/ckauth`): the only way to make, demote or delete an admin, on purpose (see `docs/DEPLOYMENT.md`, "Admins")
+- `src/app/middlewares/`: cross-cutting Express middleware (error handler, uploads, `rate-limit.ts`, `request-logger.ts`: pino-http, mounted first, one line per request at a level from `logLevelFor`, `X-Request-Id` on every response; the error handler hands 5xx errors to it as `res.err`). Every endpoint that checks a password, sends an email or takes a single-use token gets a limiter in `routes.ts`, keyed per IP, email or user; keep `docs/API.md`'s rate-limit table in sync
+- `src/utils/`: `ApiError`, `ApiResponse`, `logger.ts` (the one pino logger: JSON lines always, `LOG_LEVEL`, default `info`; `pnpm dev` pipes it through pino-pretty), `mail.ts`, `imagekit.ts` (third-party clients live here). `mail.ts` has a `MAIL_TRANSPORT=memory` switch for the tests; production never sets it
+- Emails are three files: `emails.ts` (what each says, as data), `email-layout.ts` (one HTML layout for all, with dark mode: `prefers-color-scheme` plus Outlook's `[data-ogsc]`; Gmail ignores both and recolours on its own, so the light palette must survive inversion) and `mail.ts` (sending). Icons are PNGs in `frontend/public/email/`, rendered from `frontend/email-icons/*.svg`, which `frontend/scripts/email-icons.mjs` builds from lucide (Gmail strips SVG). The design is "spotlight" (a tinted top with a big centred icon and title, a pill button); the colour theme is `midnight` (the site's own slate and ember, picked 6 Nov 2026); `emailThemes` stays a list so a new candidate can be compared on `/dev/emails`
+- `scripts/perf/` (`measure.js`, `report.js`) + `.github/workflows/perf.yml`: weekly real-world speed measurement of production, results on the orphan `perf-data` branch; read-only against production
+- `src/app/dev/routes.ts`: development-only routes (email previews, and `/dev/outbox` for the browser tests), mounted only when `NODE_ENV` isn't `production`; `frontend/src/pages/dev-emails.tsx` (`/dev/emails`) shows them. `check-dist.js` fails a build that ships it, and `check-repo.js` leaves `/dev/` routes out of the Caddyfile comparison
+- `src/db/schema.ts` → migrations in `drizzle/`; `src/db/migrate.ts` applies them in production
+- `frontend/src/lib/api.ts`: the only place that calls `fetch`; `/api` prefix, `credentials: 'include'`, single-flight refresh on 401 for `authed` requests
+- `frontend/src/components/resend-email.tsx`: "resend the verification email" (sign-up's inbox screen, unverified sign-in, expired verify link), with the API's 60 s cooldown as a countdown. `avatar-cropper.tsx`: crops a picked photo (up to 15 MB) to a 512 px JPEG in the browser before upload, behind a round mask (the corners are still saved, dimmed, for the square full-size viewer). `lib/time.ts` (`timeAgo`) for relative times
+- `frontend/src/lib/api.ts`'s `onSessionEnded`: fires when a refresh fails for a browser that had a session (anything but `"code": "NO_SESSION"`); `auth.tsx` turns it into `sessionEnded`, which the sign-in page explains
+- `frontend/src/components/avatar-lightbox.tsx`: every avatar that may have a photo (dashboard, `/admin`); with a photo it's a button opening a Radix `Dialog` that grows the photo into a big rounded square (tap anywhere or Escape closes it)
+- `frontend/src/components/ui/`: shadcn components (edit freely, they're ours); `form.tsx` (fields, password reveal and strength), `auth-shell.tsx`, `brand.tsx`. No illustrations: backdrops are CSS only (`.bg-grid`, `.bg-wall` in `index.css`), and any themed art must stay original (no copyrighted art). Colours are tokens in `src/index.css`; `dark:` follows the `.dark` class set by `lib/theme.tsx` and `public/theme-init.js`
+- `frontend/src/lib/design-lab.tsx` + `components/design-lab-panel.tsx`: dev-only switcher for comparing candidate designs on the real pages (Alt+1…9, Alt+T, `?look=<id>`). The panel hides while `looks` has one entry. Production always renders the first look
+- `frontend/src/pages/home.tsx` + `home-copy.ts`: the landing page, written for anyone running a website or app (examples span shops, clinics, startups and communities) and built to turn visits into sign-ups: one primary CTA, repeated, with the "no card required" reassurance under it. Every word is in `home-copy.ts` (English only; Hindi was removed on 7 Nov 2026, and a translation that comes back must load on demand, not in the first-load bundle); the source copy and its writing rules are in `frontend/content/landing-page.md`
+- `frontend/src/lib/use-form.ts` + `validation.ts`: every form's state, inline errors (mirroring `models.ts`) and API error → field mapping
+- `frontend/src/pages/legal.tsx`: the Privacy Policy (`/privacy`) and Terms (`/terms`). Every statement in them describes what the code does today (stored fields, cookies, rate-limit counters, processors, backup retention), so a change to any of those must update the policy in the same change, and bump its date
+- `frontend/src/pages/admin.tsx` + `lib/admin.ts`: the `/admin` page (stat tiles, the referral card (hidden until a `?ref=` tag has a visit; tag names in `referralNames`), search, one card per user, an "invite a user" card that opens the form, two-click delete) behind `RequireAdmin` (`layout.tsx`, inside `RequireAuth`). `ReauthProvider` there catches `REAUTH_REQUIRED` (`ApiRequestError.code`), asks for the password once in a Radix `Dialog` (focus trap, scroll lock, focus return) and retries the action. `reset-password.tsx` shows "Choose your password" for `&invite=1` links
+- `frontend/src/pages/`: one file per route; routes for email links are fixed by the API (`/verify-email`, `/reset-password`, `/sign-in`, `/forgot-password`). `/confirm-email` (email change) confirms only on a button press, never on load, because mail scanners open links. Each page sets its tab title with `useDocumentTitle()`
+- `frontend/src/app.tsx`: the routes and provider tree, shared by `main.tsx` (browser) and `entry-server.tsx` (build). Every page except home is lazy-loaded. A new route must also go in the `@app` list in `frontend/Caddyfile`, and inside the pathless route that carries `errorElement: <RouteError />` (`pages/route-error.tsx`), so a crash keeps the header. `main.tsx` reloads once on `vite:preloadError` (a tab older than the deploy)
+- `frontend/src/components/layout.tsx`: the skip link, `<ScrollRestoration />`, and focus moved to `<main>` on every route change; `AuthShell` moves focus to its heading when a page swaps views. The header renders the signed-out buttons until `/auth/me` answers (never a blank), and on phones shows only the one of Sign in / Sign up you're not on
+- **SEO / prerender:** `pnpm build` also renders `/` in Node (`scripts/prerender.js`) into `dist/index.html`, and writes `dist/app.html`, the empty shell every other route gets. So anything the home page renders must work without `window`/`document`, and must render the same on the first client pass: no theme-, auth- or date-dependent markup, since React doesn't fix mismatched attributes when it hydrates. Only `/` is indexed (`public/robots.txt`, `sitemap.xml`); the meta/OG tags are in `index.html`, and the brand images are SVG sources rendered by `pnpm brand:images` (`scripts/brand-images.mjs`, Chromium through Playwright, so CSS variables and Inter work; `class="light"` switches the theme): `og-image.svg` → `public/og.png` (link previews, dark) and `docs/brand/ckauth-{dark,light}.png` (README banner, GitHub social preview); `brand/icon.svg` → `public/apple-touch-icon.png`, `icon-{192,512}.png` (in `public/manifest.json`) and the social avatars; `brand/social-header.svg` → the X and LinkedIn headers in `docs/brand/social/`. Each PNG stores its source's SHA-256 in a `tEXt` chunk, and `check-dist.js` fails when `og.png` or an app icon is older than its SVG. `docs/BRAND.md` lists them all. The build also inlines `public/theme-init.js` into both pages (the CSP allows it by the SHA-256 hash in `deploy/ckauth.caddy`; the build fails with the new hash if they differ) and inlines into the home page only the CSS it uses (critical CSS, `scripts/critical-css.js`): the rules whose classes appear in its markup or first-load JS. The full sheet is preloaded in `<head>` and linked at the end of `<body>`; module scripts wait for it, so React hydrates only once every class is styled, which is what keeps lazy UI (the user menu) and in-app navigation styled. `check-dist.js` fails if a class in the home markup lost its rule, or the full sheet isn't linked or preloaded, and prints the page's CSS/markup split. When a budget is tight, read that split before naming a cause, and never inline the whole sheet again. Signed-in-only UI that pulls in big libraries (like `user-menu.tsx`) is lazy-loaded
+- `Dockerfile` (api image), `frontend/Dockerfile` + `frontend/Caddyfile` (web image: internal static server on :8080, no TLS; app routes → `app.html` + `noindex`, unknown paths → real 404)
+- `deploy/compose.yml` (CKAuth stack; `db` only on the `internal` network, `api`/`web` also on the external `edge` network), `deploy/deploy.sh` (runs on the VPS), `deploy/ckauth.caddy` (public routing + security headers), `deploy/edge/` (shared proxy)
+- `.github/workflows/api.yml`, `web.yml` → reusable `deploy.yml`

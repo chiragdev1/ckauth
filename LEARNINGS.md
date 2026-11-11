@@ -83,6 +83,10 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 
 ## Config & tooling
 
+- **`toISOString()` gave the wrong date.** The docs-page schedule used it for "today", which is UTC, so late evenings counted as tomorrow.
+  → Dates are built from local parts.
+  **Rule:** for a date a person reads, use local time; `toISOString()` is UTC.
+
 - **`.env.sample` was ignored by git.** The `.env.*` pattern caught the template file too.
   → Added `!.env.sample`.
   **Rule:** after adding an ignore pattern, check it with `git check-ignore -v <file>`.
@@ -125,6 +129,10 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
   **Rule:** after updating for an audit, run the audit again. Indirect packages need `--depth Infinity`.
 
 ## Testing
+
+- **A new check flagged good input.** The rule against naming local-only docs fired on the new, legitimate `ROADMAP.md` because "ignored" was judged from what git already tracked.
+  → "Committable" now means tracked, or new and not ignored.
+  **Rule:** run a new check against good new input as well as bad, not only to see it fail.
 
 - **A dev-only page shipped to production.** The route was gated on `LAB_ENABLED`, imported from `design-lab.tsx`. Vite replaces `import.meta.env` values only where they're written, and the bundler didn't fold the imported constant, so the page was bundled and the home page went over its JavaScript budget.
   → Write `import.meta.env.DEV || …` in place at the gate, and `check-dist.js` fails any build that contains the page.
@@ -281,3 +289,7 @@ Every real mistake made while building CKAuth, grouped by topic, with the rule i
 
 - Commit messages for behaviour or security changes need a body explaining *why*, plus a `BREAKING CHANGE:` footer when the API changes. One-line messages are only for trivial commits.
 - After a change, test the real flow end to end against the database and the external services, not just a successful build.
+
+- **A memory holding an instruction never ended.** A note said to pop a stash after a merge, and went on saying it after the stash was gone.
+  → The note was removed.
+  **Rule:** a memory that holds an instruction needs an end condition, and gets deleted when it is met.

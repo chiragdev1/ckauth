@@ -14,6 +14,18 @@ It handles the full account lifecycle: sign-up with email verification, cookie-b
 
 **Live demo:** [ckauth.chiragdev.com](https://ckauth.chiragdev.com)
 
+### Start here, by what you want to do
+
+| I want to… | Go to |
+|---|---|
+| Run it on my machine | [Getting started](#getting-started), then [Scripts](#scripts) |
+| Call the API from a frontend or app | [docs/API.md](docs/API.md): response format, every endpoint, [rate limits](docs/API.md#rate-limits) |
+| Understand how sign-in works | [How authentication works](#how-authentication-works), then the [glossary](docs/GLOSSARY.md) for any term |
+| Change or add code | [CLAUDE.md](CLAUDE.md): where things live, conventions and the security rules every change keeps |
+| Deploy, or fix production | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): everyday operations, rollbacks and troubleshooting |
+| See what's done and what's next | [DEVLOG.md](DEVLOG.md) (history), [ROADMAP.md](ROADMAP.md) (plans), [known limitations](#known-limitations) |
+| Learn from the mistakes | [LEARNINGS.md](LEARNINGS.md): each one as what went wrong → fix → rule |
+
 The repo also contains the **CKAuth web app** in [`frontend/`](frontend/) (React + Vite + Tailwind), which implements every flow in the API.
 
 ---
@@ -145,7 +157,8 @@ Open `http://localhost:3000`. The Vite dev server proxies `/api/*` to the API on
 | `pnpm seed:activity` | Development only, after `pnpm build`: adds six fake users (`@seed.example.com`) and a month of activity-log events, so `/admin` has something to show. `--clear` removes them. Refuses to run when `NODE_ENV=production`. |
 | `pnpm drizzle:studio` | Opens Drizzle Studio to browse the database. |
 | `pnpm test:coverage` | Runs the tests and fails if coverage drops below 95% of lines, 83% of branches or 85% of functions. CI runs this before every API deploy. |
-| `pnpm test` | Runs the test suite (103 tests and 5 to-dos for known gaps, about 25 s). Needs Postgres running (`pnpm db:up`); it creates and uses its own `ckauth_test` database, so your development data is never touched. |
+| `pnpm test` | Runs the test suite (its last line gives the count, plus a to-do for each known gap a test can describe; under a minute with coverage on 11 Nov 2026). Needs Postgres running (`pnpm db:up`); it creates and uses its own `ckauth_test` database, so your development data is never touched. |
+| `pnpm test:only <names>` | Runs only some test files with the same setup as `pnpm test`, e.g. `pnpm test:only admin session`. |
 | `pnpm test:types` | Type checks the tests (the runner itself skips type checking). |
 | `cd frontend && pnpm test` | The frontend's unit tests (form rules, error messages, the API client's refresh). |
 | `pnpm e2e` | Browser end-to-end tests (Playwright): builds the API and the frontend, then drives a real browser through sign-up and sign-in on Chromium, Firefox and a phone-sized Chromium (WebKit too, once its system libraries are installed with `sudo pnpm exec playwright install-deps webkit`). Needs Postgres running; uses its own `ckauth_e2e` database, port 8090 for the API and 4180 for the site. First time: `pnpm exec playwright install`. |
@@ -153,9 +166,9 @@ Open `http://localhost:3000`. The Vite dev server proxies `/api/*` to the API on
 | `pnpm perf:report` | Prints the latest measurement against the previous one, with trend charts, as Markdown. |
 | `pnpm check:pr` | Every check a branch must pass before a pull request: both builds, unused code (knip), known vulnerabilities (`pnpm audit`), the tests, SEO, speed and security of the built site, repo rules (secrets, security rules, files that change together) and links between docs. |
 | `pnpm brand:images` | Renders the brand SVGs to PNG: the link-preview image, the app icons, this README's banner and the social profile kit. The [brand guide](docs/BRAND.md) lists every file and where it's used. |
-| `pnpm docs:artifact` | Bundles every doc into one searchable page (`.docs-artifact/ckauth-docs.html`) and warns about broken links between docs. |
+| `pnpm docs:artifact` | Bundles every doc into one searchable page (`.docs-artifact/ckauth-docs.html`), warns about broken links between docs, and says when the published copy is next due for a republish. `--published` records a publish. |
 
-**Tests:** integration tests send real HTTP requests to the app and check the database afterwards; unit tests check single functions. Emails aren't sent during tests: they're kept in memory, and a test reads the verification or reset link from there, just as a user would click it. To run a single file: `node --import tsx --import ./test/env.ts --test-global-setup=test/global-setup.ts --test test/admin.test.ts`.
+**Tests:** integration tests send real HTTP requests to the app and check the database afterwards; unit tests check single functions. Emails aren't sent during tests: they're kept in memory, and a test reads the verification or reset link from there, just as a user would click it. To run only some files: `pnpm test:only admin session` (runs `test/admin.test.ts` and `test/session.test.ts` with the same setup as `pnpm test`). Don't run a test file with `tsx --test` directly: it skips that setup and would wipe the development database.
 
 **Changing the database schema:** edit `src/db/schema.ts` → `pnpm db:generate` → review the SQL in `drizzle/` → `pnpm db:migrate` → commit the schema and the migration together.
 
@@ -234,11 +247,14 @@ Two consequences:
 
 ### Known limitations
 
-These are planned but not done yet:
+The one list of known gaps; other docs link here. These are planned but not done yet. The ones a test can describe (the JSON errors) are also a `test.todo` in `test/known-gaps.test.ts`, so every test run names them.
 
-- **No CORS configuration.** Not needed for the bundled frontend, which is served from the same origin. A frontend on another origin would need CORS added first.
-- **Malformed or oversized (over 50 KB) JSON bodies return `500`** instead of `400`/`413`.
+- **No CORS configuration.** CORS (cross-origin resource sharing) is what lets a page on another site call an API. The bundled frontend doesn't need it, since it's served from the same origin. A frontend on another origin would need CORS added first.
+- **Malformed or oversized (over 50 KB) JSON bodies return `500`** instead of `400`/`413`, because the error handler only recognises `ApiError` (the JSON parser's own errors carry `status` 400/413).
+- **Rate limits fail open.** If Redis is unreachable, requests pass (`passOnStoreError`) and the error is logged; `disableOfflineQueue` makes that immediate (without it, every limited request waited about 5 s). See `test/redis-down.test.ts`.
+- **No MFA** (multi-factor authentication), for admins or anyone. Sudo mode, confirming the password within 15 minutes, is the interim protection for admin actions.
 - **Browser end-to-end tests cover only sign-up and sign-in so far**, and aren't in CI yet. The rest of the app (dashboard, password reset, admin) is covered by the API tests and by hand.
+- **SEO and traffic:** the full list, with test IDs and the score, is in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md). The prerendered footer year is the build year until the browser re-renders it.
 
 ---
 
@@ -248,4 +264,5 @@ These are planned but not done yet:
 - **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md):** production setup, deploying, rolling back and backups.
 - **[docs/VPS-ACCESS.md](docs/VPS-ACCESS.md):** first-time SSH and GitHub setup for the VPS.
 - **[DEVLOG.md](DEVLOG.md):** how the project was built, step by step.
+- **[ROADMAP.md](ROADMAP.md):** what's planned next.
 - **[LEARNINGS.md](LEARNINGS.md):** mistakes made along the way, and the rules learned from them.
