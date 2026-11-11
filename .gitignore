@@ -160,3 +160,5 @@ blob-report/
 
 # the perf-data branch, checked out here by .github/workflows/perf.yml (and written by pnpm perf when run by hand)
 perf-data/
+
+TASKS.md

@@ -114,7 +114,7 @@ Can everyone use the page, including people using screen readers, keyboards only
 |---|---|---|---|---|---|---|---|
 | A01 | Lighthouse accessibility score | 100 | ❌ | ✅ | Live 96. 23 Oct build: 100 | Deploy | yes |
 | A02 | All text meets WCAG AA contrast | 4.5:1 for normal text | ❌ | ✅ | Live: 10 elements. Fixed 23 Oct: darker light `--primary`/`--success`, no opacity on text; lowest now 4.72:1 | Deploy | yes |
-| A03 | Skip-to-content link | First focusable element skips to main | ❌ | ✅ | Fixed 27 Oct: "Skip to content" (English and Hindi) is the first focusable element in Layout | Deploy; not yet counted in the scores above | yes |
+| A03 | Skip-to-content link | First focusable element skips to main | ❌ | ✅ | Fixed 27 Oct: "Skip to content" is the first focusable element in Layout | Deploy; not yet counted in the scores above | yes |
 | A04 | Honours reduced motion | Animations off under prefers-reduced-motion | ✅ | ✅ | Global rule in index.css. 27 Oct: it now also stops infinite animations (the ticker flickered before), and the ticker has a pause button (WCAG 2.2.2) | None needed | no |
 | A05 | Language and landmarks | lang, header, nav, main, footer | ✅ | ✅ | All present | None needed | no |
 | A06 | Hero readable without waiting | No opacity-0 entrance on the main text | ❌ | ✅ | Fixed 23 Oct: slides in, never starts transparent | Deploy | yes |
@@ -196,7 +196,7 @@ Head terms like "authentication" belong to Auth0, Clerk and Okta. The opening is
 
 - Turn `docs/API.md` into indexable docs pages on the site (O06).
 - Put Cloudflare in front, for TTFB and the WAF already in DEVLOG's Next up (P09).
-- Get the landing bundle under 100 kB gzip by keeping Radix out of the signed-out header (P06, P07); inline critical CSS (P03, P08).
+- Get the landing bundle under 100 kB gzip by keeping Radix out of the signed-out header (P06, P07). Critical CSS is done (7 Nov 2026: the home page inlines only the CSS it uses, 22.5 → 19.0 KiB gzip); P03 still needs the CDN (P09).
 - Get listed in awesome-express, awesome-nodejs and auth example lists; answer Stack Overflow questions where an article fits.
 - Review Search Console monthly: which queries show us, which pages get impressions without clicks (M04).
 - Once every `chiragdev.com` subdomain is HTTPS-only, add `includeSubDomains` and submit to the HSTS preload list (B03).

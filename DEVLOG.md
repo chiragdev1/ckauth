@@ -456,6 +456,13 @@ A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 
 - **Tests:** limit, no-op save, the notice (and when it isn't sent), the mail failing, and the append-only rules; each new check was broken once and failed. The `/dev/emails` test now compares its count with `emails.ts`, so a new email can't ship without a preview.
 - **Docs:** `docs/API.md` (limits, the notice, append-only), `docs/DEPLOYMENT.md` (removing events by hand), the glossary (trigger), the Privacy Policy (the new notice; records can't be edited) and CLAUDE.md.
 
+## 7 Nov 2026 · Lighter home page, Hindi removed
+
+- **Critical CSS:** `frontend/scripts/critical-css.js` inlines only the rules the home page's markup and first-load JavaScript use (`index.html` 22.5 → 19.0 KiB gzip); the full stylesheet is preloaded in the head and linked at the end of `<body>`. `check-dist.js` proves no class lost its style, prints the CSS/markup split and warns before a budget runs out; budgets tightened (first-load JS 127 → 123.25 KiB, home HTML 22.5 → 18.75 KiB).
+- **Hindi removed:** the copy, the language switch, `lib/language.tsx`, the Noto Sans Devanagari font and the `:lang(hi)` styles (home JS 127.0 → 123.0 KiB). It cost every visitor though few switched. The Privacy Policy no longer mentions a stored language choice (dated 11 November 2026).
+- **Tests:** a quiet reporter (one summary line when everything passes, full detail for failures; `CI=1` gives the full list) and `pnpm test:only <names>` to run chosen files with the same environment and database as `pnpm test`. Critical CSS has its own unit test.
+- **Docs:** glossary (lazy rehashing, trickle migration), BRAND, SEO-AUDIT, CLAUDE.md, an "Import an existing user database" idea in Future scope.
+
 ---
 
 ## Lessons
@@ -480,7 +487,7 @@ Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in
   - Count the whole sign-up funnel (visit → sign-up → verified) once analytics exist; tagged links (`?ref=`) are counted since 6 Nov. If analytics are added, update the Privacy Policy, which now describes only the link counters.
   - Replace the placeholder pricing with real plans before taking payments, and build or drop the paid-plan features it lists (priority email help, the shop's name on login emails, early access).
   - Pick the email theme (Ember / Midnight / Warm) at `/dev/emails`, make it `DEFAULT_EMAIL_THEME`, delete the others, and send a real email to a Gmail inbox on a phone in dark mode to check it.
-  - Translate the app pages (sign-up, sign-in, dashboard), the form messages, the API's error messages and the emails into Hindi together, with a stored language per user, reviewed by a Hindi speaker; until then the language choice stops at the home page.
+  - ~~Translate the app into Hindi~~: Hindi was removed on 7 Nov 2026. Any future translation loads on demand, not in the home page's first-load bundle (LEARNINGS, Languages).
   - Verify `chiragdev.com` in Google Search Console and Bing Webmaster Tools (DNS TXT records cover every subdomain), submit `sitemap.xml`, request indexing, and check with Google's Rich Results Test [C10, C11]. Add an IndexNow ping to `deploy.sh` [C12].
   - Replace the Hostinger parked page on `chiragdev.com` with a portfolio that links to CKAuth [D02].
   - LCP is still ~2.2 s in the mobile lab [P02]: next steps are a smaller first-screen font load and a CDN [P09].
@@ -526,6 +533,11 @@ Larger directions beyond Next up, roughly in order of value. Each one says what 
 - **Webhooks.** Notify other apps of `user.created`, `user.verified` and `session.revoked`, signed with HMAC so they can prove the message came from CKAuth.
 - **CORS per registered app,** needed as soon as a frontend on another origin uses the API (see Known gaps in CLAUDE.md).
 - **Self-host kit.** The compose stack, edge proxy and setup script, packaged as a documented template for running your own copy.
+- **Import an existing user database.** Let a site that already has users move them to CKAuth without everyone signing up again. A `pnpm admin import <file>` command in `manage-users.ts` (the server-only CLI) reads a CSV or JSON export, with `--dry-run` printing what would happen first.
+  - **Passwords.** Existing bcrypt hashes (`$2a$`/`$2b$`, any cost) are copied as they are: `bcrypt.compare` already reads them, so those users sign in on day one. Other formats (Argon2, scrypt, PBKDF2, salted SHA) are stored in new `legacy_password_hash` and `legacy_password_algo` columns and checked by **lazy rehashing**: on the first successful sign-in, CKAuth verifies with the old algorithm, saves a bcrypt hash at `PASSWORD_HASH_ROUNDS` and clears the legacy columns in the same transaction. Unsalted MD5/SHA-1 hashes, or no hash at all, aren't trusted: those accounts get a "set your password" email through the existing reset flow, like admin invites.
+  - **Accounts.** Emails go through `emailModel` (trimmed, lowercased) and insert with `onConflictDoNothing`, so a duplicate or an existing CKAuth account is skipped and reported, never overwritten. Every import is `role: 'user'`, whatever the source says: admins stay made only out-of-band. The source's "verified" flag is kept only with `--trust-verified`; otherwise the first sign-in or reset verifies the inbox. Sessions aren't moved (everyone signs in once), and avatars are re-uploaded to ImageKit under random names rather than linked to the old host.
+  - **Records and privacy.** One `user_imported` audit event per account, in the insert's transaction, with the source name in `details`; the Privacy Policy gains a line on imported data. Batched inserts (about 1,000 rows each) keep a large import from holding one long transaction.
+  - **Later: trickle migration** for sites that can't export hashes: when an unknown email signs in, CKAuth checks the password against the old system's API once, creates the account on success, and the old system is switched off when the sign-ins stop.
 
 **Quality and operations**
 - **Automated tests.**
