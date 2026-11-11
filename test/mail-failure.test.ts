@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 
 import { db } from '../src/db/index.js'
 import { usersTable } from '../src/db/schema.js'
-import { Client, createUser, findUser, lastMailTo, resetDatabase, signIn, startApp, tokenFrom } from './helpers.js'
+import { Client, createUser, findUser, lastMailTo, resetDatabase, sha256, signIn, startApp, tokenFrom } from './helpers.js'
 
 const baseUrl = await startApp()
 
@@ -61,6 +61,17 @@ describe('a failed email never fails the request', () => {
     assert.equal((await client.post('/auth/change-email', {newEmail: 'moved@ckauth.test', password: user.password})).status, 200)
     const token = tokenFrom(lastMailTo('moved@ckauth.test'))
     assert.equal((await new Client(baseUrl).post(`/auth/confirm-email/${token}`)).status, 200)
+  })
+
+  test('changing and resetting a password (the "password was changed" notice)', async () => {
+    const user = await createUser({email: FAILING})
+    const client = await signIn(baseUrl, user)
+    assert.equal((await client.post('/auth/change-password', {currentPassword: user.password, newPassword: 'brand-new-password'})).status, 200)
+
+    // the reset link itself fails to send too, so the token is put in place directly
+    const token = 'a'.repeat(64)
+    await db.update(usersTable).set({resetPasswordToken: sha256(token), resetPasswordTokenExpiry: new Date(Date.now() + 60_000)}).where(eq(usersTable.email, FAILING))
+    assert.equal((await new Client(baseUrl).post(`/auth/reset-password/${token}`, {newPassword: 'another-password'})).status, 200)
   })
 
   test('the confirm link itself failing to send still answers the same', async () => {

@@ -7,6 +7,7 @@ import bcrypt from 'bcrypt'
 import { eq, sql } from 'drizzle-orm'
 
 import { createExpressApplication } from '../src/app/index.js'
+import { withAuditMaintenance } from '../src/app/auth/utils/audit.js'
 import { db } from '../src/db/index.js'
 import { auditEventsTable, referralVisitsTable, sessionsTable, usersTable } from '../src/db/schema.js'
 import { outbox } from '../src/utils/mail.js'
@@ -32,7 +33,8 @@ export async function startApp() {
 // a fresh slate for every test: no users, no mails. every table is named, and no CASCADE on purpose: if the database
 // holds tables this schema doesn't know (someone else's test database), postgres refuses instead of emptying them
 export async function resetDatabase() {
-  await db.execute(sql`truncate table ${auditEventsTable}, ${referralVisitsTable}, ${sessionsTable}, ${usersTable}`)
+  // the activity log refuses a truncate unless the transaction opts in (withAuditMaintenance)
+  await withAuditMaintenance((tx) => tx.execute(sql`truncate table ${auditEventsTable}, ${referralVisitsTable}, ${sessionsTable}, ${usersTable}`))
   outbox.length = 0
 }
 

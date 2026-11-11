@@ -436,6 +436,26 @@ New entries go at the bottom, under a dated heading.
 - **Brand guide:** `docs/BRAND.md` covers the name, the crest, colours, type, voice and taglines, imagery, every brand file with where it's used and how to upload it, and the email colours.
 - **Email theme picked: midnight,** over ember (cool grey) and warm (cream), after comparing two real emails in all three, light and dark. Its colours are the site's own (the dark card is `--card`, `#111827`), so an email looks like the product. The other two palettes are deleted; `emailThemes` stays a one-entry list, so `/dev/emails` can still compare a new candidate. A new test keeps the emails on the site's slate and card colours, proven to fail once.
 
+## 7 Nov 2026 · The activity log's missing events
+**In short:** every change to an account now shows in the activity log.
+
+- **Four new activity-log events:** `profile_updated` (one `true` per field sent, such as `{firstName: true}`, never the new value), `avatar_changed` (`removed` for a removal), `sessions_revoked` (`count`, and whether it was this device) and `email_change_requested`. These account changes wrote nothing, although CLAUDE.md says every one does. Each is written in the transaction that makes the change; the profile edit, device sign-outs and email request were single writes, so they moved into one. Removing a photo that's already gone, or "sign out other devices" with none, records nothing. An email request is recorded the same whether or not the new address is taken, and keeps no address, so the log can't be read as a list of who has an account. Sign-up stays unrecorded, as decided on 6 Nov.
+- **Why field names and not values:** the log is kept for a year and admins read it. A name change is a common sign of a takeover, so which field changed is worth keeping; the age or name itself isn't.
+- **Tests:** one per event in `test/activity.test.ts` (the profile one checks that only field names are kept), plus a rollback test for the profile edit; the device one proven to fail once by removing its write. Photo uploads can't be tested while ImageKit is off in the tests, so only removal is covered.
+- **Policy and docs:** the Privacy Policy's activity-log line lists the new events ("which fields, not what you typed"); `docs/API.md` has them in its actions table; the admin panel's filter has their labels.
+
+## 7 Nov 2026 · Hardening the activity log
+**In short:** the activity log can't be rewritten, can't be flooded, and a password change now tells the account owner.
+
+A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 800-63B found nine gaps; these went in now, the rest are in Next up.
+- **Append-only, in the database.** Three triggers on `audit_events` refuse every `UPDATE`, and refuse `DELETE`/`TRUNCATE` unless the transaction opted in with `set local ckauth.audit_maintenance = 'on'`, which only `withAuditMaintenance` does (pruning, `seed:activity --clear`, the tests' reset). `set local` ends with the transaction, so the opt-in can't leak onto a pooled connection. A bug or an injected query can no longer rewrite history. Older API images keep working: their pruning is refused and logged. Proven by dropping the triggers in a throwaway database and watching three tests fail.
+- **The API has its own database role, `ckauth_api`,** instead of the owner `ckauth` (a superuser in the Postgres image). It can read and write every table, but on `audit_events` only `SELECT` and `INSERT`, and not owning the table it can't drop the triggers. So a leaked API password or code running in the API container can add events but never remove one. Pruning moved into `prune_audit_events()`, a `SECURITY DEFINER` function with no arguments and the retention periods written in, so the API can delete only what was due. `ensure_api_role()` makes the role and its grants; `migrate.ts` runs it on every deploy (roles belong to the Postgres server, so a backup restored onto a new one gets the role back) and sets its password from the new `API_DB_PASSWORD`. Checked with tests that act as the role (what it may and may not do, proven by over-granting it in a throwaway database), a real run of every account flow and `manage-users` as the role on port 8081, and a `check-repo.js` rule that the compose file's API connects as `ckauth_api` (proven once).
+- **`PATCH /auth/me` is rate-limited** (30 per hour per user). Each saved edit now writes a row kept for a year, so without a limit one session could fill the table and bury the account's real history.
+- **`profile_updated` names only fields whose value changed,** compared against the row locked inside the transaction; saving the same name again records nothing. It used to name every field sent, which didn't match `docs/API.md`.
+- **"Your password was changed" email** after a password change or reset (not for an invited user's first password), with a reset link and never the password. Every other security change already mailed the owner. Sent after the commit, fire-and-forget, and covered by `mail-failure.test.ts`.
+- **Tests:** limit, no-op save, the notice (and when it isn't sent), the mail failing, and the append-only rules; each new check was broken once and failed. The `/dev/emails` test now compares its count with `emails.ts`, so a new email can't ship without a preview.
+- **Docs:** `docs/API.md` (limits, the notice, append-only), `docs/DEPLOYMENT.md` (removing events by hand), the glossary (trigger), the Privacy Policy (the new notice; records can't be edited) and CLAUDE.md.
+
 ---
 
 ## Lessons
@@ -445,6 +465,7 @@ Mistakes and the rules learned from them are kept topic by topic in [LEARNINGS.m
 Short-term work, roughly in order. Bracketed IDs such as [B01] point to tests in [docs/SEO-AUDIT.md](docs/SEO-AUDIT.md).
 
 - **Observability, next layer:** ship the logs off the VPS (Grafana Alloy → Grafana Cloud) with alerts on error rate and sign-in failures, plus an external uptime check, so a dead VPS still raises an alarm. See Future scope, "Observability".
+- **Activity log, the rest of the 7 Nov review:** (1) alerts on bursts of `sign_in_failed` and `admin_reauth_failed`, and on a new device followed by an email or password change, best done with the log shipping above; (2) record sign-in attempts for unknown emails, unverified sign-ins and non-admins calling `/admin/*`; (3) say which device `sessions_revoked` signed out, and keep the user agent on events; (4) show account owners their own activity on the dashboard; (5) decide whether logout and the 11th-device eviction count as events.
 - Delete the old `tests` branch and the 23 Oct stash, now that both are folded in. Watch the first CI run with the Postgres service.
 - **SEO phase 1:**
   - Deploy the general landing page and its search copy (27 Oct) [O01, O02]. Re-run the SEO audit against it: the page now targets "secure sign-in and user accounts for your website" [O03].

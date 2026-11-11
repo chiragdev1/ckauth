@@ -127,6 +127,11 @@ describe('per-user limits', () => {
     await assertLimit(5, () => client.post('/auth/upload-avatar', {}))
   })
 
+  test('profile edit: 30 per hour, since each one writes an activity-log row', async () => {
+    const client = await signIn(baseUrl, await createUser())
+    await assertLimit(30, attempt => client.patch('/auth/me', {firstName: `Name${attempt}`}))
+  })
+
   test('upload-avatar: 10 per hour', async () => {
     const client = await signIn(baseUrl, await createUser())
     await assertLimit(10, () => client.post('/auth/upload-avatar', {}))

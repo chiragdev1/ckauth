@@ -115,6 +115,25 @@ export const emails = {
     }}
   },
 
+  // after a password change or reset, so a change the owner didn't make doesn't go unnoticed: whoever made it already
+  // knew the old password or had the inbox, and the owner's other devices were just signed out without a word
+  passwordChanged(firstName: string, how: 'changed' | 'reset', resetUrl: string, when = new Date()): Email {
+    return {subject: `Your ${appName()} password was ${how}`, content: {
+      icon: 'reset', tone: 'alert',
+      title: `Your ${appName()} password was ${how}`,
+      preheader: `Your ${appName()} password was just ${how}, and other devices were signed out.`,
+      greeting: `Hi ${firstName},`,
+      paragraphs: [
+        how === 'changed'
+          ? `Your ${appName()} password was changed from a signed-in device (${when.toUTCString()}). Every other device was signed out.`
+          : `Your ${appName()} password was reset with a link sent to this address (${when.toUTCString()}). Every device was signed out.`,
+        `If this was you, there's nothing to do. If it wasn't, reset your password now: the link goes to this inbox, so it works even if someone else knows your password.`,
+      ],
+      button: {label: 'Reset your password', url: resetUrl},
+      footnote: `We send this every time your password changes. It never contains your password.`,
+    }}
+  },
+
   // to the new address: opening the link proves the inbox, and only then does the account's email change
   confirmEmailChange(firstName: string, confirmUrl: string, expiresInMinutes: number): Email {
     return {subject: `Confirm your new ${appName()} email`, content: {

@@ -62,7 +62,8 @@ describe('GET /dev/emails (development only)', () => {
     const list = await client.get('/dev/emails')
     assert.equal(list.status, 200)
     assert.deepEqual(list.body.data.themes, emailThemes)
-    assert.equal(list.body.data.emails.length, 11)
+    // every email in emails.ts has a preview, so a new one can't ship without being looked at
+    assert.equal(list.body.data.emails.length, Object.keys(emails).length)
 
     for(const theme of emailThemes) {
       const response = await fetch(`${baseUrl}/dev/emails/new-sign-in?theme=${theme}`)

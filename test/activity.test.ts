@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm'
 
 import { db } from '../src/db/index.js'
 import { auditEventsTable, usersTable } from '../src/db/schema.js'
-import { ACCOUNT_EVENT_RETENTION_DAYS, pruneAuditEvents, ROUTINE_EVENT_RETENTION_DAYS } from '../src/app/auth/utils/audit.js'
+import { ACCOUNT_EVENT_RETENTION_DAYS, pruneAuditEvents, ROUTINE_EVENT_RETENTION_DAYS, withAuditMaintenance } from '../src/app/auth/utils/audit.js'
 import { Client, createUser, lastMailTo, resetDatabase, signIn, signUp, startApp, tokenFrom } from './helpers.js'
 
 // the activity log: every action that changes an account writes one audit_events row, in the same transaction as the
@@ -116,6 +116,68 @@ describe('what gets recorded', () => {
     assert.deepEqual(byAction.user_deleted?.details, {email: 'invited@ckauth.test'})
   })
 
+  test('a profile edit', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    assert.equal((await client.patch('/auth/me', {firstName: 'Renamed', age: 41})).status, 200)
+
+    const [updated] = await events('profile_updated')
+    assert.equal(updated?.actorId, user.id)
+    assert.equal(updated?.targetId, user.id)
+    // field names only: neither the new name nor the age is kept
+    assert.deepEqual(updated?.details, {firstName: true, age: true})
+  })
+
+  test('a profile save that changes nothing records nothing, and only changed fields are named', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    assert.equal((await client.patch('/auth/me', {firstName: 'Test'})).status, 200)
+    assert.equal((await events('profile_updated')).filter(row => row.targetId === user.id).length, 0)
+
+    assert.equal((await client.patch('/auth/me', {firstName: 'Test', age: 52})).status, 200)
+    const recorded = (await events('profile_updated')).filter(row => row.targetId === user.id)
+    assert.deepEqual(recorded.map(row => row.details), [{age: true}])
+  })
+
+  test('removing a photo, but not removing one that is already gone', async () => {
+    const user = await createUser()
+    const client = await signIn(baseUrl, user)
+    // imagekit is off in the tests, so the photo is put in place directly; the upload path is covered by its catch
+    await db.update(usersTable).set({avatarUrl: 'https://ik.imagekit.io/test/a.png', avatarFileId: 'file-1'}).where(eq(usersTable.id, user.id))
+    await client.delete('/auth/avatar')
+    await client.delete('/auth/avatar')
+
+    const changes = await events('avatar_changed')
+    assert.deepEqual(changes.map(row => row.details), [{removed: true}])
+  })
+
+  test('signing out one device, the others, and nothing when there were none', async () => {
+    const user = await createUser()
+    const phone = await signIn(baseUrl, user)
+    const laptop = await signIn(baseUrl, user)
+    await signIn(baseUrl, user)
+    const phoneSession = (await laptop.get('/auth/sessions')).body.data.find((session: {current: boolean}) => !session.current)
+    assert.equal((await laptop.delete(`/auth/sessions/${phoneSession.id}`)).status, 200)
+    await laptop.delete('/auth/sessions')
+    await laptop.delete('/auth/sessions')
+    void phone
+
+    const revoked = await events('sessions_revoked')
+    assert.deepEqual(revoked.map(row => row.details), [{count: 1, current: false}, {count: 1, current: false}])
+  })
+
+  test('an email change request, recorded the same whether or not the new address is taken', async () => {
+    const user = await createUser()
+    const other = await createUser()
+    const client = await signIn(baseUrl, user)
+    await client.post('/auth/change-email', {newEmail: 'free@ckauth.test', password: user.password})
+    await client.post('/auth/change-email', {newEmail: other.email, password: user.password})
+
+    const requests = await events('email_change_requested')
+    assert.equal(requests.length, 2)
+    assert.deepEqual(requests.map(row => [row.actorId, row.details]), [[user.id, null], [user.id, null]])
+  })
+
   test('a refused action records nothing', async () => {
     const {admin, client} = await adminSession()
     const otherAdmin = await createUser({role: 'admin'})
@@ -138,6 +200,20 @@ describe('what gets recorded', () => {
     }
     // the old password still works, so the change rolled back
     assert.equal((await new Client(baseUrl).post('/auth/sign-in', {email: user.email, password: user.password})).status, 200)
+  })
+
+  // the same promise for the events added on 7 Nov, which moved single writes into transactions
+  test('a profile edit rolls back when its record cannot be written', async () => {
+    const user = await createUser({firstName: 'Original'})
+    const client = await signIn(baseUrl, user)
+    await db.execute(sql`alter table audit_events add constraint test_block check (action <> 'profile_updated')`)
+    try {
+      assert.equal((await client.patch('/auth/me', {firstName: 'Renamed'})).status, 500)
+    } finally {
+      await db.execute(sql`alter table audit_events drop constraint test_block`)
+    }
+    const [row] = await db.select({firstName: usersTable.firstName}).from(usersTable).where(eq(usersTable.id, user.id))
+    assert.equal(row?.firstName, 'Original')
   })
 })
 
@@ -237,5 +313,96 @@ describe('pruneAuditEvents', () => {
     assert.equal(await pruneAuditEvents(), 0)
     assert.equal((await db.select().from(auditEventsTable).where(eq(auditEventsTable.targetId, user.id))).length, 1)
     assert.ok(await db.select().from(usersTable).where(eq(usersTable.id, user.id)))
+  })
+})
+
+// the database refuses to rewrite history (drizzle/20261107063859_audit_events_append_only), whatever the code asks
+describe('the activity log is append-only', () => {
+  // drizzle wraps the postgres error; the trigger's message is on its cause
+  const refused = (error: any) => /append-only/.test(error?.cause?.message ?? error?.message ?? '')
+
+  async function oneEvent() {
+    const user = await createUser()
+    await signIn(baseUrl, user)
+    return user
+  }
+
+  test('an event can never be edited, even inside maintenance', async () => {
+    await oneEvent()
+    await assert.rejects(db.update(auditEventsTable).set({action: 'sign_in_failed'}), refused)
+    await assert.rejects(withAuditMaintenance((tx) => tx.update(auditEventsTable).set({ipAddress: null})), refused)
+  })
+
+  test('deleting or emptying the log is refused outside maintenance', async () => {
+    const user = await oneEvent()
+    await assert.rejects(db.delete(auditEventsTable).where(eq(auditEventsTable.targetId, user.id)), refused)
+    await assert.rejects(db.execute(sql`truncate table ${auditEventsTable}`), refused)
+    assert.equal((await events('sign_in')).length, 1)
+  })
+
+  test('the opt-in ends with its transaction, so it never carries over to the next query', async () => {
+    await oneEvent()
+    await withAuditMaintenance(async () => undefined)
+    await assert.rejects(db.delete(auditEventsTable), refused)
+  })
+})
+
+// production's api connects as ckauth_api (drizzle/20261107081824_api_database_role); these run a transaction as that role
+describe('the api database role', () => {
+  async function asApiRole<T>(work: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>) {
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`set local role ckauth_api`)
+      return await work(tx)
+    })
+  }
+  const denied = (error: any) => /permission denied|must be owner/.test(error?.cause?.message ?? error?.message ?? '')
+
+  test('can add and read events, and change the other tables', async () => {
+    const user = await createUser()
+    await asApiRole(async (tx) => {
+      await tx.insert(auditEventsTable).values({action: 'sign_in', source: 'api', targetId: user.id})
+      assert.equal((await tx.select().from(auditEventsTable)).length, 1)
+      await tx.update(usersTable).set({firstName: 'Renamed'}).where(eq(usersTable.id, user.id))
+      await tx.delete(usersTable).where(eq(usersTable.id, user.id))
+    })
+  })
+
+  test('can never edit, delete or empty the log, even with the maintenance opt-in, nor drop its guard', async () => {
+    await createUser().then(user => signIn(baseUrl, user))
+    const attempts = [
+      sql`update audit_events set ip_address = null`,
+      sql`delete from audit_events`,
+      sql`truncate table audit_events`,
+      sql`drop trigger audit_events_no_delete on audit_events`,
+      sql`alter table audit_events disable trigger all`,
+    ]
+    for(const attempt of attempts) {
+      await assert.rejects(asApiRole(async (tx) => {
+        await tx.execute(sql`set local ckauth.audit_maintenance = 'on'`)
+        await tx.execute(attempt)
+      }), denied, String(attempt.queryChunks))
+    }
+    assert.equal((await events('sign_in')).length, 1)
+  })
+
+  test('prunes only through prune_audit_events, which deletes only what is due and leaves nothing unlocked', async () => {
+    const day = 24 * 60 * 60 * 1000
+    await db.insert(auditEventsTable).values([
+      {action: 'sign_in', source: 'api', createdAt: new Date(Date.now() - (ROUTINE_EVENT_RETENTION_DAYS + 1) * day)},
+      {action: 'sign_in', source: 'api'},
+    ])
+    const deleted = await asApiRole(async (tx) => {
+      const result = await tx.execute<{deleted: number}>(sql`select prune_audit_events() as deleted`)
+      // the opt-in the function used is switched off again before it returns
+      const after = await tx.execute<{flag: string}>(sql`select current_setting('ckauth.audit_maintenance', true) as flag`)
+      assert.equal(after.rows[0]?.flag, 'off')
+      return Number(result.rows[0]?.deleted)
+    })
+    assert.equal(deleted, 1)
+    assert.equal((await events('sign_in')).length, 1)
+  })
+
+  test('cannot re-run its own grants', async () => {
+    await assert.rejects(asApiRole((tx) => tx.execute(sql`select ensure_api_role()`)), denied)
   })
 })

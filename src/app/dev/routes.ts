@@ -25,6 +25,7 @@ const samples: Record<string, () => Email> = {
   'invite': () => emails.invite('Ada', `${link('/reset-password')}&invite=1`, 72),
   'account-deleted': () => emails.accountDeleted('Ada', `${site}/privacy`, 'user'),
   'new-sign-in': () => emails.newSignIn('Ada', 'Chrome on Windows', '203.0.113.7', `${site}/dashboard#devices`, `${site}/forgot-password`),
+  'password-changed': () => emails.passwordChanged('Ada', 'changed', `${site}/forgot-password`),
   'confirm-email-change': () => emails.confirmEmailChange('Ada', link('/confirm-email'), 60),
   'email-change-requested': () => emails.emailChangeRequested('Ada', 'ada@newmail.example', `${site}/forgot-password`),
   'email-changed': () => emails.emailChanged('Ada', 'ada@newmail.example', `${site}/privacy`),

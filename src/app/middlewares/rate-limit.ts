@@ -107,6 +107,9 @@ export const rateLimits = {
   uploadAvatarPerUser: createRateLimiter({name: 'upload-avatar-user', windowMs: HOUR, limit: 10, key: userKey}),
   // sends two mails and checks the password, so every request counts, not only failures
   changeEmailPerUser: createRateLimiter({name: 'change-email-user', windowMs: HOUR, limit: 5, key: userKey}),
+  // each saved edit writes an activity-log row kept for a year, so without a cap one session could fill the table and bury
+  // the account's real history under it. far above what a person editing their name needs
+  updateProfilePerUser: createRateLimiter({name: 'update-profile-user', windowMs: HOUR, limit: 30, key: userKey}),
   confirmEmailChangePerIp: createRateLimiter({name: 'confirm-email-ip', windowMs: 15 * MINUTE, limit: 20}),
   // a bcrypt compare, like sign-in: only wrong passwords count
   deleteAccountPerUser: createRateLimiter({name: 'delete-account-user', windowMs: 15 * MINUTE, limit: 5, key: userKey, failuresOnly: true}),

@@ -11,6 +11,7 @@ import { like, sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { auditEventsTable, usersTable } from '../db/schema.js'
 import { auditActions, userRolesEnum, type AuditAction } from '../app/auth/utils/constants.js'
+import { withAuditMaintenance } from '../app/auth/utils/audit.js'
 
 const SEED_DOMAIN = 'seed.example.com'
 const DAY = 24 * 60 * 60 * 1000
@@ -47,7 +48,7 @@ function fakeIp() {
 }
 
 async function clear() {
-  const deletedEvents = await db.delete(auditEventsTable).where(sql`${auditEventsTable.details}->>'seed' = 'true'`).returning({id: auditEventsTable.id})
+  const deletedEvents = await withAuditMaintenance((tx) => tx.delete(auditEventsTable).where(sql`${auditEventsTable.details}->>'seed' = 'true'`).returning({id: auditEventsTable.id}))
   const deletedUsers = await db.delete(usersTable).where(like(usersTable.email, `%@${SEED_DOMAIN}`)).returning({id: usersTable.id})
   return {events: deletedEvents.length, users: deletedUsers.length}
 }

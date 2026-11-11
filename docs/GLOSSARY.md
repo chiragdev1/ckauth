@@ -150,6 +150,10 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Transaction.** A group of database changes that succeed or fail together.
 
+**Role.** A database account. Each role has its own password and its own rights on each table. CKAuth uses two: `ckauth` owns the database (migrations, backups), and `ckauth_api` is what the API connects as, with only the rights it needs. Giving each part only the rights it needs is called **least privilege**.
+
+**Trigger.** A function the database runs by itself before or after a change to a table. CKAuth uses triggers to make the activity log **append-only**: new events can be added, but existing ones can't be edited, and can be deleted only by the scheduled pruning.
+
 **Seed data.** Made-up records loaded into a development database so a page can be judged with realistic content. `pnpm seed:activity` adds six fake users and a month of activity events, and refuses to run in production.
 
 **Unique constraint.** A database rule that a column can't hold the same value twice, such as two accounts with one email.
