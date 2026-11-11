@@ -116,6 +116,8 @@ for(const name of ['index.html', 'app.html', ...assets.filter(name => /\.(js|css
   if(/(?:src|href)="http:\/\//.test(text)) failures.push(`${name} loads something over plain http`)
   // the dev-only email designs page (src/pages/dev-emails.tsx) talks to an api route production doesn't have
   if(text.includes('/api/dev/emails')) failures.push(`${name} ships the dev-only email designs page`)
+  // the consent screen preview (src/pages/dev-oauth-consent.tsx) shows sample apps and fake redirects
+  if(text.includes('Consent screen preview')) failures.push(`${name} ships the dev-only consent screen preview`)
 }
 
 // measure before naming a cause: when a budget is tight, these say which part grew (7 Nov 2026: the guess was the

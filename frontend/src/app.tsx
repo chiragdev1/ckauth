@@ -20,6 +20,7 @@ const ForgotPassword = lazy(() => import('./pages/forgot-password.tsx').then(mod
 // import.meta.env values in place, so a production build sees `false` and drops the page, while an imported constant
 // isn't folded across modules and would ship it
 const DevEmails = import.meta.env.DEV || import.meta.env.VITE_DESIGN_LAB === '1' ? lazy(() => import('./pages/dev-emails.tsx').then(module => ({ default: module.DevEmails }))) : null
+const DevOauthConsent = import.meta.env.DEV || import.meta.env.VITE_DESIGN_LAB === '1' ? lazy(() => import('./pages/dev-oauth-consent.tsx').then(module => ({ default: module.DevOauthConsent }))) : null
 const ConfirmEmail = lazy(() => import('./pages/confirm-email.tsx').then(module => ({ default: module.ConfirmEmail })))
 const ResetPassword = lazy(() => import('./pages/reset-password.tsx').then(module => ({ default: module.ResetPassword })))
 const Admin = lazy(() => import('./pages/admin.tsx').then(module => ({ default: module.Admin })))
@@ -62,6 +63,7 @@ export const routes: RouteObject[] = [
             ],
           },
           ...(DevEmails ? [{ path: '/dev/emails', element: <DevEmails /> }] : []),
+          ...(DevOauthConsent ? [{ path: '/dev/oauth-consent', element: <DevOauthConsent /> }] : []),
           { path: '*', element: <NotFound /> },
         ],
       },

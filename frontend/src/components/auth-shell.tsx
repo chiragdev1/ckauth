@@ -8,10 +8,12 @@ type AuthShellProps = {
   subtitle?: ReactNode
   children: ReactNode
   footer?: ReactNode
+  // a status pill in the card's top corner, e.g. the beta label on sign in with ckauth's pages
+  badge?: ReactNode
 }
 
 // every auth page: the form on a dossier card, with the safety panel beside it on wide screens
-export function AuthShell({ eyebrow, title, subtitle, children, footer }: AuthShellProps) {
+export function AuthShell({ eyebrow, title, subtitle, children, footer, badge }: AuthShellProps) {
   const heading = useRef<HTMLHeadingElement>(null)
   const shownTitle = useRef(title)
 
@@ -26,11 +28,19 @@ export function AuthShell({ eyebrow, title, subtitle, children, footer }: AuthSh
   return (
     <div className="relative flex flex-1">
       <SafetyPanel />
-      <div className="relative flex flex-1 items-start justify-center px-4 py-10 sm:items-center sm:py-16">
+      <div className="relative flex min-w-0 flex-1 items-start justify-center px-4 py-10 sm:items-center sm:py-16">
         <div aria-hidden className="bg-wall pointer-events-none absolute inset-0 lg:hidden" />
-        <div className="relative w-full max-w-[26rem] animate-in fade-in slide-in-from-bottom-2 duration-500">
+        {/* min-w-0 here and on the column around it: a flex item won't shrink below its widest unbreakable content
+            (a one-line email, a row of tiles), so without both that content widens the card past a 320 px screen
+            instead of truncating inside it */}
+        <div className="relative w-full max-w-[26rem] min-w-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="dossier rounded-2xl border bg-card/95 p-6 backdrop-blur sm:p-8">
-            <p className="eyebrow">{eyebrow}</p>
+            {badge ? (
+              <div className="flex items-start justify-between gap-3">
+                <p className="eyebrow">{eyebrow}</p>
+                {badge}
+              </div>
+            ) : <p className="eyebrow">{eyebrow}</p>}
             <h1 ref={heading} tabIndex={-1} className="font-display mt-2 text-3xl font-semibold outline-none">{title}</h1>
             {subtitle && <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>}
             <div className="mt-7">{children}</div>

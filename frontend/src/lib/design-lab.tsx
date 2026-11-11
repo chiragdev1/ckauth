@@ -11,6 +11,10 @@ type LookOption = { id: string, name: string, blurb: string, swatch: string[] }
 // the first entry is the shipped design; the panel only appears once there is something to compare it with
 export const looks: LookOption[] = [
   { id: 'guard', name: 'Guard', blurb: 'Current · slate and ember', swatch: ['#c2410c', '#0f172a', '#f7f8fb'] },
+  // kept on purpose (user's call, 6 Nov 2026): alternatives for the sign in with ckauth consent screen only.
+  // they change no tokens, just the consent markup (components/oauth-consent.tsx); every other page renders as guard
+  { id: 'consent-handshake', name: 'Consent: handshake', blurb: 'Two tiles, CKAuth ⇄ app · /dev/oauth-consent', swatch: ['#c2410c', '#0f172a', '#f7f8fb'] },
+  { id: 'consent-sentence', name: 'Consent: sentence', blurb: 'One line, "Continue as …" · /dev/oauth-consent', swatch: ['#c2410c', '#0f172a', '#f7f8fb'] },
 ]
 
 const STORAGE_KEY = 'ckauth-look'
