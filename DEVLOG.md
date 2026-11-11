@@ -478,6 +478,7 @@ A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 
 - **ROADMAP.md** created from this file's "Next up" and "Future scope", so DEVLOG is history only. Eight finished items were struck after checking the code.
 - **README:** a "Start here, by what you want to do" table; the stale test count ("103 tests") and an unsafe single-file `tsx --test` command replaced by `pnpm test:only`.
 - **Docs page schedule:** `pnpm docs:artifact` prints when the docs page was last published and when the next republish is due (3-day gap), from a local, ignored `published.json`; `--published` records a publish. The `/ship` skill uses it.
+- **Docs page rule is change-based:** `--published` also saves a copy of every doc (`published-docs.json`, local, ignored). Each build diffs the docs against it and prints "up to date", "republish now" or "republish due <date>", listing each changed doc with lines added and removed. A change to a contract doc (README.md or docs/API.md, what other developers build against) means republish now; anything else waits for the 3-day gap so small edits batch together.
 
 ---
 
