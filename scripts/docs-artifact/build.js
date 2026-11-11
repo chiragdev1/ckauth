@@ -22,7 +22,6 @@ const docs = [
   { key: 'glossary', path: 'docs/GLOSSARY.md', title: 'Glossary', group: 'Reference', blurb: 'Every term the docs use' },
   { key: 'brand', path: 'docs/BRAND.md', title: 'Brand guide', group: 'Reference', blurb: 'Name, crest, colours, voice and brand files' },
   { key: 'seo-audit', path: 'docs/SEO-AUDIT.md', title: 'SEO audit', group: 'Reference', blurb: '64 strict tests and the traffic plan' },
-  { key: 'market', path: 'docs/MARKET.md', title: 'Market review', group: 'Reference', blurb: 'Rating, competitors, pricing and go-to-market' },
   { key: 'devlog', path: 'DEVLOG.md', title: 'Dev log', group: 'Journey', blurb: 'What changed, and when' },
   { key: 'learnings', path: 'LEARNINGS.md', title: 'Learnings', group: 'Journey', blurb: 'Mistakes and the rules they taught' },
 ]
@@ -31,8 +30,21 @@ const docs = [
 const links = [
   { title: 'OpenID Connect plan', url: 'https://claude.ai/artifact/MxN3STxRZL6EYgWA1rVWBC', note: 'Sign in with CKAuth: flow, tokens, 33 rules' },
   { title: 'SEO audit, interactive', url: 'https://claude.ai/artifact/MQQ63c5zJywVQqwcsCznbF', note: 'The 21 Oct audit, fixes to 7 Nov' },
-  { title: 'Market review', url: 'https://claude.ai/artifact/6vDs2y172qiJSbz8nXnmRx', note: 'Rating, competitors, pricing, go-to-market' },
 ]
+
+// docs kept on one machine only (ignored by git, never pushed) join the bundle through an optional, untracked
+// local-docs.json: {"docs": [{...a docs entry, "after": "<key>"}], "links": [...]}. a fresh clone has neither
+// the file nor the docs, so it builds the public set
+const localList = join(here, 'local-docs.json')
+if(existsSync(localList)) {
+  const local = JSON.parse(readFileSync(localList, 'utf8'))
+  for(const {after, ...doc} of local.docs ?? []) {
+    if(!existsSync(join(root, doc.path))) continue
+    const at = docs.findIndex(d => d.key === after)
+    docs.splice(at === -1 ? docs.length : at + 1, 0, doc)
+  }
+  links.push(...(local.links ?? []))
+}
 
 function git(...args) {
   try {

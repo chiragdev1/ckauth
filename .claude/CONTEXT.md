@@ -288,7 +288,6 @@ docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
 | OIDC build plan and checklist | `TASKS.md` (Active: housekeeping → before OIDC code → build API → testing) |
 | A term | `docs/GLOSSARY.md` (sections: web 21, security 70, OIDC 146, database 216, server 258, frontend 312, hosting 352, logs 405, email 435, SEO 449, legal 534) |
 | SEO scores, tests, plan | `docs/SEO-AUDIT.md` (tests 49, plan 166) |
-| Rating, competitors, pricing, go-to-market | `docs/MARKET.md` (11 Nov 2026 snapshot) |
 | Name, colours, voice, brand files | `docs/BRAND.md` (colours 40, files 87, emails 120) |
 | Why something is the way it is | `LEARNINGS.md` (passwords 13, tokens 22, enumeration 39, concurrency 65, uploads 76, tooling 84, testing 127, performance 176, logging 206, SEO 215, frontend UX 237, process 265) |
 | When something changed; what's next | `DEVLOG.md` (dated entries, "Next up" 444, "Future scope" 482) |

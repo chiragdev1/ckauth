@@ -559,7 +559,7 @@ Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps 
 
 **DPDP Act.** India's Digital Personal Data Protection Act, 2023: the law on how services handle Indians' personal data. It gives people the right to see, correct and erase their data and to complain to the Data Protection Board of India.
 
-**MAU (monthly active users).** The number of different users who sign in or otherwise use an app in a calendar month. Most auth providers price by it. Clerk counts *monthly retained users* instead, which leaves out people who sign up and never come back. See the [market review](MARKET.md#the-competition).
+**MAU (monthly active users).** The number of different users who sign in or otherwise use an app in a calendar month. Most auth providers price by it. Clerk counts *monthly retained users* instead, which leaves out people who sign up and never come back.
 
 **Free tier (freemium).** A plan that costs nothing up to a limit, so people can try a product and pay only once they grow. The limits decide what pushes someone to pay.
 
@@ -573,7 +573,7 @@ Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps 
 
 **SOC 2.** An independent audit of how a company protects customer data, common in the US. Larger customers often ask for a SOC 2 report before buying.
 
-**Unit economics.** What one unit of a business, such as one customer, costs and earns. It shows whether each customer makes money before counting the fixed bills. See the [market review](MARKET.md#unit-economics).
+**Unit economics.** What one unit of a business, such as one customer, costs and earns. It shows whether each customer makes money before counting the fixed bills.
 
 **Fixed and variable costs.** A *fixed cost* is paid whatever the number of customers, like the server; a *variable cost* grows with use, like each email sent or each payment's fee.
 
@@ -585,7 +585,7 @@ Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps 
 
 **LUT (Letter of Undertaking).** A yearly form on India's GST portal that lets a registered business sell services abroad at 0% GST instead of paying the tax and claiming it back.
 
-**Uptime and "the nines".** The share of time a service is reachable, usually written as a number of nines: 99.9% ("three nines") allows about 44 minutes of downtime a month, 99.99% about 4. Each extra nine cuts the allowed downtime tenfold. See the [market review](MARKET.md#servers-speed-and-uptime).
+**Uptime and "the nines".** The share of time a service is reachable, usually written as a number of nines: 99.9% ("three nines") allows about 44 minutes of downtime a month, 99.99% about 4. Each extra nine cuts the allowed downtime tenfold.
 
 **Vertical and horizontal scaling.** *Vertical* means a bigger server (more CPU and memory); *horizontal* means more servers sharing the work. Only horizontal scaling lets a service survive one server dying.
 
