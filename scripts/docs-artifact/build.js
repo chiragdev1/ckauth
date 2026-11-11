@@ -18,17 +18,20 @@ const docs = [
   { key: 'conventions', path: 'CLAUDE.md', title: 'Conventions', group: 'Build', blurb: 'Layout, code style and security rules' },
   { key: 'deployment', path: 'docs/DEPLOYMENT.md', title: 'Deployment', group: 'Run', blurb: 'From an empty VPS to live, plus operations' },
   { key: 'vps-access', path: 'docs/VPS-ACCESS.md', title: 'VPS access', group: 'Run', blurb: 'SSH keys, GitHub and the deploy user' },
+  { key: 'oidc', path: 'docs/OIDC.md', title: 'Sign in with CKAuth', group: 'Build', blurb: 'The OpenID Connect design, from analogy to security rules' },
   { key: 'glossary', path: 'docs/GLOSSARY.md', title: 'Glossary', group: 'Reference', blurb: 'Every term the docs use' },
   { key: 'brand', path: 'docs/BRAND.md', title: 'Brand guide', group: 'Reference', blurb: 'Name, crest, colours, voice and brand files' },
   { key: 'seo-audit', path: 'docs/SEO-AUDIT.md', title: 'SEO audit', group: 'Reference', blurb: '64 strict tests and the traffic plan' },
+  { key: 'market', path: 'docs/MARKET.md', title: 'Market review', group: 'Reference', blurb: 'Rating, competitors, pricing and go-to-market' },
   { key: 'devlog', path: 'DEVLOG.md', title: 'Dev log', group: 'Journey', blurb: 'What changed, and when' },
   { key: 'learnings', path: 'LEARNINGS.md', title: 'Learnings', group: 'Journey', blurb: 'Mistakes and the rules they taught' },
 ]
 
 // plans and reports that live as their own artifacts
 const links = [
-  { title: 'OpenID Connect plan', url: 'https://claude.ai/artifact/MxN3STxRZL6EYgWA1rVWBC', note: 'Provider role + Google/GitHub sign-in' },
-  { title: 'SEO audit, interactive', url: 'https://claude.ai/artifact/MQQ63c5zJywVQqwcsCznbF', note: 'The 21 Oct audit as a page' },
+  { title: 'OpenID Connect plan', url: 'https://claude.ai/artifact/MxN3STxRZL6EYgWA1rVWBC', note: 'Sign in with CKAuth: flow, tokens, 33 rules' },
+  { title: 'SEO audit, interactive', url: 'https://claude.ai/artifact/MQQ63c5zJywVQqwcsCznbF', note: 'The 21 Oct audit, fixes to 7 Nov' },
+  { title: 'Market review', url: 'https://claude.ai/artifact/6vDs2y172qiJSbz8nXnmRx', note: 'Rating, competitors, pricing, go-to-market' },
 ]
 
 function git(...args) {

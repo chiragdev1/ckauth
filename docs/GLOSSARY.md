@@ -6,6 +6,7 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 - [Web basics](#web-basics)
 - [Sign-in and security](#sign-in-and-security)
+- [Sign in with CKAuth (OpenID Connect)](#sign-in-with-ckauth-openid-connect)
 - [Database](#database)
 - [Server and performance](#server-and-performance)
 - [Frontend](#frontend)
@@ -136,9 +137,81 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **TOTP.** The six-digit codes from an authenticator app, used for two-factor sign-in.
 
+**MFA (multi-factor authentication).** Proving who you are with two different things, such as a password plus a code from an app on your phone, so a stolen password alone isn't enough. CKAuth doesn't have it yet; sudo mode is the interim protection for admin actions.
+
 **Passkey (WebAuthn).** Signing in with the device's fingerprint, face or PIN instead of a password. Passkeys resist phishing.
 
-**OpenID Connect (OIDC) / PKCE.** The standard protocol behind "Sign in with Google". PKCE is the part that protects the exchange in browser and mobile apps.
+**OpenID Connect (OIDC) / PKCE.** The standard protocol behind "Sign in with Google". PKCE is the part that protects the exchange in browser and mobile apps. CKAuth's planned use of it, and every term that comes with it, are in [Sign in with CKAuth](#sign-in-with-ckauth-openid-connect) below.
+
+---
+
+## Sign in with CKAuth (OpenID Connect)
+
+Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps sign their users in through CKAuth. The design explains the whole flow with an analogy first.
+
+**OAuth 2.0.** The standard for letting an app act on a user's behalf with a limited permission (a token) instead of their password. On its own it says nothing about *who* the user is.
+
+**OpenID Provider (OP) / authorization server.** The service that signs users in and issues tokens. With this feature, CKAuth.
+
+**Client / relying party (RP).** An app that sends its users to the provider to sign in and relies on the answer, for example a shop's website.
+
+**Confidential client / public client.** A confidential client has a server that can keep a secret. A public client (a single-page app or mobile app) runs on the user's device, so anything in it can be read; it relies on PKCE instead of a secret.
+
+**Client registration.** Telling the provider about an app: its name, redirect URIs and allowed scopes. It returns a `client_id` and, for confidential clients, a `client_secret`. In CKAuth, only admins can do it.
+
+**`client_id` / `client_secret`.** The app's public identifier and its password. The secret is shown once and stored only as a hash.
+
+**Redirect URI.** The exact address the provider sends the user back to after sign-in. Compared character for character, because a loose match lets an attacker receive the user's code.
+
+**Open redirect.** A site that will send visitors to any address named in a link. Attackers use one to make a phishing link look like it belongs to a trusted site.
+
+**Scope.** A named permission the app asks for, such as `email` or `profile`. `openid` is the scope that makes a request OIDC; `offline_access` asks for a refresh token.
+
+**Consent.** The screen where the user approves what an app asked for. CKAuth remembers the answer per app.
+
+**Authorization code.** A one-time, 60-second value the provider gives the browser after sign-in. It's useless alone: the app's server swaps it, with proof, for tokens.
+
+**Front channel / back channel.** The front channel is the browser travelling between sites (redirects), which anything on the device can see. The back channel is a direct server-to-server request, which the browser never sees. Tokens only travel on the back channel.
+
+**`state`.** A random value the app sends with the request and checks when the user comes back, so an attacker can't make the user's browser finish a sign-in the attacker started (a form of CSRF).
+
+**`nonce`.** A random "number used once" that the app sends and the provider copies into the ID token, so an old token can't be replayed.
+
+**Replay attack.** Capturing something valid, such as a token, and sending it again later to be accepted a second time.
+
+**`code_verifier` / `code_challenge`.** The two halves of PKCE. The verifier is a random secret the app keeps; the challenge is its SHA-256 hash, sent at the start. To redeem the code, the app must show the verifier, which an attacker who stole the code doesn't have. `S256` names the hash method.
+
+**ID token.** A signed JWT from the provider that says who the user is. Meant for the app to read once, at sign-in.
+
+**Bearer token.** A token that works for whoever holds it, like cash. OIDC access tokens are bearer tokens, so they're short-lived.
+
+**`iss`, `sub`, `aud`, `exp`, `iat`, `auth_time`.** The standard claims in an ID token. `iss` (issuer) is who made it; `sub` (subject) is which user; `aud` (audience) is which app it's for; `exp` is when it expires; `iat` is when it was issued; `auth_time` is when the user last typed their password. An app must check `iss`, `aud`, `exp` and `nonce`, plus the signature, before trusting a token.
+
+**`typ`.** A JWT header field naming the kind of token: `JWT` for ID tokens, `at+jwt` for access tokens. Different values stop one kind being accepted as the other.
+
+**Pairwise subject identifier.** A user ID that's different for each app (each *sector*: the host name of an app's redirect URIs), so two apps can't compare user lists to find people they share.
+
+**Single sign-on (SSO).** Signing in once and being signed in to many apps. With OIDC, it works because the provider remembers your session.
+
+**Asymmetric signing (ES256 / RS256).** Signing with a private key that only the provider has, and checking with a public key anyone can have. ES256 uses elliptic curves, RS256 uses RSA. CKAuth's own session tokens use **HS256**, a single shared secret that both signs and checks; that's fine inside one server but can't be handed to other apps.
+
+**Algorithm confusion.** An attack on verifiers that let the token choose its own algorithm: the attacker signs an HS256 token using the public key as if it were the shared secret. Prevented by always naming the accepted algorithm.
+
+**JWKS (JSON Web Key Set).** The provider's public keys, published at `/.well-known/jwks.json`. Each key has a **`kid`** (key ID), so keys can be replaced without breaking tokens that are still valid.
+
+**Discovery document.** A JSON file at `/.well-known/openid-configuration` listing a provider's endpoints and options, so a client library can set itself up from the issuer's address alone.
+
+**Userinfo endpoint.** An endpoint that returns the user's profile when called with an access token.
+
+**Mix-up attack.** An attack on apps that use several providers: a malicious provider tricks the app into sending it a code issued by another provider. Prevented by the provider adding `iss` to its redirect back to the app.
+
+**Clickjacking.** Hiding a real button (such as "Allow") under a fake page inside an invisible frame, so the user clicks it without knowing. Prevented by never allowing the page in a frame.
+
+**Revocation.** Cancelling a token before it expires.
+
+**OpenID conformance suite.** The OpenID Foundation's free test tool that checks a provider against the standard. Passing it is how providers show they're compliant (and is required for OpenID certification).
+
+**PAR, DPoP.** Optional extras for higher security. PAR (Pushed Authorization Requests) sends the sign-in request over the back channel first, so the browser can't tamper with it. DPoP ties a token to a key the app holds, so a stolen token is useless on its own.
 
 ---
 
@@ -485,3 +558,40 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 **Data processor.** A company that handles personal data on another company's behalf, such as Resend sending CKAuth's emails or ImageKit storing its photos.
 
 **DPDP Act.** India's Digital Personal Data Protection Act, 2023: the law on how services handle Indians' personal data. It gives people the right to see, correct and erase their data and to complain to the Data Protection Board of India.
+
+**MAU (monthly active users).** The number of different users who sign in or otherwise use an app in a calendar month. Most auth providers price by it. Clerk counts *monthly retained users* instead, which leaves out people who sign up and never come back. See the [market review](MARKET.md#the-competition).
+
+**Free tier (freemium).** A plan that costs nothing up to a limit, so people can try a product and pay only once they grow. The limits decide what pushes someone to pay.
+
+**Activation.** The moment a new user gets real value from a product, not just an account. For CKAuth it's a website connected and its first user signed in through CKAuth; a sign-up that never connects a site hasn't activated.
+
+**SLA (service-level agreement).** A written promise about how reliable a service will be, such as "up 99.9% of the month", usually with refunds when it isn't. Businesses often require one before trusting a provider with sign-in.
+
+**SSO tax.** The practice of reserving single sign-on, or other basic security features, for the most expensive plans. It's widely criticised, because it makes being safe a luxury.
+
+**SAML.** An older single sign-on standard, built on XML, that large companies use to let staff sign in to work apps with their company account. Enterprise buyers often expect it alongside OIDC.
+
+**SOC 2.** An independent audit of how a company protects customer data, common in the US. Larger customers often ask for a SOC 2 report before buying.
+
+**Unit economics.** What one unit of a business, such as one customer, costs and earns. It shows whether each customer makes money before counting the fixed bills. See the [market review](MARKET.md#unit-economics).
+
+**Fixed and variable costs.** A *fixed cost* is paid whatever the number of customers, like the server; a *variable cost* grows with use, like each email sent or each payment's fee.
+
+**Contribution.** A customer's price minus the variable costs of serving them: what's left over to pay the fixed costs.
+
+**Break-even.** The point where total contribution equals the fixed costs, usually stated as a number of customers. Below it the business loses money each month; above it, it makes some.
+
+**GST (Goods and Services Tax).** India's tax on sales, 18% for software services. A service business must register once its yearly turnover passes ₹20 lakh, and may register earlier.
+
+**LUT (Letter of Undertaking).** A yearly form on India's GST portal that lets a registered business sell services abroad at 0% GST instead of paying the tax and claiming it back.
+
+**Uptime and "the nines".** The share of time a service is reachable, usually written as a number of nines: 99.9% ("three nines") allows about 44 minutes of downtime a month, 99.99% about 4. Each extra nine cuts the allowed downtime tenfold. See the [market review](MARKET.md#servers-speed-and-uptime).
+
+**Vertical and horizontal scaling.** *Vertical* means a bigger server (more CPU and memory); *horizontal* means more servers sharing the work. Only horizontal scaling lets a service survive one server dying.
+
+**Failover.** Switching traffic to a standby server when the main one fails, either by hand or automatically through a health-checked load balancer. In an *active-passive* set-up only the main server serves until then; in *active-active* both serve all the time.
+
+**Database replication (streaming).** A second Postgres server receiving every change from the main one as it happens, so it holds an up-to-date copy and can take over after a failover.
+
+**Zero-downtime deploy.** Releasing a new version without any moment where the service is unreachable: the new copy starts and passes its health check before the old one stops.
+
