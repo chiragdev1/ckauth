@@ -13,6 +13,7 @@ The product is **CKAuth**, at `https://ckauth.chiragdev.com`. `frontend/` holds 
 
 - Human docs: `README.md` (setup), `docs/API.md` (endpoint contract), `docs/DEPLOYMENT.md` (production), `docs/SEO-AUDIT.md` (strict SEO/traffic tests, scores and the traffic plan), `docs/GLOSSARY.md` (every term the docs use), `docs/BRAND.md` (name, crest, colours, voice, every brand file and where it's used). Docs are written for beginners but stay professional: keep the technical term and explain it on first use, and add new terms to the glossary
 - Project history: `DEVLOG.md` (timeline), `LEARNINGS.md` (mistakes → rules)
+- **Codebase index for AI assistants:** `.claude/CONTEXT.md`. Read the section you need before searching: endpoint → handler → limiter → model → audit → mail → frontend → test, the files each kind of change touches, and what's stale or in progress. Update it when you add an endpoint, table, route or check
 
 ## Commands
 

@@ -463,6 +463,12 @@ A review of the new events against OWASP's logging guidance, NIST SP 800-92 and 
 - **Tests:** a quiet reporter (one summary line when everything passes, full detail for failures; `CI=1` gives the full list) and `pnpm test:only <names>` to run chosen files with the same environment and database as `pnpm test`. Critical CSS has its own unit test.
 - **Docs:** glossary (lazy rehashing, trickle migration), BRAND, SEO-AUDIT, CLAUDE.md, an "Import an existing user database" idea in Future scope.
 
+## 7 Nov 2026 · A codebase index
+**In short:** AI assistants get a map of the code instead of searching it.
+
+- **The index:** `.claude/CONTEXT.md` lists, for each endpoint, its handler, rate limits, model, audit event, emails, frontend caller, test and `docs/API.md` section, plus "change recipes" naming every file one kind of change touches, and what's in progress or stale. The first draft was a plain file list; tried on five real tasks, it found the right files for none of them, because the slow part is finding everything one change touches. CLAUDE.md points to it, and `check-repo.js` warns when routes, the schema, `app.tsx`, the audit actions, the rate limits or the checks change without it (proven once by moving the file away).
+- **The activity log's missing events** went out on their own branch first (`fix/audit-events`, see its entry); the index's audit column already lists them. The glossary's Devanagari and `lang` entries now say Hindi was removed.
+
 ---
 
 ## Lessons
