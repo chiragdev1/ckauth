@@ -30,6 +30,8 @@ describe('GET /auth/me (authenticateToken)', () => {
       jwt.sign({something: 'else'}, ACCESS_SECRET),
       // signed correctly, but from before sessions existed: no session id
       jwt.sign({userId: user.id}, ACCESS_SECRET),
+      // a real session and the right secret, but HS512: only the algorithm we sign with is accepted
+      jwt.sign(jwt.decode(valid) as object, ACCESS_SECRET, {algorithm: 'HS512'}),
     ]
     for(const token of forged) {
       const client = new Client(baseUrl)

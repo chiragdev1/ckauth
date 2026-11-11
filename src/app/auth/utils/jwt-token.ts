@@ -9,13 +9,13 @@ dotenv.config()
 // jwtid makes every token unique, even two issued for the same user in the same second
 export function generateAccessToken(payload: object) {
   const secret = process.env.ACCESS_TOKEN_SECRET_KEY as string
-  const token = jwt.sign(payload, secret, { expiresIn: process.env.ACCESS_TOKEN_EXPIRY as NonNullable<SignOptions['expiresIn']>, jwtid: crypto.randomUUID() })
+  const token = jwt.sign(payload, secret, { algorithm: 'HS256', expiresIn: process.env.ACCESS_TOKEN_EXPIRY as NonNullable<SignOptions['expiresIn']>, jwtid: crypto.randomUUID() })
   return token
 }
 
 export function generateRefreshToken(payload: object) {
   const secret = process.env.REFRESH_TOKEN_SECRET_KEY as string
-  const token = jwt.sign(payload, secret, { expiresIn: process.env.REFRESH_TOKEN_EXPIRY as NonNullable<SignOptions['expiresIn']>, jwtid: crypto.randomUUID() })
+  const token = jwt.sign(payload, secret, { algorithm: 'HS256', expiresIn: process.env.REFRESH_TOKEN_EXPIRY as NonNullable<SignOptions['expiresIn']>, jwtid: crypto.randomUUID() })
   return token
 }
 
@@ -34,7 +34,8 @@ export function verifyRefreshToken(token: string) {
 
   let payload: string | jwt.JwtPayload
   try {
-    payload = jwt.verify(token, secret)
+    // named, not inferred (see middleware.ts): only the algorithm we sign with is accepted
+    payload = jwt.verify(token, secret, {algorithms: ['HS256']})
   } catch {
     throw ApiError.unauthorized("Invalid or expired refresh token")
   }

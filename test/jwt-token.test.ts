@@ -59,6 +59,8 @@ describe('verifyRefreshToken', () => {
     assertUnauthorized(() => verifyRefreshToken(jwt.sign({userId: 'u1'}, REFRESH_SECRET, {expiresIn: '-1s'})))
     assertUnauthorized(() => verifyRefreshToken(`${refresh.slice(0, -2)}xx`))
     assertUnauthorized(() => verifyRefreshToken(jwt.sign({foo: 'bar'}, REFRESH_SECRET)))
+    // the right secret but another hs algorithm: without the pin, jsonwebtoken accepts any hs algorithm for a string key
+    assertUnauthorized(() => verifyRefreshToken(jwt.sign({userId: 'u1'}, REFRESH_SECRET, {algorithm: 'HS512'})))
     assertUnauthorized(() => verifyRefreshToken('not-a-jwt'))
   })
 })
