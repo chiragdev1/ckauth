@@ -4,6 +4,8 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { findOidcFlags, scopeOf } from './checks/oidc-flags.js'
+
 const failures = []
 const warnings = []
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' })
@@ -107,7 +109,7 @@ const limiters = new Map([...limiterSource.matchAll(/^\s+(\w+): createRateLimite
   key: keyKinds[options.match(/key: (\w+)/)?.[1] ?? 'ipKey'],
   failuresOnly: /failuresOnly: true/.test(options),
 }]))
-const mounts = Object.fromEntries([...readFileSync('src/app/index.ts', 'utf8').matchAll(/app\.use\('(\/[\w.-]+)', (\w+)\)/g)].map(([, prefix, router]) => [router, prefix]))
+const mounts = Object.fromEntries([...readFileSync('src/app/index.ts', 'utf8').matchAll(/app\.use\('(\/[\w.-]+)', (?:\w+, )*(\w+Router)\)/g)].map(([, prefix, router]) => [router, prefix]))
 const describeLimit = ({window, limit, key, failuresOnly}) => `${limit}/${window}/${key}${failuresOnly ? '/failures' : ''}`
 const codeLimits = new Set()
 let limiterUses = 0
@@ -137,6 +139,19 @@ if(limiterUses !== limiterUsesRead) failures.push(`routes.ts files use rateLimit
 if(!codeLimits.size || !docLimits.size) failures.push(`rate-limit check read ${codeLimits.size} limits from the code and ${docLimits.size} from docs/API.md: a parser no longer matches`)
 for(const entry of codeLimits) if(!docLimits.has(entry)) failures.push(`docs/API.md rate-limit table is missing or wrong for: ${entry} (limit/window/key from the code)`)
 for(const entry of docLimits) if(!codeLimits.has(entry)) failures.push(`docs/API.md rate-limit table lists ${entry}, which the code doesn't have`)
+
+// docs/OIDC.md rule 27: no trusted, first-party or skip-consent flag, in the schema or in the code. the detector and
+// its scope are in checks/oidc-flags.js, with its own tests (oidc-flags.test.js) for what it must and mustn't catch
+const rule27Files = committable.filter(file => scopeOf(file) && existsSync(file))
+for(const file of rule27Files) {
+  for(const {line, name, reason} of findOidcFlags(file, readFileSync(file, 'utf8'))) {
+    failures.push(`${file}:${line}: "${name}" ${reason}. No app may skip consent, PKCE, the exact redirect match, scope limits or pairwise ids (docs/OIDC.md, rule 27)`)
+  }
+}
+// an empty scope would pass forever without checking anything: a moved folder or renamed schema must fail here
+if(!rule27Files.some(file => file.startsWith('src/app/oidc/')) || !rule27Files.includes('src/db/schema.ts')) {
+  failures.push('rule 27 check no longer reads src/app/oidc/ or src/db/schema.ts: fix scopeOf in scripts/checks/oidc-flags.js')
+}
 
 // the web Caddyfile's @app list must match the routes in app.tsx, or a route gets a 404 (or a noindex goes missing)
 // /dev/… pages are development only (frontend/scripts/check-dist.js fails a build that ships one), so caddy never serves them

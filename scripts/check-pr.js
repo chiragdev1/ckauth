@@ -4,6 +4,9 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+
+import { checkProofNumbers } from './checks/proof-numbers.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -30,7 +33,13 @@ const checks = [
   { name: 'api: unused files, exports and dependencies (knip)', run: command('pnpm', ['exec', 'knip', '--no-progress']) },
   { name: 'api: known vulnerabilities', run: command('pnpm', ['audit', '--prod', '--audit-level', 'moderate']) },
   { name: 'tests: type check', run: command('pnpm', ['test:types']) },
-  { name: 'tests and coverage (need Postgres: pnpm db:up)', run: command('pnpm', ['test:coverage']) },
+  // the same run also checks the home page's proof numbers against what it measured (scripts/checks/proof-numbers.js)
+  { name: 'tests and coverage, and the home page\'s proof numbers (need Postgres: pnpm db:up)', run: () => {
+    const tests = command('pnpm', ['test:coverage'])()
+    if(!tests.ok) return tests
+    const failures = checkProofNumbers({ copySource: readFileSync(join(root, 'frontend/src/pages/home-copy.ts'), 'utf8'), testOutput: tests.output })
+    return failures.length ? { ok: false, output: failures.join('\n') } : tests
+  } },
   { name: 'web: type check, build and prerender', run: command('pnpm', ['build'], { cwd: 'frontend' }) },
   { name: 'web: unit tests and their type check', run: () => {
     const types = command('pnpm', ['test:types'], { cwd: 'frontend' })()
@@ -39,6 +48,8 @@ const checks = [
   { name: 'web: unused files, exports and dependencies (knip)', run: command('pnpm', ['exec', 'knip', '--no-progress'], { cwd: 'frontend' }) },
   { name: 'web: known vulnerabilities', run: command('pnpm', ['audit', '--prod', '--audit-level', 'moderate'], { cwd: 'frontend' }) },
   { name: 'web: seo, speed and security of the build', run: command('node', ['frontend/scripts/check-dist.js']) },
+  // before check-repo: a repo rule whose own tests fail can't be trusted to pass or fail correctly
+  { name: 'repo: the repo checks\' own tests', run: command('node', ['--test', 'scripts/checks/*.test.js']) },
   { name: 'repo: secrets, security rules, Caddyfile routes, files that change together', run: command('node', ['scripts/check-repo.js']) },
   // strict: a broken link between docs fails here, though `pnpm docs:artifact` alone only warns
   { name: 'docs: build and links', run: command('node', ['scripts/docs-artifact/build.js'], { env: { DOCS_STRICT: '1' } }) },

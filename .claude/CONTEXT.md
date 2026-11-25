@@ -29,10 +29,12 @@ section you need (the index below), then open the files it names.
 ```
 browser ──/api/*──▶ edge Caddy (deploy/ckauth.caddy: strips /api, CSP + headers) ──▶ ckauth-api :8080
   src/index.ts                       http server, keepAlive 125s, pruneAuditEvents daily
-  src/app/index.ts                   createExpressApplication(): trust proxy 1 → requestLogger → json(50kb) → cookieParser
+  src/app/index.ts                   createExpressApplication(): trust proxy 1 → requestLogger → json(50kb) (no form parser) → cookieParser
+    /auth, /admin, /metrics are mounted behind refuseCrossSite (writes from the web app's own origin only)
     /auth    src/app/auth/routes.ts      rateLimits.* → authenticateToken → [uploadAvatar] → AuthController.handleX
     /admin   src/app/admin/routes.ts     router.use(authenticateToken, authorizeRoles('admin')) → limiter → requireRecentReauth → AdminController
     /metrics src/app/metrics/routes.ts   metricsVisitPerIp → MetricsController.handleVisit
+    /.well-known src/app/oidc/routes.ts  only when isOidcEnabled() (OIDC_ENABLED === 'true'); no auth, no limiter → OidcController
     /dev     src/app/dev/routes.ts       only when NODE_ENV !== 'production'
     errorHandler (src/app/middlewares/error-handler.ts) last
 handler: parseOrThrow(model, req.body) → db query → check → db.transaction(tx → write + recordEvent(tx)) → send*Mail().catch → ApiResponse.ok
@@ -75,6 +77,8 @@ Controller line = where `handleX` starts. "Audit" is the `auditActions` key writ
 | POST /admin/users | handleInviteUser (145) | adminWritePerUser + requireRecentReauth | inviteUserPayloadModel (.strict) | USER_INVITED tx | Invite | admin.tsx InviteUserForm | admin | 863 |
 | DELETE /admin/users/:id | handleDeleteUser (183) | adminWritePerUser + requireRecentReauth | userIdParamsModel | USER_DELETED tx | AccountDeleted (verified only) | admin.tsx DeleteUserButton | admin | 892 |
 | POST /metrics/visit | handleVisit (metrics 11) | metricsVisitPerIp | visitPayloadModel (metrics/models.ts) | none | none | lib/referral.ts captureReferral | metrics | 666 |
+| GET /.well-known/openid-configuration | handleDiscovery (oidc 16) | none (public, no db) | none | none | none | none (client libraries) | oidc | n/a (not yet) |
+| GET /.well-known/jwks.json | handleJwks (oidc 52) | none (public, no db) | none | none | none | none (client libraries) | oidc | n/a (not yet) |
 | GET /dev/emails, /dev/emails/:id, /dev/outbox | inline in dev/routes.ts | none | inline zod | none | none | pages/dev-emails.tsx, e2e/fixtures.ts | emails | n/a |
 
 `ROLE_CHANGED` and a CLI `USER_DELETED` are written only by `src/scripts/manage-users.ts` (lines 31, 53, `source: 'cli'`).
@@ -113,10 +117,21 @@ Lines in brackets are file sizes, so you know whether to read the whole file.
 **`src/app/metrics/`**: `sources.ts` (`referralSources = ['x']`, `normalizeRefSource`), `models.ts` (`refModel`,
 `visitPayloadModel`; `refModel` is also used by `signupPayloadModel`), `controller.ts` (upsert into `referral_visits`).
 
+**`src/app/oidc/`** (Sign in with CKAuth, being built; design and the 33 rules in `docs/OIDC.md`):
+`enabled.ts` [6] (`isOidcEnabled(value = process.env.OIDC_ENABLED)`: exact `'true'` only, fail closed; read once in
+`createExpressApplication`), `keys.ts` [40] (`OIDC_SIGNING_ALG` = `'ES256'`, `getSigningKey()` lazy and not cached on
+failure (503 without a key), `kid` = RFC 7638 thumbprint, `resetSigningKeyForTests`), `controller.ts` [58]
+(`oidcIssuer()` = `FRONTEND_URL` without trailing slash, never the Host header; `OidcController.handleDiscovery`,
+`handleJwks`, plain JSON, not the `ApiResponse` envelope, `Cache-Control: public, max-age=300`), `routes.ts` [12]
+(`wellKnownRouter`). `/oauth/*` (M2–M4) will be a second router in this area, mounted under the same switch.
+
 **`src/app/middlewares/`**: `rate-limit.ts` [119] (`createRateLimiter({name, windowMs, limit, key, failuresOnly})`,
 keys `ipKey`/`emailKey`/`userKey`, Redis store with `passOnStoreError` + in-memory fallback, `rateLimits` object at 92,
 `closeRateLimitStore`), `request-logger.ts` [72] (`routeOf`, `requestFields` allow-list, `logLevelFor`, `requestLogger`),
-`upload-multer.ts` [87] (`AVATAR_MAX_FILE_SIZE` 2 MB, memory storage, magic-byte sniff), `error-handler.ts` [21].
+`upload-multer.ts` [87] (`AVATAR_MAX_FILE_SIZE` 2 MB, memory storage, magic-byte sniff), `error-handler.ts` [21],
+`refuse-cross-site.ts` [25] (`refuseCrossSite`: a non-GET/HEAD/OPTIONS request with `Sec-Fetch-Site` other than `same-origin`, or
+without it an `Origin` other than `FRONTEND_URL`'s, is a 403; neither header passes; test `cross-site`). A new cookie-authenticated
+router is mounted behind it; `/oauth/token`, `/revoke`, `/userinfo` (called by other sites on purpose) are not.
 
 **`src/utils/`**: `api-error.ts` (`ApiError.badRequest/unauthorized/forbidden/notFound/conflict/internal`),
 `api-response.ts` (`ok`, `created`), `validate.ts` (`parseOrThrow`, the one error format), `logger.ts` (pino),
@@ -130,12 +145,13 @@ one `sendXMail` per email, 50–91), `emails.ts` [174] (`emails.<name>(...)` →
 `seed-activity.ts` [157] (dev data, `--clear`).
 
 Env vars (`.env.sample`; prod: `deploy/api.env.sample`): PORT, NODE_ENV, DATABASE_URL, ACCESS_/REFRESH_TOKEN_SECRET_KEY,
-ACCESS_/REFRESH_TOKEN_EXPIRY, REDIS_URL, APP_NAME, RESEND_API_KEY, EMAIL_FROM, FRONTEND_URL, IMAGEKIT_PRIVATE_KEY;
+ACCESS_/REFRESH_TOKEN_EXPIRY, REDIS_URL, APP_NAME, RESEND_API_KEY, EMAIL_FROM, FRONTEND_URL, IMAGEKIT_PRIVATE_KEY, OIDC_ENABLED (`false` in
+production until the Beta), OIDC_SIGNING_KEY (ES256 PKCS #8 PEM on one line with `\n` escapes); prod only: API_DB_PASSWORD;
 test/dev only: MAIL_TRANSPORT, LOG_LEVEL, TEST_DATABASE_URL.
 
 ## 4. Data model
 
-`src/db/schema.ts`. Four tables:
+`src/db/schema.ts`. Four account tables, then six for Sign in with CKAuth (OIDC, from line ~126):
 
 | Table (line) | Key columns | Notes |
 |---|---|---|
@@ -143,9 +159,21 @@ test/dev only: MAIL_TRANSPORT, LOG_LEVEL, TEST_DATABASE_URL.
 | `sessions` (60) | id, userId → users cascade, refreshTokenHash unique, userAgent, ipAddress, reauthenticatedAt (sudo mode), lastUsedAt, expiresAt | one row per device; delete row = sign out |
 | `audit_events` (86) | action varchar(40), actorId, targetId (no FKs), details jsonb, source 'api'/'cli', ipAddress, requestId | append-only; pruned by retention |
 | `referral_visits` (114) | PK (day, source), visits | no IP/user |
+| `oauth_clients` (139) | id uuid = public client_id, name, type `oauth_client_type`, secretHash + previousSecretHash/ExpiresAt, redirectUris[], postLogoutRedirectUris[], allowedScopes `oauth_scope[]`, allowedOrigins[], sector, status `oauth_client_status`, registeredBy → users set null | checks: secret matches type, sha256 hex, old secret always expires, ≥1 redirect, openid allowed, origins only for public, lowercase sector. `test/oauth-schema.test.ts` pins its exact column list (rule 27) |
+| `oauth_requests` (182) | id (the `continue=` id), clientId → clients cascade, browserBindingHash, redirectUri, scopes, state, nonce, codeChallenge, prompt, maxAge, expiresAt | ≤ 10 min; consumed with DELETE … RETURNING; challenge is S256 format (43 base64url) |
+| `oauth_codes` (214) | PK codeHash, clientId, userId → cascade, familyId, redirectUri, codeChallenge, nonce, scopes, authTime, expiresAt, usedAt | ≤ 60 s; redeemed with conditional UPDATE … WHERE used_at IS NULL; reuse revokes the family |
+| `oauth_consents` (243) | PK (userId, clientId), scopes | always includes openid |
+| `oauth_refresh_tokens` (258) | id, tokenHash unique, familyId, clientId, userId → cascade, scopes, authTime, expiresAt (abs), idleExpiresAt, usedAt | only with offline_access; ≤ 30 d absolute, ≤ 14 d idle, idle ≤ absolute |
+| `oauth_subjects` (286) | PK (userId, sector), subject unique (43 base64url) | the pairwise sub; kept when an app is deleted |
 
-Migrations: `drizzle/<timestamp>_<name>/migration.sql` (+ snapshot.json), 15 so far, newest
-`20261106074228_small_the_santerians` (signup_source). Config: `drizzle.config.js`.
+OIDC tables use `timestamptz` (the account tables don't) and enums from `src/app/oidc/constants.ts` (`oidcScopes`,
+`oauthClientTypes`, `oauthClientStatuses`; discovery uses the same list). Their lifetime checks compare with
+`created_at` (= the transaction's `now()`), so endpoints must set `expires_at` with the database clock
+(`sql\`now() + interval …\``), never a JS `Date`. Signing keys aren't a table: the private key is `OIDC_SIGNING_KEY`
+and the public JWK and `kid` are derived from it (`keys.ts`).
+
+Migrations: `drizzle/<timestamp>_<name>/migration.sql` (+ snapshot.json), 18 so far, newest
+`20261125160847_oidc_tables` (the six oauth tables). Config: `drizzle.config.js`.
 
 ## 5. Frontend file map
 
@@ -182,7 +210,7 @@ Migrations: `drizzle/<timestamp>_<name>/migration.sql` (+ snapshot.json), 15 so 
 **lib/**: `api.ts` (`ApiRequestError` with `.code`, `User` type 21, `onSessionEnded`, `api`), `auth.tsx`
 (`AuthProvider`, `useAuth`: `user`, `reloadUser`, `sessionEnded`), `validation.ts` (`validate*` per field mirroring
 models.ts, `PASSWORD_MIN/MAX` 8/72, `parseInvalidFields`, `describeError` 80), `use-form.ts` (`useForm`), `theme.tsx`,
-`design-lab.tsx` (`looks`: `guard` + `consent-handshake`, `consent-sentence`), `referral.ts`, `device.ts`, `time.ts`
+`design-lab.tsx` (`looks`: `guard` only, so the panel is hidden), `referral.ts`, `device.ts`, `time.ts`
 (`timeAgo`), `password-strength.ts`, `oauth-scopes.ts` (`describeScopes`), `use-url-token.ts`, `use-document-title.ts`.
 
 **components/**: `layout.tsx` (`Layout` 14, `SiteHeader` 77, `SiteFooter` 120, guards 143–162), `auth-shell.tsx`
@@ -258,6 +286,8 @@ commit the PNGs (check-dist compares the embedded SHA-256) → `docs/BRAND.md` "
 | every limiter | rate-limits; Redis down: redis-down |
 | admin endpoints | admin; audit log: activity; referrals: metrics |
 | mail failures don't fail requests | mail-failure; email rendering: emails |
+| OIDC tables: every check constraint, enum, cascade, the one-time code redemption race, ckauth_api access | oauth-schema |
+| OIDC discovery, JWKS, signing key, `OIDC_ENABLED` switched off | oidc (`withSwitchedOffApp` builds a second app; it closes its own server, since `startApp`'s `after` also ends the db pool) |
 | units | models, jwt-token, error-handler, request-logger; `test.todo` gaps: known-gaps |
 
 **Frontend unit tests** `frontend/test/` (`cd frontend && pnpm test`): api, device, time, validation, oauth-scopes,
@@ -274,6 +304,18 @@ docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
   compares against `origin/main`; Caddyfile `@app` = app.tsx routes; schema.ts needs a drizzle/ change;
   warnings: code without DEVLOG, routes/models without API.md, pages/routes without `frontend/index.html`, and
   routes/schema/app.tsx/constants/rate-limit/check scripts without `.claude/CONTEXT.md`.
+- Proof numbers: the home page's "How we know it's safe" ledger states `proofNumbers` (`home-copy.ts`: tests, linesCovered,
+  verified). `check-pr.js`'s test step runs `scripts/checks/proof-numbers.js` on the `test:coverage` output: fails if a
+  claim is above the measured value, more than 10% below it, or `verified` is over 45 days old. Tests: proof-numbers.test.js.
+- OIDC coverage: `pnpm test:coverage` also writes `coverage/lcov.info` and runs `scripts/check-coverage.js`, which needs
+  100% lines and branches in `src/app/oidc/` and `src/app/oauth/`.
+- Rule 27 (docs/OIDC.md, no trusted / skip-consent flag): `scripts/checks/oidc-flags.js` (`scopeOf`, `flagReason`, `tokenize`,
+  `findOidcFlags`), called from `check-repo.js`. It splits every identifier, name-like string, env key and SQL name into
+  words and matches those, so camelCase and word order don't slip past; comments and prose are never read. Every rule
+  runs in OIDC files (paths with oauth/oidc/openid/consent/connected-apps, `src/app/admin/`, `src/scripts/`, admin pages,
+  `schema.ts`, `drizzle/*.sql`, `OIDC_*` env keys); elsewhere only consent/pkce/pairwise and auto-approve. Its own tests:
+  `scripts/checks/oidc-flags.test.js` (`node --test 'scripts/checks/*.test.js'`, a `check:pr` step before check-repo).
+  A false positive: fix the detector and add the name to the test's "left alone" list; never add an exemption.
 - `check-dist.js` [133+]: title 50–60 chars with "sign-in", description 140–160, OG tags, one h1, prerendered home,
   empty app.html shell, robots/sitemap, og.png 1200×630, brand PNG hashes, no render-blocking CSS/JS, size budgets
   (`budgets` near line 18: initialJs 127 KiB, homeHtml 19.25 KiB), critical-CSS coverage, no dev pages shipped.
@@ -306,6 +348,12 @@ docs-artifact build (`DOCS_STRICT=1`) → no leftover `TODO(human)`.
 - `handleSignin` sends the verification mail again for an unverified user (line ~176), not only sign-up.
 - Admin delete mails only verified users; admins can't delete admins or themselves (controller line ~190).
 - `/dev/*` exists only when `NODE_ENV !== 'production'`; `/dev/outbox` also needs `MAIL_TRANSPORT=memory`.
+- Sign in with CKAuth's routes exist only when `OIDC_ENABLED` is exactly `true` (tests set it in `test/env.ts`); unset or
+  anything else is a 404, not a 503. The discovery document already lists `/oauth/*` endpoints that don't exist yet, and
+  `deploy/ckauth.caddy` doesn't route `/.well-known/*` to the api yet (M5).
+- `resetDatabase()` (`test/helpers.ts`) truncates without CASCADE on purpose, so a new table with a foreign key to
+  `users` or `oauth_clients` must be added to its list, or every test fails with "cannot truncate a table referenced
+  in a foreign key constraint".
 - Production stack lives in `/opt/ckauth`, not `~/Authentication` (that's just a clone) on the VPS.
 - The user's dev server is on 8080; use `PORT=8081` for manual runs. Docker commands hang locally: probe ports instead.
 
@@ -335,7 +383,7 @@ git ls-files | xargs wc -l | sort -n | tail -30                     # file sizes
 Moved here from CLAUDE.md on 11 Nov 2026, word for word, so the file loaded every session holds only the rules (CLAUDE.md →
 "Where things live" keeps one line per rule). Read the bullet for the part you're changing.
 
-**Test setup.** (`test/`, Node's built-in `node:test` run through `tsx`, no test framework): one file per area (`sign-up`, `verify-email`, `sign-in`, `session` (incl. the device list), `account` (profile, avatar removal, self-delete, resend, change email), `mail-failure` (every mail-sending endpoint still answers when its mail fails: any address at `@mail-fails.test` fails in memory mode), `password`, `upload-avatar`, `rate-limits`, `admin`, `activity` (every audit event, the rollback guarantee, `/admin/activity`, pruning), `metrics` (referral tags, the visit counter, sign-up sources, the stats' `referrals`), `redis-down`), plus unit tests for the Zod models, JWT helpers, error handler and `request-logger` (route templates, the allow-list, log levels), and `known-gaps.test.ts` (a `test.todo` for each known gap in `README.md` → "Known limitations" that a test can describe). `pnpm test:coverage` fails below 95% lines / 83% branches / 85% functions; CI runs it (`api.yml`, with a Postgres service) before building an image. Frontend unit tests (`frontend/test/`, run by Node directly) cover `validation.ts`, `device.ts`, `time.ts`, `oauth-scopes.ts`, `scripts/critical-css.js` and `api.ts`'s single-flight refresh and session-ended signal. **Browser tests** (`e2e/`, Playwright, `pnpm e2e`; sign-up and sign-in so far, not in CI yet): `playwright.config.ts` starts the API on 8090 through `e2e/start-api.ts` (its own `ckauth_e2e` database made by `prepareDatabase` from `test/global-setup.ts`, `MAIL_TRANSPORT=memory`, no Redis) and `vite preview` on 4180, and runs chromium, firefox, webkit and a Pixel 7 project. `e2e/fixtures.ts` gives each test a fake `X-Forwarded-For` (so per-IP limits don't trip), a fresh `email`, a `verifiedUser` and an `inbox` that reads the dev-only `GET /dev/outbox?to=` (404 unless `MAIL_TRANSPORT=memory`). Every integration test drives the real Express app over HTTP against a separate `ckauth_test` database, which `test/global-setup.ts` creates and migrates; `TEST_DATABASE_URL` overrides it. `test/env.ts` fixes the environment first: `MAIL_TRANSPORT=memory` keeps mails in `outbox` (`src/utils/mail.ts`) so a test reads the link a user would click, no Redis (fresh in-memory rate limits per file), no ImageKit, fixed secrets, `LOG_LEVEL=silent`. Helpers in `test/helpers.ts`: `Client` (cookies, plus its own IP per client so per-IP limits behave), `createUser`, `signIn`, `signUp`, `lastMailTo`, `tokenFrom`, `findUser`, `sessionsOf`. Call `startApp()` at a test file's top level, never inside a hook. Output goes through `test/quiet-reporter.ts`: one summary line when everything passes, full detail for each failure plus the stderr of its file, and every `todo` (known gap) and skipped test by name; `CI=1` (set by GitHub Actions) gives Node's full spec output instead. `pnpm test <file>` does not narrow the run (the file is added to the full glob); use `pnpm test:only`. One test run at a time: two runs (two sessions) share `ckauth_test` and truncate each other's tables. A new endpoint or rule gets tests in the same change, and a check that can't fail proves nothing: break the code once and watch the test fail.
+**Test setup.** (`test/`, Node's built-in `node:test` run through `tsx`, no test framework): one file per area (`sign-up`, `verify-email`, `sign-in`, `session` (incl. the device list), `account` (profile, avatar removal, self-delete, resend, change email), `mail-failure` (every mail-sending endpoint still answers when its mail fails: any address at `@mail-fails.test` fails in memory mode), `password`, `upload-avatar`, `rate-limits`, `admin`, `activity` (every audit event, the rollback guarantee, `/admin/activity`, pruning), `metrics` (referral tags, the visit counter, sign-up sources, the stats' `referrals`), `redis-down`, `cross-site` (writes from another origin or as a form body are refused)), plus unit tests for the Zod models, JWT helpers, error handler and `request-logger` (route templates, the allow-list, log levels), and `known-gaps.test.ts` (a `test.todo` for each known gap in `README.md` → "Known limitations" that a test can describe). `pnpm test:coverage` fails below 95% lines / 83% branches / 85% functions; CI runs it (`api.yml`, with a Postgres service) before building an image. Frontend unit tests (`frontend/test/`, run by Node directly) cover `validation.ts`, `device.ts`, `time.ts`, `oauth-scopes.ts`, `scripts/critical-css.js` and `api.ts`'s single-flight refresh and session-ended signal. **Browser tests** (`e2e/`, Playwright, `pnpm e2e`; sign-up and sign-in so far, not in CI yet): `playwright.config.ts` starts the API on 8090 through `e2e/start-api.ts` (its own `ckauth_e2e` database made by `prepareDatabase` from `test/global-setup.ts`, `MAIL_TRANSPORT=memory`, no Redis) and `vite preview` on 4180, and runs chromium, firefox, webkit and a Pixel 7 project. `e2e/fixtures.ts` gives each test a fake `X-Forwarded-For` (so per-IP limits don't trip), a fresh `email`, a `verifiedUser` and an `inbox` that reads the dev-only `GET /dev/outbox?to=` (404 unless `MAIL_TRANSPORT=memory`). Every integration test drives the real Express app over HTTP against a separate `ckauth_test` database, which `test/global-setup.ts` creates and migrates; `TEST_DATABASE_URL` overrides it. `test/env.ts` fixes the environment first: `MAIL_TRANSPORT=memory` keeps mails in `outbox` (`src/utils/mail.ts`) so a test reads the link a user would click, no Redis (fresh in-memory rate limits per file), no ImageKit, fixed secrets, `LOG_LEVEL=silent`. Helpers in `test/helpers.ts`: `Client` (cookies, plus its own IP per client so per-IP limits behave), `createUser`, `signIn`, `signUp`, `lastMailTo`, `tokenFrom`, `findUser`, `sessionsOf`. Call `startApp()` at a test file's top level, never inside a hook. Output goes through `test/quiet-reporter.ts`: one summary line when everything passes, full detail for each failure plus the stderr of its file, and every `todo` (known gap) and skipped test by name; `CI=1` (set by GitHub Actions) gives Node's full spec output instead. `pnpm test <file>` does not narrow the run (the file is added to the full glob); use `pnpm test:only`. One test run at a time: two runs (two sessions) share `ckauth_test` and truncate each other's tables. A new endpoint or rule gets tests in the same change, and a check that can't fail proves nothing: break the code once and watch the test fail.
 
 **Layout, area by area.**
 
@@ -354,7 +402,7 @@ Moved here from CLAUDE.md on 11 Nov 2026, word for word, so the file loaded ever
 - Emails are three files: `emails.ts` (what each says, as data), `email-layout.ts` (one HTML layout for all, with dark mode: `prefers-color-scheme` plus Outlook's `[data-ogsc]`; Gmail ignores both and recolours on its own, so the light palette must survive inversion) and `mail.ts` (sending). Icons are PNGs in `frontend/public/email/`, rendered from `frontend/email-icons/*.svg`, which `frontend/scripts/email-icons.mjs` builds from lucide (Gmail strips SVG). The design is "spotlight" (a tinted top with a big centred icon and title, a pill button); the colour theme is `midnight` (the site's own slate and ember, picked 6 Nov 2026); `emailThemes` stays a list so a new candidate can be compared on `/dev/emails`
 - `scripts/perf/` (`measure.js`, `report.js`) + `.github/workflows/perf.yml`: weekly real-world speed measurement of production, results on the orphan `perf-data` branch; read-only against production
 - `src/app/dev/routes.ts`: development-only routes (email previews, and `/dev/outbox` for the browser tests), mounted only when `NODE_ENV` isn't `production`; `frontend/src/pages/dev-emails.tsx` (`/dev/emails`) shows them. `check-dist.js` fails a build that ships it, and `check-repo.js` leaves `/dev/` routes out of the Caddyfile comparison
-- `frontend/src/components/oauth-consent.tsx`: the Sign in with CKAuth consent screen (`docs/OIDC.md`, step 4), drawn in `AuthShell` with its `badge` prop. The shipped design is the card; `consent-handshake` and `consent-sentence` stay in the design lab as alternatives. `lib/oauth-scopes.ts`'s `describeScopes` turns scopes into rows (fixed order, throws on an unknown scope). `beta-badge.tsx` (`BetaBadge` + `BetaNote`, the explaining line) goes on every OIDC page and nowhere else. `pages/dev-oauth-consent.tsx` (`/dev/oauth-consent`, beside `/dev/emails`) previews it with sample apps until the `/oauth` endpoints exist; `check-dist.js` fails a build that ships it
+- `frontend/src/components/oauth-consent.tsx`: the Sign in with CKAuth consent screen (`docs/OIDC.md`, step 4), drawn in `AuthShell` with its `badge` prop. The card design, picked 25 Nov 2026 over a two-tile "handshake" and a one-sentence "Continue as …" (both deleted). Every name can be at its database maximum without breaking a 320 px screen: the title takes `AuthShell`'s `titleClassName="wrap-anywhere"`, scope values wrap instead of truncating, and app and person names are isolated (`\u2068…\u2069` / `<bdi>`) for right-to-left scripts. The preview's three "Stress:" samples are those cases. `lib/oauth-scopes.ts`'s `describeScopes` turns scopes into rows (fixed order, throws on an unknown scope). `beta-badge.tsx` (`BetaBadge` + `BetaNote`, the explaining line) goes on every OIDC page and nowhere else. `pages/dev-oauth-consent.tsx` (`/dev/oauth-consent`, beside `/dev/emails`) previews it with sample apps until the `/oauth` endpoints exist; `check-dist.js` fails a build that ships it
 - `src/db/schema.ts` → migrations in `drizzle/`; `src/db/migrate.ts` applies them in production
 - `frontend/src/lib/api.ts`: the only place that calls `fetch`; `/api` prefix, `credentials: 'include'`, single-flight refresh on 401 for `authed` requests
 - `frontend/src/components/resend-email.tsx`: "resend the verification email" (sign-up's inbox screen, unverified sign-in, expired verify link), with the API's 60 s cooldown as a countdown. `avatar-cropper.tsx`: crops a picked photo (up to 15 MB) to a 512 px JPEG in the browser before upload, behind a round mask (the corners are still saved, dimmed, for the square full-size viewer). `lib/time.ts` (`timeAgo`) for relative times

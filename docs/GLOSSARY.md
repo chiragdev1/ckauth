@@ -51,9 +51,11 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **httpOnly cookie.** A cookie that JavaScript on the page cannot read. If an attacker manages to run a script on the page, they still can't steal the session.
 
-**SameSite.** A cookie setting that controls whether the browser sends the cookie when another site makes the request. `Lax` (CKAuth's setting) blocks most cross-site uses, which protects against CSRF.
+**SameSite.** A cookie setting that controls whether the browser sends the cookie when another site makes the request. `Lax` (CKAuth's setting) blocks most cross-site uses, which protects against CSRF. A "site" is the registrable domain, so `a.chiragdev.com` and `ckauth.chiragdev.com` are the *same site*: `SameSite` doesn't protect one subdomain from another. That's why the API also checks where a write came from (see Fetch Metadata).
 
-**Origin.** The scheme, domain and port of a URL, such as `https://ckauth.chiragdev.com`. Two URLs with the same origin are "same-origin".
+**Origin.** The scheme, domain and port of a URL, such as `https://ckauth.chiragdev.com`. Two URLs with the same origin are "same-origin". Stricter than "same-site" (see SameSite). Browsers also send it as the `Origin` request header.
+
+**Fetch Metadata.** Headers the browser adds to every request to say where it came from. `Sec-Fetch-Site` is `same-origin`, `same-site`, `cross-site` or `none` (typed or bookmarked). The API refuses any write that isn't `same-origin` (`src/app/middlewares/refuse-cross-site.ts`), and falls back to the `Origin` header in older browsers.
 
 **CORS (Cross-Origin Resource Sharing).** Rules that let a page on one origin call an API on another. CKAuth doesn't need CORS, because the web app and the API share one origin.
 
@@ -127,7 +129,7 @@ Plain definitions of the terms used across CKAuth's docs ([README](../README.md)
 
 **Botnet.** Many hijacked computers that attack together, from many IP addresses.
 
-**CSRF (Cross-Site Request Forgery).** A malicious site making your browser send requests to another site where you're signed in. `SameSite` cookies prevent most of it.
+**CSRF (Cross-Site Request Forgery).** A malicious site making your browser send requests to another site where you're signed in. `SameSite` cookies prevent most of it; CKAuth also refuses writes from any other origin (see Fetch Metadata), which covers sibling subdomains.
 
 **CSP (Content Security Policy).** A header that tells the browser which scripts, styles and images it may load. CKAuth's CSP blocks inline scripts, except the one theme script it names by **hash**: a fingerprint of the script's exact text (`'sha256-…'`), so changing even one character blocks it until the hash is updated.
 
@@ -194,6 +196,8 @@ Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps 
 **Single sign-on (SSO).** Signing in once and being signed in to many apps. With OIDC, it works because the provider remembers your session.
 
 **Asymmetric signing (ES256 / RS256).** Signing with a private key that only the provider has, and checking with a public key anyone can have. ES256 uses elliptic curves, RS256 uses RSA. CKAuth's own session tokens use **HS256**, a single shared secret that both signs and checks; that's fine inside one server but can't be handed to other apps.
+
+**PEM / PKCS #8.** PEM is the text format for keys: base64 text between a "BEGIN PRIVATE KEY" header line and an "END PRIVATE KEY" footer line. PKCS #8 is the standard layout of the private key inside it. `OIDC_SIGNING_KEY` holds one, written on a single line with `\n` where the line breaks were.
 
 **Algorithm confusion.** An attack on verifiers that let the token choose its own algorithm: the attacker signs an HS256 token using the public key as if it were the shared secret. Prevented by always naming the accepted algorithm.
 
@@ -313,6 +317,10 @@ Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps 
 
 **vCPU / core.** A unit of processing power. CKAuth's VPS has two.
 
+**Steal time.** The share of time a virtual machine is ready to run but has to wait, because other customers on the same physical server are using the real CPU. On a shared VPS it quietly lowers how much work each vCPU does at busy times. `top` shows it as `st`.
+
+**Connection pool.** A fixed set of open database connections that requests take turns using, so each request doesn't pay to open a new one. CKAuth's API uses the `pg` driver's default of 10; when all 10 are busy, the next query waits.
+
 ---
 
 ## Frontend
@@ -364,6 +372,8 @@ Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps 
 **Docker Compose.** A file (`compose.yml`) that describes several containers and how they connect, so one command starts them all.
 
 **Caddy.** The web server and reverse proxy in front of CKAuth. It gets HTTPS certificates automatically.
+
+**Kill switch (feature flag).** A setting that turns a feature on or off without changing the code. `OIDC_ENABLED` is one: while it's off, Sign in with CKAuth's routes aren't mounted, so unfinished work can be merged and deployed "dark" (present in the code but unreachable).
 
 **Edge proxy.** The one shared Caddy that receives all traffic on ports 80 and 443 for every site on the VPS, and passes each request to the right project.
 
@@ -572,6 +582,30 @@ Terms from the [OIDC design](OIDC.md), the planned feature that lets other apps 
 **SAML.** An older single sign-on standard, built on XML, that large companies use to let staff sign in to work apps with their company account. Enterprise buyers often expect it alongside OIDC.
 
 **SOC 2.** An independent audit of how a company protects customer data, common in the US. Larger customers often ask for a SOC 2 report before buying.
+
+**ISO 27001.** The international standard for running information security, certified by an outside auditor. It plays the same role as SOC 2 for buyers outside the US.
+
+**DPDP Rules.** The rules that put the DPDP Act into practice, notified in November 2025 with 18 months to comply, so most duties apply from May 2027. For sign-in they mean consent records, breach notices and deleting data on request.
+
+**CERT-In directions.** Orders from India's national computer emergency team: report listed cyber incidents within 6 hours, and keep system logs for a rolling 180 days in India. Anyone hosting other companies' users in India has to plan for both.
+
+**OWASP ASVS.** The Application Security Verification Standard: a checklist of security requirements in three levels, which penetration testers and buyers use to judge an app. Version 5.0 (May 2025) covers OAuth and OIDC in more depth. Level 2 is the usual target for apps that handle personal data.
+
+**NIST SP 800-63B.** The US government's guideline on passwords, MFA and passkeys (revision 4, July 2025). Buyers outside government use it too, as "do you follow NIST?".
+
+**Penetration test (pentest).** A paid, authorised attack on a system by outside security testers, who report what they could break. A cheap pentest is often just an automated scanner's output; a real one has people trying things by hand.
+
+**OpenID certification.** The OpenID Foundation's listing of providers that passed the [conformance suite](#sign-in-with-ckauth-openid-connect), for a fee ($700 for members, $3,500 for non-members in 2026). Passing the tests is free; the certificate is what buyers can check.
+
+**Retainer.** A fixed monthly fee for ongoing work, such as patches, monitoring and a set number of hours of changes, agreed in advance instead of billed per job.
+
+**Pilot / design partner.** An early customer who gets a lower price in return for feedback, a testimonial and permission to be named. The deal accepts that the product is still being finished.
+
+**White-label.** Selling something that another company presents under its own brand, such as an agency offering CKAuth to its clients as its own login service.
+
+**Postmortem.** A short write-up after an incident: what happened, the impact, the fix and the rule that stops it happening again. It looks for causes, not someone to blame. [LEARNINGS](../LEARNINGS.md) works this way.
+
+**Bus factor.** How many people would have to disappear before a project stalls. A solo developer's bus factor is one, so clients ask what happens if that person is gone; full code ownership and good docs are the usual answer.
 
 **Unit economics.** What one unit of a business, such as one customer, costs and earns. It shows whether each customer makes money before counting the fixed bills.
 

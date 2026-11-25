@@ -1,10 +1,13 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { KeyRound, MailCheck, ShieldCheck } from 'lucide-react'
+import { cn } from '@/lib/utils.ts'
 
 type AuthShellProps = {
   // small caps line above the title, e.g. "Create an account"
   eyebrow: string
   title: string
+  // extra classes for the title, e.g. wrap-anywhere when it holds a name someone else chose (an app's, on consent)
+  titleClassName?: string
   subtitle?: ReactNode
   children: ReactNode
   footer?: ReactNode
@@ -13,7 +16,7 @@ type AuthShellProps = {
 }
 
 // every auth page: the form on a dossier card, with the safety panel beside it on wide screens
-export function AuthShell({ eyebrow, title, subtitle, children, footer, badge }: AuthShellProps) {
+export function AuthShell({ eyebrow, title, titleClassName, subtitle, children, footer, badge }: AuthShellProps) {
   const heading = useRef<HTMLHeadingElement>(null)
   const shownTitle = useRef(title)
 
@@ -41,7 +44,7 @@ export function AuthShell({ eyebrow, title, subtitle, children, footer, badge }:
                 {badge}
               </div>
             ) : <p className="eyebrow">{eyebrow}</p>}
-            <h1 ref={heading} tabIndex={-1} className="font-display mt-2 text-3xl font-semibold outline-none">{title}</h1>
+            <h1 ref={heading} tabIndex={-1} className={cn('font-display mt-2 text-3xl font-semibold outline-none', titleClassName)}>{title}</h1>
             {subtitle && <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>}
             <div className="mt-7">{children}</div>
           </div>

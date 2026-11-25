@@ -5,15 +5,34 @@ import { cn } from '@/lib/utils.ts'
 import { ConsentScreen, type ConsentApp } from '@/components/oauth-consent.tsx'
 
 // development only (app.tsx adds the route only in dev or design-lab builds): the consent screen of sign in with ckauth
-// with sample apps, until the /oauth endpoints exist (docs/OIDC.md). switch designs with the design lab (Alt+1…3)
+// with sample apps, until the /oauth endpoints exist (docs/OIDC.md). the last three are stress cases at the database's
+// limits (oauth_clients: name 80, sector 253; users: names 45, email 322), to check nothing breaks at 320 px
 
-const samples: { id: string, app: ConsentApp, scopes: string[] }[] = [
-  { id: 'shop', app: { name: 'Shop', host: 'shop.example' }, scopes: ['openid', 'profile', 'email'] },
-  { id: 'clinic', app: { name: 'Clinic Portal', host: 'portal.clinic.example' }, scopes: ['openid', 'email', 'profile', 'offline_access'] },
-  { id: 'long', app: { name: 'Sunrise Community Gardens Members Area', host: 'members.sunrise-community-gardens.example' }, scopes: ['openid', 'email'] },
+type SampleUser = { firstName: string, lastName: string, email: string }
+
+const sampleUser: SampleUser = { firstName: 'Asha', lastName: 'Rao', email: 'asha@example.com' }
+
+const samples: { id: string, label: string, app: ConsentApp, scopes: string[], user?: SampleUser }[] = [
+  { id: 'shop', label: 'Shop', app: { name: 'Shop', host: 'shop.example' }, scopes: ['openid', 'profile', 'email'] },
+  { id: 'clinic', label: 'Clinic Portal', app: { name: 'Clinic Portal', host: 'portal.clinic.example' }, scopes: ['openid', 'email', 'profile', 'offline_access'] },
+  { id: 'long', label: 'Long name', app: { name: 'Sunrise Community Gardens Members Area', host: 'members.sunrise-community-gardens.example' }, scopes: ['openid', 'email'] },
+  {
+    id: 'max', label: 'Stress: longest',
+    app: { name: 'W'.repeat(80), host: `${'a'.repeat(63)}.${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(57)}.example` },
+    scopes: ['openid', 'profile', 'email', 'offline_access'],
+    user: { firstName: 'Bartholomew-Maximilian Alexander Christopher', lastName: 'Vanderbilt-Montgomery-Fitzgerald-Worthington', email: `${'x'.repeat(64)}@${'very-long-subdomain-'.repeat(8)}example.co.in` },
+  },
+  {
+    id: 'rtl', label: 'Stress: right-to-left',
+    app: { name: 'متجر الحي', host: 'shop.example' }, scopes: ['openid', 'profile', 'email'],
+    user: { firstName: 'سارة', lastName: 'الأحمد', email: 'sara@example.com' },
+  },
+  {
+    id: 'scripts', label: 'Stress: other scripts',
+    app: { name: 'दुकान · Café Ölçü 東京ストア', host: 'xn--h1aaa.example' }, scopes: ['openid', 'profile', 'email', 'offline_access'],
+    user: { firstName: 'अनन्या', lastName: '渡辺', email: 'ananya@example.com' },
+  },
 ]
-
-const sampleUser = { firstName: 'Asha', lastName: 'Rao', email: 'asha@example.com' }
 
 export function DevOauthConsent() {
   useDocumentTitle('Consent screen preview')
@@ -32,7 +51,7 @@ export function DevOauthConsent() {
         {samples.map(item => (
           <button key={item.id} type="button" onClick={() => { setSampleId(item.id); setResult(null) }}
             className={cn('rounded-full border px-3 py-1', item.id === sampleId ? 'border-primary text-primary' : 'text-muted-foreground')}>
-            {item.app.name}
+            {item.label}
           </button>
         ))}
         {result && <span className="w-full break-all text-muted-foreground sm:w-auto">→ {result}</span>}
@@ -40,7 +59,7 @@ export function DevOauthConsent() {
       <ConsentScreen
         app={sample.app}
         scopes={sample.scopes}
-        user={user ?? sampleUser}
+        user={sample.user ?? user ?? sampleUser}
         onAllow={() => setResult(`${callback}?code=…&state=…&iss=https://ckauth.chiragdev.com`)}
         onDeny={() => setResult(`${callback}?error=access_denied&state=…&iss=https://ckauth.chiragdev.com`)}
         onSwitchAccount={() => setResult('signs out, then /sign-in?continue=<request id>')}

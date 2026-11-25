@@ -5,6 +5,11 @@
 export const CONTACT_EMAIL = 'chiragaroradev@gmail.com'
 export const REPO_URL = 'https://github.com/chiragdev1/ckauth'
 
+// the proof ledger's numbers, from a real `pnpm test:coverage` run, rounded down. pnpm check:pr fails if they claim more
+// than that run measured, lag it by more than 10%, or verified is over 45 days old (scripts/checks/proof-numbers.js),
+// so a release that changes them updates them here and bumps verified
+export const proofNumbers = { tests: 270, linesCovered: 96, verified: '25 Nov 2026' }
+
 const en = {
   nav: {
     features: 'Features',
@@ -62,6 +67,19 @@ const en = {
       { title: 'Keeps your user list private', body: 'Nobody can find out who has an account. Everyone gets the same answer.' },
       { title: 'Signs out lost devices for you', body: 'When someone changes or resets their password, every other phone and computer is signed out.' },
     ],
+  },
+  // each claim with how we know it. only what's true in production today; a milestone that lands adds a line
+  proof: {
+    eyebrow: 'Proof, not promises',
+    title: 'How we know it\'s safe',
+    verified: `Verified ${proofNumbers.verified}`,
+    items: [
+      { claim: 'Passwords can\'t be read, even by us', proof: 'Stored with bcrypt, a one-way code built to be slow to crack, and checked by tests on every release.' },
+      { claim: 'Nobody can find out who has an account', proof: 'Real and unknown emails get the same answer at the same speed: 54.4\u00a0ms vs 54.5\u00a0ms, measured under load.' },
+      { claim: 'The activity log can\'t be rewritten', proof: 'The database itself refuses every edit, even from CKAuth\'s own server, and deletes an event only once its retention period is over.' },
+      { claim: `Nothing ships unless ${proofNumbers.tests}+ tests pass`, proof: `They cover ${proofNumbers.linesCovered}% of the code, and one failure stops a release before it's built.` },
+    ],
+    link: 'Read the code and every test on GitHub',
   },
   steps: {
     eyebrow: 'How it works',

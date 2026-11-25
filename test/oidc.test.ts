@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, test } from 'node:test'
+import type { AddressInfo } from 'node:net'
 import * as jose from 'jose'
 
+import { createExpressApplication } from '../src/app/index.js'
+import { isOidcEnabled } from '../src/app/oidc/enabled.js'
 import { getSigningKey, resetSigningKeyForTests } from '../src/app/oidc/keys.js'
+import { oidcIssuer } from '../src/app/oidc/controller.js'
 import { startApp } from './helpers.js'
 
 const baseUrl = await startApp()
@@ -50,9 +54,25 @@ describe('GET /.well-known/openid-configuration', () => {
     assert.equal(body.request_uri_parameter_supported, false)
   })
 
-  test('is cacheable for a few minutes', async () => {
-    const {headers} = await getJson('/.well-known/openid-configuration')
-    assert.equal(headers.get('cache-control'), 'public, max-age=300')
+  test('is cacheable for a few minutes, and readable from any origin', async () => {
+    for(const path of ['/.well-known/openid-configuration', '/.well-known/jwks.json']) {
+      const {headers} = await getJson(path)
+      assert.equal(headers.get('cache-control'), 'public, max-age=300', path)
+      // a browser app (a public client) reads both cross-origin
+      assert.equal(headers.get('access-control-allow-origin'), '*', path)
+    }
+  })
+
+  test('the issuer is the bare origin, and falls back like every other link when FRONTEND_URL is unset', () => {
+    const saved = process.env.FRONTEND_URL
+    try {
+      process.env.FRONTEND_URL = 'https://ckauth.example/'
+      assert.equal(oidcIssuer(), 'https://ckauth.example')
+      delete process.env.FRONTEND_URL
+      assert.equal(oidcIssuer(), 'http://localhost:3000')
+    } finally {
+      process.env.FRONTEND_URL = saved
+    }
   })
 })
 
@@ -97,5 +117,41 @@ describe('GET /.well-known/jwks.json', () => {
     process.env.OIDC_SIGNING_KEY = generateKeyPairSync('ec', {namedCurve: 'P-384'}).privateKey.export({type: 'pkcs8', format: 'pem'}) as string
     resetSigningKeyForTests()
     assert.equal((await getJson('/.well-known/jwks.json')).status, 500)
+  })
+})
+
+describe('OIDC_ENABLED (the kill switch)', () => {
+  // a second, switched-off app beside the file's own; closed here, not by startApp, which also ends the db pool
+  async function withSwitchedOffApp(value: string | undefined, check: (url: string) => Promise<void>) {
+    const saved = process.env.OIDC_ENABLED
+    if(value === undefined) delete process.env.OIDC_ENABLED
+    else process.env.OIDC_ENABLED = value
+    const server = createExpressApplication().listen(0)
+    // the flag is read only inside createExpressApplication, so it can be put back straight away
+    process.env.OIDC_ENABLED = saved ?? ''
+    try {
+      await new Promise((resolve) => server.once('listening', resolve))
+      await check(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)
+    } finally {
+      server.closeAllConnections()
+      await new Promise((resolve) => server.close(resolve))
+    }
+  }
+
+  // anything but an exact "true" leaves it off: a typo in api.env must never switch a half-built feature on
+  for(const value of [undefined, '', 'false', '0', 'yes', 'TRUE ', 'ture']) {
+    test(`unset or ${JSON.stringify(value)}: discovery and jwks don't exist`, async () => {
+      await withSwitchedOffApp(value, async (url) => {
+        for(const path of ['/.well-known/openid-configuration', '/.well-known/jwks.json']) {
+          assert.equal((await fetch(`${url}${path}`)).status, 404, path)
+        }
+        // the rest of the api is unaffected
+        assert.equal((await fetch(`${url}/`)).status, 200)
+      })
+    })
+  }
+
+  test('"true" mounts them (the rest of this file runs with it on)', () => {
+    assert.equal(isOidcEnabled('true'), true)
   })
 })

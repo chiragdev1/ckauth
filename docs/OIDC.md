@@ -1,6 +1,6 @@
 # Sign in with CKAuth (OpenID Connect)
 
-> **Status: proposed, not built yet (6 Nov 2026).** This is the design for letting other websites and apps sign their users in through CKAuth. It's the first step of "CKAuth as a product for other apps" in the [DEVLOG](../DEVLOG.md)'s future scope. Nothing on this page exists in the code until this note changes. While the feature is new, it ships labelled **Beta** in production.
+> **Status: being built (23 Nov 2026; designed 6 Nov).** This is the design for letting other websites and apps sign their users in through CKAuth. It's the first step of "CKAuth as a product for other apps" in the [ROADMAP](../ROADMAP.md). So far only discovery (`/.well-known/openid-configuration`) and the JWKS (`/.well-known/jwks.json`) exist on the `feat/oidc-provider` branch, in `src/app/oidc/`, signed with an ES256 key from `OIDC_SIGNING_KEY`, mounted only when the `OIDC_ENABLED` kill switch is `true` (off in production), and covered by 16 tests in `test/oidc.test.ts`. The discovery document already lists the other endpoints (`/oauth/authorize`, `/token`, `/userinfo`, `/revoke`, `/logout`), which don't exist yet; everything else on this page is still design. While the feature is new, it ships labelled **Beta** in production.
 
 Today CKAuth signs people in to CKAuth itself. This feature turns it into an **identity provider**: a shop, clinic or community site sends its visitors to CKAuth to sign in, and CKAuth tells that site who they are. It uses **OpenID Connect (OIDC)**, the open standard behind "Sign in with Google", so any existing OIDC library works with CKAuth without a CKAuth-specific SDK.
 
@@ -133,7 +133,7 @@ https://ckauth.chiragdev.com/oauth/authorize
 
 The screen (`frontend/src/components/oauth-consent.tsx`, previewed at `/dev/oauth-consent`) follows these choices, made on 6 Nov 2026:
 
-- **Cancel on the left, Allow on the right** when the buttons sit side by side. The forward action is on the right, as on most platforms' dialogs, and the page order is the visual order, so the Tab key reaches them in the order people see them. When the buttons are stacked (a long label such as "Continue as Asha Rao"), Allow goes on top.
+- **Cancel on the left, Allow on the right** when the buttons sit side by side. The forward action is on the right, as on most platforms' dialogs, and the page order is the visual order, so the Tab key reaches them in the order people see them.
 - **"Cancel", not "Deny".** The person isn't judging the app. They're choosing not to go on, and "Deny" sounds like an accusation that makes people hesitate. Behind the button, the protocol still sends `error=access_denied` to the app.
 - **A fixed scope order.** The rows are always name, email, "who you are", then "stay connected", whatever order the app asked in. That's data first and lasting access last, so two apps asking for the same thing look the same.
 - **`openid` is listed only when no data scope is requested.** On its own it shares only the pairwise ID ("An ID only this app gets"). When `profile` or `email` is requested, those rows already say who the app learns about, and an extra row would only add noise.
@@ -240,7 +240,9 @@ Plus the CKAuth-side pages and API: the consent page (a new React route), the ad
 | `oauth_consents` | user + app | the scopes allowed, when |
 | `oauth_refresh_tokens` | refresh token | token hash, family ID, client, user, scopes, absolute and idle expiry, used-at |
 | `oauth_subjects` | user + sector | the pairwise `sub` |
-| signing keys | key | public key and `kid` in the database; the **private key stays in the environment**, never in the database or logs |
+| signing keys | (not a table) | the **private key stays in the environment** (`OIDC_SIGNING_KEY`), never in the database or logs; the public key and its `kid` (the key's RFC 7638 thumbprint) are derived from it, so there's nothing to store or keep in sync |
+
+The database enforces what it can on its own, so a bug in an endpoint fails with an error instead of opening a hole: a PKCE challenge is always the S256 format, codes live at most 60 seconds and pending requests 10 minutes, refresh tokens at most 30 days (14 idle) and only with `offline_access`, every token and secret column holds a SHA-256 digest, a confidential client always has a secret and a public one never does, an old secret always has an end date, and scopes can only be ones the code knows (a database enum). `test/oauth-schema.test.ts` tries each with a row that breaks it, and pins `oauth_clients`' exact columns, so a new one needs a deliberate change (rule 27).
 
 ## Security requirements
 
@@ -256,7 +258,7 @@ These are the rules the implementation must meet. They come from the current OAu
 ### Clients and redirect URIs
 
 5. **The redirect URI is checked before anything else**, and on failure CKAuth shows an error page and never redirects. *Stops: open redirects.*
-6. **Exact string match**, both at `/authorize` and again at `/token`. No wildcards, prefixes or patterns. *Stops: codes being sent to a look-alike URL.*
+6. **Exact string match**, both at `/authorize` and again at `/token`. No wildcards, prefixes or patterns. One exception, which [RFC 8252 §7.3](https://www.rfc-editor.org/rfc/rfc8252#section-7.3) requires for native apps (they pick a free port each time they run): for a registered `http://127.0.0.1` redirect, the port is ignored. Scheme, host, path and query still match exactly, and `localhost`, other loopback addresses and `https://127.0.0.1` never get the exception. The comparison parses both URIs and compares field by field; it never uses a prefix or pattern. *Stops: codes being sent to a look-alike URL.*
 7. **Rules when an admin registers a URI:** `https://` only; no fragment (`#…`) and no user name or password in the URL. Native apps may use `http://127.0.0.1` with any port, or a private-use scheme in reverse-domain form (`com.example.app:/callback`), as [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) describes. All of a client's redirect URIs share one host, which becomes its pairwise sector. **(review)** *Stops: codes travelling over plain HTTP; ambiguous sectors.*
 8. **Client secrets:** 32 random bytes, shown once, stored as SHA-256, compared with `crypto.timingSafeEqual`. Two secrets can be active at once during a rotation. **(review)** *Stops: secrets leaking from the database; timing attacks.*
 
@@ -264,7 +266,7 @@ These are the rules the implementation must meet. They come from the current OAu
 
 9. **Consent cannot be clickjacked:** the consent page is never shown inside a frame. CKAuth already sends `frame-ancestors 'none'` and `X-Frame-Options: DENY` from `deploy/ckauth.caddy`. *Stops: a site hiding the Allow button under its own.*
 10. **The pending request is bound to the browser that started it**, by a random cookie whose hash is stored in its `oauth_requests` row. It expires after 10 minutes and works once. **(review)** *Stops: an attacker making a victim approve a request the attacker started.*
-11. **"Allow" is a `POST` through `api.ts`,** which returns `{redirectTo}`; the page then sets `window.location` itself. Browsers apply CSP `form-action 'self'` to the redirect after a form submission, so a plain HTML form would be blocked. The session cookie is `SameSite=Lax`, so a cross-site `POST` never carries it: that blocks CSRF on Allow. The cross-site `GET /oauth/authorize` *does* carry it, which is what lets single sign-on work. **(review)** *Stops: CSRF on consent.*
+11. **"Allow" is a `POST` through `api.ts`,** which returns `{redirectTo}`; the page then sets `window.location` itself. Browsers apply CSP `form-action 'self'` to the redirect after a form submission, so a plain HTML form would be blocked. The session cookie is `SameSite=Lax`, so a cross-site `POST` never carries it. A *same-site* page (another `*.chiragdev.com` host) would still send it, so the consent API is mounted behind `refuseCrossSite` too, which refuses any write not from CKAuth's own origin: together they block CSRF on Allow. The cross-site `GET /oauth/authorize` *does* carry it, which is what lets single sign-on work. **(review)** *Stops: CSRF on consent.*
 12. **The consent screen shows the app's host** (`shop.example`) next to its name, and the Beta label. *Stops: a registered app named after a better-known one fooling users.*
 13. **`Referrer-Policy: no-referrer`** stays on CKAuth's pages (it's already set). The developer docs tell clients to set it on their callback page too, since the code is in its URL. *Stops: the code leaking through the `Referer` header.*
 
@@ -294,7 +296,7 @@ These are the rules the implementation must meet. They come from the current OAu
 
 Every app is registered by an admin, and that is the *only* thing an admin controls. An admin decides which apps exist; only each user decides what an app learns about them. In the code, every client is treated as untrusted.
 
-27. **No trusted, first-party or skip-consent flag exists**, in the schema or in the code. There is no setting that lets an app skip consent, PKCE, the exact redirect match, scope limits or pairwise IDs. `scripts/check-repo.js` fails if one appears. *Stops: one "temporary" exemption becoming a permanent hole.*
+27. **No trusted, first-party or skip-consent flag exists**, in the schema or in the code. There is no setting that lets an app skip consent, PKCE, the exact redirect match, scope limits or pairwise IDs. `scripts/check-repo.js` fails if one appears: it reads every name in the OIDC code, the schema, the migrations and the env samples, whatever the spelling (`skipConsent`, `skip_consent`, `consentSkipped`), plus `requirePkce: false` and loose redirect comparisons (`scripts/checks/oidc-flags.js`, tested in `oidc-flags.test.js`). *Stops: one "temporary" exemption becoming a permanent hole.*
 28. **Admins can't consent for a user, sign in as a user to an app, or issue tokens by hand.** Tokens come only from a user's own sign-in and consent.
 29. **Widening an app's scopes needs every user's consent again.** An admin may add a scope to an app, but existing consents cover only the old scopes, so users see the consent screen again on their next sign-in.
 30. **Admins see apps, not people's use of them.** The admin pages show an app's settings and how many users it has; which users, and when they signed in, appear only in the audit log, which already hides IPs. A user's own "Connected apps" list is theirs alone.

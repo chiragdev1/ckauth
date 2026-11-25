@@ -1,11 +1,8 @@
-import type { ReactNode } from 'react'
-import { ArrowLeftRight, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
 import type { User } from '@/lib/api.ts'
-import { useLook } from '@/lib/design-lab.tsx'
-import { describeScopes, type ScopeRow } from '@/lib/oauth-scopes.ts'
+import { describeScopes } from '@/lib/oauth-scopes.ts'
 import { AuthShell } from '@/components/auth-shell.tsx'
 import { BetaBadge, BetaNote } from '@/components/beta-badge.tsx'
-import { Crest } from '@/components/brand.tsx'
 import { Button } from '@/components/ui/button.tsx'
 
 export type ConsentApp = { name: string, host: string }
@@ -20,24 +17,23 @@ type ConsentProps = {
   onSwitchAccount: () => void
 }
 
-// the consent screen of sign in with ckauth (docs/OIDC.md, step 4). the shipped design is the card with the list of
-// what's shared; the design lab keeps two alternatives, the two-tile "handshake" and the one-sentence version
-export function ConsentScreen(props: ConsentProps) {
-  const { look } = useLook()
-  const rows = describeScopes(props.scopes, props.user)
-  if(look === 'consent-handshake') return <HandshakeConsent {...props} rows={rows} />
-  if(look === 'consent-sentence') return <SentenceConsent {...props} rows={rows} />
-  return <CardConsent {...props} rows={rows} />
-}
+// unicode's first-strong isolate: what <bdi> does, for text that has to stay a string (the shell compares titles to
+// move focus). an app or person named in a right-to-left script then can't reorder the english around it
+const isolate = (text: string) => `⁨${text}⁩`
 
-type ViewProps = ConsentProps & { rows: ScopeRow[] }
-
-function CardConsent({ app, rows, ...rest }: ViewProps) {
+// the consent screen of sign in with ckauth (docs/OIDC.md, step 4). picked 25 Nov 2026 over a two-tile "handshake" and
+// a one-sentence "continue as …" version: it lists each thing shared with the person's own value, so the consent is
+// specific (which email, not "your email"), and its "allow" can't be mistaken for a plain sign-in button.
+// every piece of content can be at its longest (an 80-character app name with no spaces, a 253-character host,
+// a long email, a right-to-left name) and still fit a 320 px screen without scrolling sideways or hiding anything
+export function ConsentScreen({ app, scopes, user, ...rest }: ConsentProps) {
+  const rows = describeScopes(scopes, user)
   return (
     <AuthShell
       eyebrow="Sign in with CKAuth"
       badge={<BetaBadge />}
-      title={`${app.name} wants to know who you are`}
+      title={`${isolate(app.name)} wants to know who you are`}
+      titleClassName="wrap-anywhere"
       subtitle={<AppHost host={app.host} />}
       footer={<ConsentFooter app={app} />}
     >
@@ -46,50 +42,16 @@ function CardConsent({ app, rows, ...rest }: ViewProps) {
         {rows.map(row => (
           <li key={row.scope} className="flex items-start gap-3 px-4 py-3 text-sm">
             <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
-            <span className="flex-1">{row.label}</span>
-            {row.value && <span className="min-w-0 truncate text-right text-muted-foreground">{row.value}</span>}
+            {/* label and value share a line while they fit; a long value moves to its own line and wraps there,
+                shown in full rather than cut short, since which email or name is shared is the point of the list */}
+            <span className="flex min-w-0 flex-1 flex-wrap justify-between gap-x-3">
+              <span>{row.label}</span>
+              {row.value && <bdi className="min-w-0 wrap-anywhere text-muted-foreground">{row.value}</bdi>}
+            </span>
           </li>
         ))}
       </ul>
-      <Decision {...rest} allowLabel="Allow" />
-    </AuthShell>
-  )
-}
-
-function HandshakeConsent({ app, rows, ...rest }: ViewProps) {
-  return (
-    <AuthShell
-      eyebrow="Sign in with CKAuth"
-      badge={<BetaBadge />}
-      title={`Connect to ${app.name}?`}
-      footer={<ConsentFooter app={app} />}
-    >
-      {/* top-aligned, and the arrow in a box the size of the tile icons, so it sits at their middle */}
-      <div className="flex items-start justify-center gap-2">
-        <Tile label="CKAuth"><Crest className="size-7" /></Tile>
-        <div className="flex size-14 items-center justify-center"><ArrowLeftRight aria-hidden className="size-5 text-muted-foreground" /></div>
-        <Tile label={app.name}>
-          <span className="font-display text-xl font-semibold">{app.name.charAt(0).toUpperCase()}</span>
-        </Tile>
-      </div>
-      {/* the host on its own full line, never inside a tile where it would be cut short */}
-      <p className="mt-4 text-center text-sm"><AppHost host={app.host} /></p>
-      <p className="mt-6 text-sm leading-relaxed">{app.name} wants {listLabels(rows)}.</p>
-      <Decision {...rest} allowLabel="Allow" />
-    </AuthShell>
-  )
-}
-
-function SentenceConsent({ app, rows, ...rest }: ViewProps) {
-  return (
-    <AuthShell
-      eyebrow="Sign in with CKAuth"
-      badge={<BetaBadge />}
-      title={`Continue to ${app.name}?`}
-      subtitle={<>{app.name} (<span className="font-medium text-foreground">{app.host}</span>) will see {listLabels(rows)}.</>}
-      footer={<ConsentFooter app={app} />}
-    >
-      <Decision {...rest} allowLabel={`Continue as ${rest.user.firstName}`} stacked />
+      <Decision user={user} {...rest} />
     </AuthShell>
   )
 }
@@ -98,14 +60,12 @@ function SentenceConsent({ app, rows, ...rest }: ViewProps) {
 // as in the avatar cropper. both the same size, so refusing is as easy as agreeing. "cancel" rather than "deny", which
 // reads as hostile; the app gets error=access_denied either way. never autofocused: one stray enter would grant consent.
 // dom order is the visual order, so tab order matches what people see (wcag 2.4.3)
-function Decision({ user, pending, onAllow, onDeny, onSwitchAccount, allowLabel, stacked }: Omit<ConsentProps, 'app' | 'scopes'> & { allowLabel: string, stacked?: boolean }) {
-  const allow = <Button key="allow" onClick={onAllow} disabled={pending} className="min-w-0"><span className="truncate">{allowLabel}</span></Button>
-  const cancel = <Button key="cancel" variant="outline" onClick={onDeny} disabled={pending}>Cancel</Button>
+function Decision({ user, pending, onAllow, onDeny, onSwitchAccount }: Omit<ConsentProps, 'app' | 'scopes'>) {
   return (
     <>
-      {/* a long label like "continue as …" gets full-width rows instead, allow on top (material's order for stacked buttons) */}
-      <div className={stacked ? 'mt-7 grid gap-3' : 'mt-7 grid grid-cols-2 gap-3'}>
-        {stacked ? [allow, cancel] : [cancel, allow]}
+      <div className="mt-7 grid grid-cols-2 gap-3">
+        <Button variant="outline" onClick={onDeny} disabled={pending}>Cancel</Button>
+        <Button onClick={onAllow} disabled={pending}>Allow</Button>
       </div>
       <p className="mt-5 text-sm text-muted-foreground">
         Signed in as <span className="font-medium break-all text-foreground">{user.email}</span>.{' '}
@@ -129,28 +89,9 @@ function AppHost({ host }: { host: string }) {
 
 function ConsentFooter({ app }: { app: ConsentApp }) {
   return (
-    <div className="space-y-2 text-left">
-      <p>You can disconnect {app.name} any time from Connected apps on your dashboard.</p>
+    <div className="space-y-2 text-left wrap-anywhere">
+      <p>You can disconnect <bdi>{app.name}</bdi> any time from Connected apps on your dashboard.</p>
       <BetaNote />
     </div>
   )
-}
-
-// names only, cut to one line: the full name is in the title right above. w-full on the text: in a centred flex column
-// a child sizes to its content, so without it truncate has no width to cut at and the text overflows the tile.
-// (classes the site already uses: the home page inlines the one stylesheet, and every new utility adds to its budget)
-function Tile({ label, children }: { label: string, children: ReactNode }) {
-  return (
-    <div className="flex w-28 min-w-0 flex-col items-center gap-2 text-center">
-      <div className="flex size-14 items-center justify-center rounded-2xl border bg-muted">{children}</div>
-      <p className="w-full truncate text-sm font-medium" title={label}>{label}</p>
-    </div>
-  )
-}
-
-// "your name and your email address", lowercased, for the sentence versions
-function listLabels(rows: ScopeRow[]) {
-  const labels = rows.map(row => row.label.charAt(0).toLowerCase() + row.label.slice(1))
-  if(labels.length <= 1) return labels[0] ?? 'nothing yet'
-  return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`
 }

@@ -1,10 +1,13 @@
 import type {Request, Response} from 'express'
 import { getSigningKey, OIDC_SIGNING_ALG } from './keys.js'
+import { oidcScopes } from './constants.js'
+import { getFrontendUrl } from '../auth/utils/constants.js'
 
 // the issuer is the site's own origin (https://ckauth.chiragdev.com in production): clients compare the id token's
-// `iss` with it exactly, so no trailing slash, and it never comes from the request's Host header
+// `iss` with it exactly, so no trailing slash, and it never comes from the request's Host header. built from
+// getFrontendUrl() like refuseCrossSite's origin check, so the two can't disagree (and an unset FRONTEND_URL isn't a 500)
 export function oidcIssuer() {
-  return (process.env.FRONTEND_URL as string).replace(/\/+$/, '')
+  return new URL(getFrontendUrl()).origin
 }
 
 // these two answer with the plain json their standards define, not the ApiResponse envelope: client libraries
@@ -12,7 +15,8 @@ export function oidcIssuer() {
 export class OidcController {
 
   // openid connect discovery 1.0: a client library needs only the issuer url, and reads everything else from here.
-  // it advertises only what the code really does, because a client trusts it and picks options from it
+  // a client trusts it and picks options from it, so every option is one the code supports. the /oauth endpoints are
+  // listed ahead of their routers during the dark build (OIDC_ENABLED is off in production until they all land)
   public handleDiscovery(req: Request, res: Response) {
     const issuer = oidcIssuer()
     const discovery = {
@@ -36,7 +40,7 @@ export class OidcController {
       // client_secret_post is left out: one way per client type means one code path to get right
       token_endpoint_auth_methods_supported: ['client_secret_basic', 'none'],
       revocation_endpoint_auth_methods_supported: ['client_secret_basic', 'none'],
-      scopes_supported: ['openid', 'profile', 'email', 'offline_access'],
+      scopes_supported: oidcScopes,
       claims_supported: ['iss', 'sub', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'email', 'email_verified', 'name'],
       // rfc 9207: iss rides on every authorization response, so a client using several providers can't be mixed up (rule 4)
       authorization_response_iss_parameter_supported: true,
@@ -44,6 +48,8 @@ export class OidcController {
       request_uri_parameter_supported: false,
     }
     res.set('Cache-Control', 'public, max-age=300')
+    // public and cookie-free, so any origin may read it: a browser app (a public client) fetches it cross-origin
+    res.set('Access-Control-Allow-Origin', '*')
     return res.status(200).json(discovery)
   }
 
@@ -53,6 +59,7 @@ export class OidcController {
     const {publicJwk} = await getSigningKey()
     // a few minutes, so a new key reaches clients soon after it's published
     res.set('Cache-Control', 'public, max-age=300')
+    res.set('Access-Control-Allow-Origin', '*')
     return res.status(200).json({keys: [publicJwk]})
   }
 }

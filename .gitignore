@@ -127,6 +127,9 @@ dist-server
 # Stores Visual Studio Code versions used for testing Visual Studio Code extensions
 .vscode-test
 
+# personal editor settings (e.g. which TypeScript VS Code uses); each person keeps their own
+.vscode/
+
 # pnpm
 .pnpm-store
 
