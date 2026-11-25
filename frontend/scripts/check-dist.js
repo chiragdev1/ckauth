@@ -21,8 +21,11 @@ const kib = bytes => (bytes / 1024).toFixed(1)
 // home page inlines only the css it uses (scripts/critical-css.js), which took it from 22.49 to 18.97 KiB. the same day the
 // hindi version was removed (copy, language switch, font): home JS 127.0 → 123.0 KiB, index.html 18.97 → 18.54 KiB.
 // both budgets were then set tight on purpose, a quarter KiB above the new sizes, so growth is a decision, not drift:
-// initialJs 127 → 123.25, homeHtml 22.5 → 18.75. raising one needs a reason in this comment, like the entries above
-const budgets = { initialJs: 123.25, lazyChunk: 30, homeHtml: 18.75 }
+// initialJs 127 → 123.25, homeHtml 22.5 → 18.75. raising one needs a reason in this comment, like the entries above.
+// 25 Nov 2026: the "How we know it's safe" proof section (home-copy.ts proof, home.tsx Proof), approved by the owner.
+// its words are in both the prerendered html and the js that hydrates it: home JS 123.0 → 123.5, index.html 18.54 → 19.1.
+// a quarter KiB above again: initialJs 123.25 → 123.75, homeHtml 18.75 → 19.35
+const budgets = { initialJs: 123.75, lazyChunk: 30, homeHtml: 19.35 }
 // with tight budgets the warning has to come early: 0.1 KiB is about one new section's worth of classes
 const warnWhenLeft = 0.1
 
@@ -116,6 +119,8 @@ for(const name of ['index.html', 'app.html', ...assets.filter(name => /\.(js|css
   if(/(?:src|href)="http:\/\//.test(text)) failures.push(`${name} loads something over plain http`)
   // the dev-only email designs page (src/pages/dev-emails.tsx) talks to an api route production doesn't have
   if(text.includes('/api/dev/emails')) failures.push(`${name} ships the dev-only email designs page`)
+  // the consent screen preview (src/pages/dev-oauth-consent.tsx) shows sample apps and fake redirects
+  if(text.includes('Consent screen preview')) failures.push(`${name} ships the dev-only consent screen preview`)
 }
 
 // measure before naming a cause: when a budget is tight, these say which part grew (7 Nov 2026: the guess was the

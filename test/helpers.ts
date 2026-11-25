@@ -9,7 +9,7 @@ import { eq, sql } from 'drizzle-orm'
 import { createExpressApplication } from '../src/app/index.js'
 import { withAuditMaintenance } from '../src/app/auth/utils/audit.js'
 import { db } from '../src/db/index.js'
-import { auditEventsTable, referralVisitsTable, sessionsTable, usersTable } from '../src/db/schema.js'
+import { auditEventsTable, oauthClientsTable, oauthCodesTable, oauthConsentsTable, oauthRefreshTokensTable, oauthRequestsTable, oauthSubjectsTable, referralVisitsTable, sessionsTable, usersTable } from '../src/db/schema.js'
 import { outbox } from '../src/utils/mail.js'
 import type { UserRole } from '../src/app/auth/utils/constants.js'
 
@@ -34,7 +34,9 @@ export async function startApp() {
 // holds tables this schema doesn't know (someone else's test database), postgres refuses instead of emptying them
 export async function resetDatabase() {
   // the activity log refuses a truncate unless the transaction opts in (withAuditMaintenance)
-  await withAuditMaintenance((tx) => tx.execute(sql`truncate table ${auditEventsTable}, ${referralVisitsTable}, ${sessionsTable}, ${usersTable}`))
+  // postgres refuses to truncate a table others reference unless they're in the same statement, so a new table with a
+  // foreign key to users (or to oauth_clients) must be added here
+  await withAuditMaintenance((tx) => tx.execute(sql`truncate table ${auditEventsTable}, ${referralVisitsTable}, ${sessionsTable}, ${oauthRequestsTable}, ${oauthCodesTable}, ${oauthConsentsTable}, ${oauthRefreshTokensTable}, ${oauthSubjectsTable}, ${oauthClientsTable}, ${usersTable}`))
   outbox.length = 0
 }
 
@@ -50,6 +52,8 @@ export class Client {
   readonly ip: string
   // what the "browser" calls itself; fetch's default is "node"
   userAgent: string | undefined
+  // headers a real browser adds on its own (Origin, Sec-Fetch-Site), for tests about where a request came from
+  browserHeaders: Record<string, string> = {}
 
   constructor(private baseUrl: string, ip?: string) {
     clientCount += 1
@@ -68,7 +72,7 @@ export class Client {
   }
 
   async request(method: string, path: string, body?: unknown): Promise<ApiResult> {
-    const headers: Record<string, string> = {'x-forwarded-for': this.ip}
+    const headers: Record<string, string> = {...this.browserHeaders, 'x-forwarded-for': this.ip}
     if(this.userAgent) {
       headers['user-agent'] = this.userAgent
     }

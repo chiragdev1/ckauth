@@ -1,0 +1,193 @@
+import assert from 'node:assert/strict'
+import { afterEach, describe, test } from 'node:test'
+import http from 'node:http'
+import type { AddressInfo } from 'node:net'
+import * as jose from 'jose'
+
+import { createExpressApplication } from '../src/app/index.js'
+import { isOidcEnabled } from '../src/app/oidc/enabled.js'
+import { getSigningKey, resetSigningKeyForTests } from '../src/app/oidc/keys.js'
+import { oidcIssuer } from '../src/app/oidc/controller.js'
+import { startApp } from './helpers.js'
+
+const baseUrl = await startApp()
+const testKey = process.env.OIDC_SIGNING_KEY
+
+afterEach(() => {
+  process.env.OIDC_SIGNING_KEY = testKey
+  resetSigningKeyForTests()
+})
+
+async function getJson(path: string) {
+  const response = await fetch(`${baseUrl}${path}`)
+  // any: the tests assert on the fields, so a wrong shape fails an assertion rather than the type check
+  return {status: response.status, headers: response.headers, body: await response.json() as any}
+}
+
+describe('GET /.well-known/openid-configuration', () => {
+  test('names the issuer and every endpoint under it', async () => {
+    const {status, body} = await getJson('/.well-known/openid-configuration')
+    assert.equal(status, 200)
+    // FRONTEND_URL in test/env.ts; exact, because clients compare iss character for character
+    assert.equal(body.issuer, 'http://ckauth.test')
+    assert.equal(body.jwks_uri, 'http://ckauth.test/.well-known/jwks.json')
+    for(const field of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'revocation_endpoint', 'end_session_endpoint']) {
+      assert.match(body[field], /^http:\/\/ckauth\.test\/oauth\//, field)
+    }
+  })
+
+  test('the issuer never comes from the Host or X-Forwarded-Host header', async () => {
+    // fetch won't let a caller set Host, so a raw request does it
+    const {port} = new URL(baseUrl)
+    const body = await new Promise<string>((resolve, reject) => {
+      http.get({host: '127.0.0.1', port, path: '/.well-known/openid-configuration', headers: {host: 'evil.test', 'x-forwarded-host': 'evil.test', 'x-forwarded-proto': 'https'}}, response => {
+        let data = ''
+        response.on('data', chunk => { data += chunk })
+        response.on('end', () => resolve(data))
+      }).on('error', reject)
+    })
+    assert.equal(JSON.parse(body).issuer, 'http://ckauth.test')
+  })
+
+  test('offers only the safe options: code + pkce s256, pairwise ids, es256, iss on responses', async () => {
+    const {body} = await getJson('/.well-known/openid-configuration')
+    assert.deepEqual(body.response_types_supported, ['code'])
+    assert.deepEqual(body.response_modes_supported, ['query'])
+    assert.deepEqual(body.code_challenge_methods_supported, ['S256'])
+    assert.deepEqual(body.subject_types_supported, ['pairwise'])
+    assert.deepEqual(body.id_token_signing_alg_values_supported, ['ES256'])
+    assert.ok(!body.grant_types_supported.includes('implicit') && !body.grant_types_supported.includes('password'))
+    assert.ok(!body.token_endpoint_auth_methods_supported.includes('client_secret_post'))
+    assert.equal(body.authorization_response_iss_parameter_supported, true)
+    // defaults to true in the spec when left out
+    assert.equal(body.request_uri_parameter_supported, false)
+  })
+
+  test('is cacheable for a few minutes, and readable from any origin', async () => {
+    for(const path of ['/.well-known/openid-configuration', '/.well-known/jwks.json']) {
+      const {headers} = await getJson(path)
+      assert.equal(headers.get('cache-control'), 'public, max-age=300', path)
+      // a browser app (a public client) reads both cross-origin
+      assert.equal(headers.get('access-control-allow-origin'), '*', path)
+    }
+  })
+
+  test('the issuer is the bare origin, and falls back like every other link when FRONTEND_URL is unset', () => {
+    const saved = process.env.FRONTEND_URL
+    try {
+      process.env.FRONTEND_URL = 'https://ckauth.example/'
+      assert.equal(oidcIssuer(), 'https://ckauth.example')
+      delete process.env.FRONTEND_URL
+      assert.equal(oidcIssuer(), 'http://localhost:3000')
+    } finally {
+      process.env.FRONTEND_URL = saved
+    }
+  })
+})
+
+describe('GET /.well-known/jwks.json', () => {
+  test('publishes one public es256 key, with its thumbprint as kid and no private part', async () => {
+    const {status, headers, body} = await getJson('/.well-known/jwks.json')
+    assert.equal(status, 200)
+    assert.equal(headers.get('cache-control'), 'public, max-age=300')
+    assert.equal(body.keys.length, 1)
+    const [key] = body.keys
+    assert.equal(key.kty, 'EC')
+    assert.equal(key.crv, 'P-256')
+    assert.equal(key.alg, 'ES256')
+    assert.equal(key.use, 'sig')
+    assert.equal(key.d, undefined)
+    const {kid: _kid, alg: _alg, use: _use, ...bare} = key
+    assert.equal(key.kid, await jose.calculateJwkThumbprint(bare, 'sha256'))
+  })
+
+  test('verifies what the private key signs, and only with es256', async () => {
+    const {body} = await getJson('/.well-known/jwks.json')
+    const {kid, privateKey} = await getSigningKey()
+    const token = await new jose.SignJWT({hello: 'world'}).setProtectedHeader({alg: 'ES256', kid}).sign(privateKey)
+    const jwks = jose.createLocalJWKSet(body)
+    const {payload} = await jose.jwtVerify(token, jwks, {algorithms: ['ES256']})
+    assert.equal(payload.hello, 'world')
+  })
+
+  test('answers 503 without a key, and works once one is set and the api restarts', async () => {
+    process.env.OIDC_SIGNING_KEY = ''
+    resetSigningKeyForTests()
+    assert.equal((await getJson('/.well-known/jwks.json')).status, 503)
+    // the rest of the api is unaffected
+    assert.equal((await getJson('/.well-known/openid-configuration')).status, 200)
+
+    process.env.OIDC_SIGNING_KEY = testKey
+    // resetting is what a restart does
+    resetSigningKeyForTests()
+    assert.equal((await getJson('/.well-known/jwks.json')).status, 200)
+  })
+
+  test('a failed key load is remembered, not retried on every request', async () => {
+    process.env.OIDC_SIGNING_KEY = 'not a pem'
+    resetSigningKeyForTests()
+    assert.equal((await getJson('/.well-known/jwks.json')).status, 500)
+    // a good key appearing in the environment changes nothing until the process restarts: no re-import per hit
+    process.env.OIDC_SIGNING_KEY = testKey
+    assert.equal((await getJson('/.well-known/jwks.json')).status, 500)
+  })
+
+  test('a key on the wrong curve (p-384) is refused rather than published', async () => {
+    const {generateKeyPairSync} = await import('node:crypto')
+    process.env.OIDC_SIGNING_KEY = generateKeyPairSync('ec', {namedCurve: 'P-384'}).privateKey.export({type: 'pkcs8', format: 'pem'}) as string
+    resetSigningKeyForTests()
+    assert.equal((await getJson('/.well-known/jwks.json')).status, 500)
+  })
+})
+
+describe('OIDC_ENABLED (the kill switch)', () => {
+  // a second, switched-off app beside the file's own; closed here, not by startApp, which also ends the db pool
+  async function withSwitchedOffApp(value: string | undefined, check: (url: string) => Promise<void>) {
+    const saved = process.env.OIDC_ENABLED
+    if(value === undefined) delete process.env.OIDC_ENABLED
+    else process.env.OIDC_ENABLED = value
+    const server = createExpressApplication().listen(0)
+    // the flag is read only inside createExpressApplication, so it can be put back straight away
+    process.env.OIDC_ENABLED = saved ?? ''
+    try {
+      await new Promise((resolve) => server.once('listening', resolve))
+      await check(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)
+    } finally {
+      server.closeAllConnections()
+      await new Promise((resolve) => server.close(resolve))
+    }
+  }
+
+  // anything but an exact "true" leaves it off: a typo in api.env must never switch a half-built feature on
+  for(const value of [undefined, '', 'false', '0', 'yes', 'TRUE ', 'ture']) {
+    test(`unset or ${JSON.stringify(value)}: discovery and jwks don't exist`, async () => {
+      await withSwitchedOffApp(value, async (url) => {
+        for(const path of ['/.well-known/openid-configuration', '/.well-known/jwks.json']) {
+          assert.equal((await fetch(`${url}${path}`)).status, 404, path)
+        }
+        // the rest of the api is unaffected
+        assert.equal((await fetch(`${url}/`)).status, 200)
+      })
+    })
+  }
+
+  test('"true" mounts them (the rest of this file runs with it on)', () => {
+    assert.equal(isOidcEnabled('true'), true)
+  })
+})
+
+describe('FRONTEND_URL at startup', () => {
+  // the issuer, the cross-site check and every email link are built from it, so a bad value stops the api starting
+  // rather than becoming a 500 on each request
+  for(const value of ['ckauth.chiragdev.com', 'localhost:3000', 'ftp://ckauth.test']) {
+    test(`${JSON.stringify(value)} refuses to start`, () => {
+      const saved = process.env.FRONTEND_URL
+      process.env.FRONTEND_URL = value
+      try {
+        assert.throws(() => createExpressApplication(), /FRONTEND_URL must be an absolute http\(s\) url/)
+      } finally {
+        process.env.FRONTEND_URL = saved
+      }
+    })
+  }
+})

@@ -95,6 +95,30 @@ Fixed details:
 
 ---
 
+## 4a. How we know it's safe (the proof ledger)
+
+Added 25 Nov 2026. Each claim from the features above, with how we know it. A milestone that lands adds one line; nothing here may be true only on a branch or behind a switch (Sign in with CKAuth stays off this list until its Beta launches).
+
+- Eyebrow: Proof, not promises
+- Title: How we know it's safe
+- Stamp: Verified 25 Nov 2026
+
+| Claim | Proof |
+|---|---|
+| Passwords can't be read, even by us | Stored with bcrypt, a one-way code built to be slow to crack, and checked by tests on every release. |
+| Nobody can find out who has an account | Real and unknown emails get the same answer at the same speed: 54.4 ms vs 54.5 ms, measured under load. |
+| The activity log can't be rewritten | The database itself refuses every edit, even from CKAuth's own server, and deletes an event only once its retention period is over. |
+| Nothing ships unless 270+ tests pass | They cover 96% of the code, and one failure stops a release before it's built. |
+
+- Link: Read the code and every test on GitHub
+
+**Rules for this section:**
+- **Round down, never up.** The numbers live in `proofNumbers` (`home-copy.ts`), and `pnpm check:pr` compares them with the test run it just did: it fails if the page claims more than was measured, lags by more than 10%, or the stamp is over 45 days old (`scripts/checks/proof-numbers.js`).
+- **A measured figure names how it was measured** ("measured under load"), so it reads as evidence, not a slogan. Re-measure it when the load test is re-run (ROADMAP: "Re-run the load test").
+- **Plain words first, the technical term second:** the claim is for a website owner, the proof line for a developer or a reviewer.
+
+---
+
 ## 5. One simple path
 
 - Eyebrow: How it works

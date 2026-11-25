@@ -304,6 +304,8 @@ Paste the sample's contents and fill in each empty value:
 | `RESEND_API_KEY` | From step 5 |
 | `EMAIL_FROM` | `CKAuth <no-reply@yourdomain.com>`, using your **Resend-verified** domain |
 | `IMAGEKIT_PRIVATE_KEY` | From ImageKit → Developer → API keys, or leave empty to run without avatars |
+| `OIDC_ENABLED` | Leave `false`. This **kill switch** (a setting that turns a feature off without a code change) keeps Sign in with CKAuth unmounted while it's built; only the exact value `true` turns it on. It changes at the Beta launch ([docs/OIDC.md](OIDC.md)) |
+| `OIDC_SIGNING_KEY` | The private key that signs Sign in with CKAuth's **id tokens** (the signed note that tells another site who signed in). Make it on the VPS with `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 \| awk 'NF {printf "%s\\n", $0}'` and paste the single line it prints (the `\n`s are the PEM file's line breaks, which the API restores). ES256 (P-256) only; another curve is refused. Can stay empty while `OIDC_ENABLED` is off |
 
 **6d. Lock both files** so only the `deploy` group (you and GitHub Actions) can read them. 🖥️ VPS:
 
@@ -529,6 +531,7 @@ Change a secret if it may have leaked, or as routine hygiene.
 | `ACCESS_TOKEN_SECRET_KEY` / `REFRESH_TOKEN_SECRET_KEY` | New value (`openssl rand -hex 64`) in `api.env` → `docker compose up -d api` | **Everyone is signed out** |
 | `RESEND_API_KEY` | Create a new key in Resend → update `api.env` → `up -d api` → delete the old key in Resend | None |
 | `IMAGEKIT_PRIVATE_KEY` | Same pattern | None |
+| `OIDC_SIGNING_KEY` | Not yet: before launch, a new key (same command as step 6c) in `api.env` → `up -d api`. After launch, rotate in two steps so tokens already handed out still verify ([docs/OIDC.md](OIDC.md), rule 15) | None today; after launch, a one-step swap breaks every other site's sign-in check until their key cache refreshes |
 | `POSTGRES_PASSWORD` | See below (two places must change together) | A few seconds of downtime |
 | `API_DB_PASSWORD` | New value (`openssl rand -hex 32`) in `.env` → `docker compose run --rm migrate` (sets it in the database) → `docker compose up -d api` | A few seconds of API errors between the two commands |
 | The GitHub deploy key | [VPS-ACCESS.md, Part 3](VPS-ACCESS.md#part-3-github-actions--vps) with a new key, update `VPS_SSH_KEY`, remove the old line from `/home/deploy/.ssh/authorized_keys` | None |
@@ -709,6 +712,37 @@ Measured on 2 dedicated cores, with the API capped like production. **Expect abo
 | Profile loads (`/me`) per second | ~2,100 |
 | One attacker guessing passwords | Blocked after 100 attempts in 15 min; real users unaffected (p95 46 ms) |
 | A botnet using real account emails (rate limits can't stop it) | Real users slow to ~0.8 s until every targeted email has failed 5 times |
+
+**These figures are older than today's code.** The load test ran on 21 Oct 2026. Sessions and the activity log came on 2 Nov: since then every signed-in request joins `users` with `sessions` to check that the session still exists, and every sign-in writes a session row and an audit event in one transaction. Until the test is re-run, plan with these estimates for the real VPS (11 Nov 2026):
+
+| Load | Realistic | Pessimistic |
+|---|---|---|
+| Sign-ins per second | ~18–22 | ~12–15 |
+| Profile loads (`/me`) per second | ~1,000–1,500 | ~600–900 |
+| People online with p95 under ~200 ms | ~1,000–1,500 | ~700–1,000 |
+| A botnet using real account emails | Real users at ~1–2 s | Several seconds, if Redis is also down |
+
+Why the estimates are lower:
+
+- **Sign-in is bound by bcrypt.** At cost 10 one hash takes about 55–60 ms of CPU, so the 1.5 vCPU cap allows at most ~25 a second before any database work. The VPS's vCPUs are shared with other customers, and their load shows up as *steal time* (see the [glossary](GLOSSARY.md)), which can take 20–40% away at busy times.
+- **Postgres has 1 vCPU and the API has 10 connections** (the `pg` driver's default *connection pool*). The extra session check and the audit writes all wait for one of those 10.
+- **Overload is a cliff, not a slope.** In the lab, 1,000 people online had a p95 of 5 ms and 2,000 had 100 ms; before the October fixes 2,000 meant 12 s. Once requests arrive faster than they finish, the queue only grows, so the pessimistic column is where the cliff may start.
+- **Rate limits fail open.** If Redis is down during a password-guessing flood, nothing slows the flood, and bcrypt fills all 4 thread-pool threads, which database reconnects also need for their DNS lookups.
+
+**Is that enough?** People online at once are roughly 1–5% of daily users (a rule of thumb), so even the pessimistic column serves somewhere between 15,000 and 100,000 people a day. Most people sign in once and stay signed in through `/refresh`, which skips bcrypt, so even 100,000 monthly users need only a few sign-ins a second at peak. The server is far bigger than CKAuth needs today. What visitors notice first is distance (the weekly `pnpm perf` figures below), not capacity.
+
+**What visitors feel**, from the first weekly `perf.yml` run (9 Nov 2026, a GitHub runner in the US):
+
+| Measure | Desktop | Phone (slow 4G) | Google's "good" limit |
+|---|---|---|---|
+| Connection set-up (TCP + TLS) | 485 ms | 483 ms | n/a |
+| TTFB | 730 ms | 728 ms | ≤ 800 ms: passes, barely |
+| Home page LCP | 1.15 s | 1.31 s | ≤ 2.5 s: passes |
+| Sign-in page LCP | 2.09 s | **3.26 s** | ≤ 2.5 s: **fails on a phone** |
+| Home page CLS | 0.09 | 0.001 | ≤ 0.1: passes, barely, on desktop |
+| API round trip | 242 ms median, 243 ms p95 | | |
+
+Each trip between the US and the server takes about a quarter of a second, and a first page load needs several, so a visitor far away waits 3–4 s on a phone before they can sign in; visitors near the server wait much less. A CDN for the static files, such as Cloudflare in front, would leave only the `/api` calls making the long trip. This is one run from one place, so treat it as a first reading until a few weeks of runs show a trend.
 
 **If you outgrow this:** a botnet is the one case the app can't absorb on its own. Put Cloudflare in front, either as a proxy with a WAF or with Turnstile on the sign-in form. Beyond ~2,000 people online at once, move to a KVM 4 (4 vCPUs) and raise the API's CPU cap.
 

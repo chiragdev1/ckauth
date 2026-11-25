@@ -4,6 +4,9 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { checkBetaBadge } from './checks/beta-badge.js'
+import { findOidcFlags, scopeOf } from './checks/oidc-flags.js'
+
 const failures = []
 const warnings = []
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' })
@@ -41,6 +44,17 @@ const apiSources = tracked.filter(file => file.startsWith('src/') && file.endsWi
 for(const file of apiSources) {
   const source = readFileSync(file, 'utf8')
   if(source.includes('bcryptjs')) failures.push(`${file}: use native bcrypt, never bcryptjs`)
+  // every jwt.verify names its algorithms (docs/OIDC.md, "Pinning today's algorithm"): an unpinned verify trusts the
+  // token's own header to pick the algorithm, which becomes algorithm confusion once a public key exists
+  // jose's jwtVerify too, which the oidc code will use. a call is read up to its first ")" at a line end, so options
+  // split over several lines still count, and a later call's algorithms can't vouch for this one
+  for(const match of source.matchAll(/\b(?:jwt\.verify|jwtVerify)\(/g)) {
+    const end = source.indexOf(')\n', match.index)
+    const call = source.slice(match.index, end === -1 ? undefined : end)
+    if(!call.includes('algorithms')) {
+      failures.push(`${file}:${source.slice(0, match.index).split('\n').length}: ${match[0]}…) must name its algorithms`)
+    }
+  }
   // the api logs through pino (req.log / logger) so every line is JSON with a request id; only the CLIs print
   const mayPrint = file.startsWith('src/scripts/') || file === 'src/db/migrate.ts'
   source.split('\n').forEach((line, index) => {
@@ -96,7 +110,7 @@ const limiters = new Map([...limiterSource.matchAll(/^\s+(\w+): createRateLimite
   key: keyKinds[options.match(/key: (\w+)/)?.[1] ?? 'ipKey'],
   failuresOnly: /failuresOnly: true/.test(options),
 }]))
-const mounts = Object.fromEntries([...readFileSync('src/app/index.ts', 'utf8').matchAll(/app\.use\('(\/[\w.-]+)', (\w+)\)/g)].map(([, prefix, router]) => [router, prefix]))
+const mounts = Object.fromEntries([...readFileSync('src/app/index.ts', 'utf8').matchAll(/app\.use\('(\/[\w.-]+)', (?:\w+, )*(\w+Router)\)/g)].map(([, prefix, router]) => [router, prefix]))
 const describeLimit = ({window, limit, key, failuresOnly}) => `${limit}/${window}/${key}${failuresOnly ? '/failures' : ''}`
 const codeLimits = new Set()
 let limiterUses = 0
@@ -127,6 +141,23 @@ if(!codeLimits.size || !docLimits.size) failures.push(`rate-limit check read ${c
 for(const entry of codeLimits) if(!docLimits.has(entry)) failures.push(`docs/API.md rate-limit table is missing or wrong for: ${entry} (limit/window/key from the code)`)
 for(const entry of docLimits) if(!codeLimits.has(entry)) failures.push(`docs/API.md rate-limit table lists ${entry}, which the code doesn't have`)
 
+// docs/OIDC.md rule 27: no trusted, first-party or skip-consent flag, in the schema or in the code. the detector and
+// its scope are in checks/oidc-flags.js, with its own tests (oidc-flags.test.js) for what it must and mustn't catch
+const rule27Files = committable.filter(file => scopeOf(file) && existsSync(file))
+for(const file of rule27Files) {
+  for(const {line, name, reason} of findOidcFlags(file, readFileSync(file, 'utf8'))) {
+    failures.push(`${file}:${line}: "${name}" ${reason}. No app may skip consent, PKCE, the exact redirect match, scope limits or pairwise ids (docs/OIDC.md, rule 27)`)
+  }
+}
+// an empty scope would pass forever without checking anything: a moved folder or renamed schema must fail here
+if(!rule27Files.some(file => file.startsWith('src/app/oidc/')) || !rule27Files.includes('src/db/schema.ts')) {
+  failures.push('rule 27 check no longer reads src/app/oidc/ or src/db/schema.ts: fix scopeOf in scripts/checks/oidc-flags.js')
+}
+
+// the beta badge goes on every oidc page and nowhere else (CLAUDE.md → Frontend); the rule is in checks/beta-badge.js
+const frontendFiles = committable.filter(file => file.startsWith('frontend/src/') && file.endsWith('.tsx') && existsSync(file))
+failures.push(...checkBetaBadge(new Map(frontendFiles.map(file => [file, readFileSync(file, 'utf8')]))))
+
 // the web Caddyfile's @app list must match the routes in app.tsx, or a route gets a 404 (or a noindex goes missing)
 // /dev/… pages are development only (frontend/scripts/check-dist.js fails a build that ships one), so caddy never serves them
 const routes = [...readFileSync('frontend/src/app.tsx', 'utf8').matchAll(/path: '(\/[^']+)'/g)].map(match => match[1]).filter(route => !route.startsWith('/dev/')).sort()
@@ -153,6 +184,11 @@ if([...changed].some(file => /^src\/app\/[^/]+\/(routes|models)\.ts$/.test(file)
 }
 const featureTouched = [...changed].some(file => file.startsWith('frontend/src/pages/') || /^src\/app\/[^/]+\/routes\.ts$/.test(file))
 if(featureTouched && !changed.has('frontend/index.html')) warnings.push('a page or endpoint changed: does the search title/description still match? (frontend/index.html)')
+// .claude/CONTEXT.md indexes these files (endpoint matrix, tables, routes, audit actions, limiters, checks); a warning,
+// not a failure, since its line numbers are hints and not every edit moves what it indexes
+const indexed = [/^src\/app\/[^/]+\/routes\.ts$/, /^src\/db\/schema\.ts$/, /^frontend\/src\/app\.tsx$/, /^src\/app\/auth\/utils\/constants\.ts$/, /^src\/app\/middlewares\/rate-limit\.ts$/, /^scripts\/check-repo\.js$/, /^frontend\/scripts\/check-dist\.js$/]
+const indexTouched = [...changed].filter(file => indexed.some(pattern => pattern.test(file)))
+if(indexTouched.length && !changed.has('.claude/CONTEXT.md')) warnings.push(`${indexTouched.join(', ')} changed but .claude/CONTEXT.md did not: update its tables`)
 
 for(const warning of warnings) console.log(`  warn  ${warning}`)
 for(const failure of failures) console.log(`  FAIL  ${failure}`)

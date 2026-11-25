@@ -102,6 +102,10 @@ Then open `.env` and fill in the values:
 | `FRONTEND_URL` | Yes | Base URL of your frontend. Links in emails point here. Default: `http://localhost:3000`. |
 | `IMAGEKIT_PRIVATE_KEY` | For avatars | ImageKit private API key. The server starts without it; only avatar uploads fail. |
 | `REDIS_URL` | No | Redis for rate-limit counts, e.g. `redis://localhost:6379`. Without it, limits are counted in the process's memory (fine for one local process). |
+| `OIDC_ENABLED` | No | Kill switch for Sign in with CKAuth (in progress): only the exact value `true` mounts `/.well-known/*` and `/oauth/*`; unset or anything else leaves them off (a `404`). The test suite sets it to `true`. |
+| `OIDC_SIGNING_KEY` | No | Sign in with CKAuth (in progress): the PEM contents of an ES256 (P-256) private key that signs id tokens. Without it, `/.well-known/jwks.json` answers `503` and the rest of the API works. See [docs/OIDC.md](docs/OIDC.md). |
+| `API_DB_PASSWORD` | Production | Password for the limited `ckauth_api` database role, set by the migrator (at least 32 hex characters, `openssl rand -hex 32`). Not needed locally, where the API uses `DATABASE_URL`'s owner. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). |
+| `MAIL_TRANSPORT` | Tests | Set to `memory` by the test suite, so no email leaves the machine and a test reads the link from the outbox. Leave it unset otherwise. |
 | `LOG_LEVEL` | No | How much the API logs: `debug`, `info`, `warn` or `error`. Default: `info`. The API always writes JSON lines; `pnpm dev` pipes them through pino-pretty so they're readable in a terminal. |
 
 Generate strong JWT secrets with:

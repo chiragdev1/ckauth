@@ -20,6 +20,7 @@ Everything a client needs in order to use the Authentication API. New to some of
   - [List devices](#get-authsessions) · [Sign out a device](#delete-authsessionsid) · [Sign out other devices](#delete-authsessions)
   - [Forgot password](#post-authforgot-password) · [Reset password](#post-authreset-passwordtoken) · [Change password](#post-authchange-password)
 - [Metrics](#post-metricsvisit): count a visit from a tagged link
+- [Sign in with CKAuth (Beta)](#sign-in-with-ckauth-beta): [discovery](#get-well-knownopenid-configuration) · [signing keys](#get-well-knownjwksjson)
 - [Admin endpoints](#admin-endpoints): [stats](#get-adminstats) · [list users](#get-adminusers) · [activity log](#get-adminactivity) · [confirm password](#post-adminreauth) · [invite user](#post-adminusers) · [delete user](#delete-adminusersid)
 - [Typical flows](#typical-flows)
 
@@ -102,7 +103,7 @@ Invalid input returns **`400`** with every problem listed in the message, as `fi
 |---|---|
 | `400` | Invalid input (see above). |
 | `401` | Not signed in, the session has expired, or the credentials are wrong. |
-| `403` | Signed in correctly, but the email isn't verified yet, or (on `/admin` endpoints) the user isn't an admin. |
+| `403` | Signed in correctly, but the email isn't verified yet, or (on `/admin` endpoints) the user isn't an admin. Also `Cross-site request refused` for any write (`POST`, `PATCH`, `DELETE`) under `/auth`, `/admin` or `/metrics` that a browser sends from another origin: the browser's `Sec-Fetch-Site` header must be `same-origin`, or, without it, `Origin` must be the web app's own. A request with neither header (curl, a server) isn't affected. Request bodies are JSON only. |
 | `404` | The link or token is invalid or has expired. |
 | `429` | Too many attempts. See [Rate limits](#rate-limits). |
 | `500` | Server error. Usually `Internal Server Error`, sometimes a more specific message (e.g. `Could not save refresh token in db`). Safe to retry. |
@@ -682,6 +683,49 @@ Counts one visit that arrived through one of our own tagged links, such as `http
 
 > **Frontend:** `captureReferral()` (`frontend/src/lib/referral.ts`) posts this once per tab when the page opens with `?ref=`, removes the tag from the address bar, and keeps it in session storage so [Sign up](#post-authsign-up) can send it as `ref`.
 > **Adding a tag:** add it to `referralSources` before posting links with it; until then its visits aren't counted.
+
+---
+
+## Sign in with CKAuth (Beta)
+
+These endpoints are the start of the OpenID Connect provider (OIDC: the standard that lets other sites sign their users in through CKAuth; design in [OIDC.md](OIDC.md)). They exist only when the `OIDC_ENABLED` kill switch is `true`; otherwise they answer `404`. It is off in production until the Beta launches. Their paths are fixed by the standards, so they sit under `/.well-known`, not `/auth`. Both are public: no authentication, no rate limit, and no database read. They answer with the plain JSON their standards define, **not** the `{ success, message, data }` envelope, because client libraries read the fields at the top level. Both send `Cache-Control: public, max-age=300` and `Access-Control-Allow-Origin: *` (CORS, so a browser app on another site can read them).
+
+### `GET /.well-known/openid-configuration`
+
+The discovery document (OpenID Connect Discovery 1.0): a client library needs only the issuer URL and reads every endpoint and option from here. The `issuer` is the site's origin from `FRONTEND_URL` with no trailing slash, never the request's `Host` header.
+
+**Response: `200`**, abridged:
+
+```json
+{
+  "issuer": "https://ckauth.chiragdev.com",
+  "authorization_endpoint": "https://ckauth.chiragdev.com/oauth/authorize",
+  "jwks_uri": "https://ckauth.chiragdev.com/.well-known/jwks.json",
+  "response_types_supported": ["code"],
+  "code_challenge_methods_supported": ["S256"],
+  "subject_types_supported": ["pairwise"],
+  "id_token_signing_alg_values_supported": ["ES256"]
+}
+```
+
+> **Not built yet:** the `/oauth/*` endpoints it lists (`authorize`, `token`, `userinfo`, `revoke`, `logout`) don't exist yet. They're advertised ahead of the code while the feature is built behind the kill switch.
+
+### `GET /.well-known/jwks.json`
+
+The JWKS (JSON Web Key Set, RFC 7517): the public half of every key a valid CKAuth token can be signed with. Each key's `kid` (key ID) is its RFC 7638 thumbprint.
+
+**Response: `200`**
+
+```json
+{ "keys": [{ "kty": "EC", "crv": "P-256", "x": "…", "y": "…", "kid": "…", "alg": "ES256", "use": "sig" }] }
+```
+
+**Errors**
+
+| Status | When |
+|---|---|
+| `503` | `OIDC_SIGNING_KEY` isn't set (`Sign in with CKAuth is not configured`). Set it in `/opt/ckauth/api.env` and run `docker compose up -d api`; the key is read once per process. |
+| `500` | `OIDC_SIGNING_KEY` isn't a valid P-256 (ES256) private key in PKCS #8 PEM format. |
 
 ---
 

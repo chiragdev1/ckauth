@@ -17,6 +17,7 @@ export function Home() {
       <Hero copy={copy} />
       <Ticker items={copy.ticker} pauseLabel={copy.tickerPause} />
       <Features copy={copy} />
+      <Proof copy={copy} />
       <Steps copy={copy} />
       <Business copy={copy} />
       <Developers copy={copy} />
@@ -193,6 +194,36 @@ function Features({ copy }: { copy: HomeCopy }) {
             )
           })}
         </div>
+      </div>
+    </section>
+  )
+}
+
+// each claim from the features, with how we know it. a plain list, so a new milestone is one more line, not a redesign
+function Proof({ copy }: { copy: HomeCopy }) {
+  const { proof } = copy
+
+  return (
+    <section id="proof" className="scroll-mt-20 border-b py-24 sm:py-32">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6">
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+          <Heading eyebrow={proof.eyebrow} title={proof.title} />
+          <p className="text-sm text-muted-foreground">{proof.verified}</p>
+        </div>
+        <ul className="mt-12 divide-y border-y">
+          {proof.items.map(item => (
+            <li key={item.claim} className="flex gap-4 py-6">
+              <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-success" />
+              <div>
+                <h3 className="font-semibold">{item.claim}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.proof}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <a href={REPO_URL} target="_blank" rel="noreferrer" className="mt-8 inline-flex items-center gap-2 font-medium text-primary underline-offset-4 hover:underline">
+          {proof.link}<ExternalLink aria-hidden className="size-4" />
+        </a>
       </div>
     </section>
   )
