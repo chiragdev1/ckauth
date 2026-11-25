@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, test } from 'node:test'
+import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import * as jose from 'jose'
 
@@ -35,9 +36,17 @@ describe('GET /.well-known/openid-configuration', () => {
     }
   })
 
-  test('the issuer never comes from the Host header', async () => {
-    const response = await fetch(`${baseUrl}/.well-known/openid-configuration`, {headers: {'X-Forwarded-Host': 'evil.test'}})
-    assert.equal((await response.json() as any).issuer, 'http://ckauth.test')
+  test('the issuer never comes from the Host or X-Forwarded-Host header', async () => {
+    // fetch won't let a caller set Host, so a raw request does it
+    const {port} = new URL(baseUrl)
+    const body = await new Promise<string>((resolve, reject) => {
+      http.get({host: '127.0.0.1', port, path: '/.well-known/openid-configuration', headers: {host: 'evil.test', 'x-forwarded-host': 'evil.test', 'x-forwarded-proto': 'https'}}, response => {
+        let data = ''
+        response.on('data', chunk => { data += chunk })
+        response.on('end', () => resolve(data))
+      }).on('error', reject)
+    })
+    assert.equal(JSON.parse(body).issuer, 'http://ckauth.test')
   })
 
   test('offers only the safe options: code + pkce s256, pairwise ids, es256, iss on responses', async () => {
@@ -101,7 +110,7 @@ describe('GET /.well-known/jwks.json', () => {
     assert.equal(payload.hello, 'world')
   })
 
-  test('answers 503 without a key, and works once one is set, with no restart', async () => {
+  test('answers 503 without a key, and works once one is set and the api restarts', async () => {
     process.env.OIDC_SIGNING_KEY = ''
     resetSigningKeyForTests()
     assert.equal((await getJson('/.well-known/jwks.json')).status, 503)
@@ -109,7 +118,18 @@ describe('GET /.well-known/jwks.json', () => {
     assert.equal((await getJson('/.well-known/openid-configuration')).status, 200)
 
     process.env.OIDC_SIGNING_KEY = testKey
+    // resetting is what a restart does
+    resetSigningKeyForTests()
     assert.equal((await getJson('/.well-known/jwks.json')).status, 200)
+  })
+
+  test('a failed key load is remembered, not retried on every request', async () => {
+    process.env.OIDC_SIGNING_KEY = 'not a pem'
+    resetSigningKeyForTests()
+    assert.equal((await getJson('/.well-known/jwks.json')).status, 500)
+    // a good key appearing in the environment changes nothing until the process restarts: no re-import per hit
+    process.env.OIDC_SIGNING_KEY = testKey
+    assert.equal((await getJson('/.well-known/jwks.json')).status, 500)
   })
 
   test('a key on the wrong curve (p-384) is refused rather than published', async () => {
@@ -154,4 +174,20 @@ describe('OIDC_ENABLED (the kill switch)', () => {
   test('"true" mounts them (the rest of this file runs with it on)', () => {
     assert.equal(isOidcEnabled('true'), true)
   })
+})
+
+describe('FRONTEND_URL at startup', () => {
+  // the issuer, the cross-site check and every email link are built from it, so a bad value stops the api starting
+  // rather than becoming a 500 on each request
+  for(const value of ['ckauth.chiragdev.com', 'localhost:3000', 'ftp://ckauth.test']) {
+    test(`${JSON.stringify(value)} refuses to start`, () => {
+      const saved = process.env.FRONTEND_URL
+      process.env.FRONTEND_URL = value
+      try {
+        assert.throws(() => createExpressApplication(), /FRONTEND_URL must be an absolute http\(s\) url/)
+      } finally {
+        process.env.FRONTEND_URL = saved
+      }
+    })
+  }
 })

@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { checkBetaBadge } from './checks/beta-badge.js'
 import { findOidcFlags, scopeOf } from './checks/oidc-flags.js'
 
 const failures = []
@@ -152,6 +153,10 @@ for(const file of rule27Files) {
 if(!rule27Files.some(file => file.startsWith('src/app/oidc/')) || !rule27Files.includes('src/db/schema.ts')) {
   failures.push('rule 27 check no longer reads src/app/oidc/ or src/db/schema.ts: fix scopeOf in scripts/checks/oidc-flags.js')
 }
+
+// the beta badge goes on every oidc page and nowhere else (CLAUDE.md → Frontend); the rule is in checks/beta-badge.js
+const frontendFiles = committable.filter(file => file.startsWith('frontend/src/') && file.endsWith('.tsx') && existsSync(file))
+failures.push(...checkBetaBadge(new Map(frontendFiles.map(file => [file, readFileSync(file, 'utf8')]))))
 
 // the web Caddyfile's @app list must match the routes in app.tsx, or a route gets a 404 (or a noindex goes missing)
 // /dev/… pages are development only (frontend/scripts/check-dist.js fails a build that ships one), so caddy never serves them

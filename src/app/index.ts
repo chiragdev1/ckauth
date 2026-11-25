@@ -11,8 +11,16 @@ import { isOidcEnabled } from './oidc/enabled.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { requestLogger } from './middlewares/request-logger.js';
 import { refuseCrossSite } from './middlewares/refuse-cross-site.js';
+import { getFrontendUrl } from './auth/utils/constants.js';
 
 export function createExpressApplication(): Express {
+  // email links, the cross-site check and the oidc issuer are all built from it. a value without http(s)://
+  // (`ckauth.chiragdev.com`) would otherwise be a 500 on every write and on discovery, so refuse to start instead
+  const frontendUrl = URL.parse(getFrontendUrl())
+  if(!frontendUrl || !['http:', 'https:'].includes(frontendUrl.protocol)) {
+    throw new Error('FRONTEND_URL must be an absolute http(s) url, such as https://ckauth.chiragdev.com')
+  }
+
   const app = express()
 
   // in production caddy sits in front, so trust one proxy hop for req.ip and req.secure

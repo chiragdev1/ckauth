@@ -724,7 +724,7 @@ The JWKS (JSON Web Key Set, RFC 7517): the public half of every key a valid CKAu
 
 | Status | When |
 |---|---|
-| `503` | `OIDC_SIGNING_KEY` isn't set (`Sign in with CKAuth is not configured`). The key is read on each request until one loads, so setting it works without a code change. |
+| `503` | `OIDC_SIGNING_KEY` isn't set (`Sign in with CKAuth is not configured`). Set it in `/opt/ckauth/api.env` and run `docker compose up -d api`; the key is read once per process. |
 | `500` | `OIDC_SIGNING_KEY` isn't a valid P-256 (ES256) private key in PKCS #8 PEM format. |
 
 ---

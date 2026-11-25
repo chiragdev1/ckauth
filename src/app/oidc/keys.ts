@@ -9,14 +9,13 @@ export type SigningKey = {kid: string, privateKey: CryptoKey, publicJwk: jose.JW
 let signingKey: Promise<SigningKey> | null = null
 
 // read on first use, like imagekit.ts, so the rest of the api still starts without a key configured.
-// the private key lives only in the environment (a pkcs8 pem), never in the database or the logs
+// the private key lives only in the environment (a pkcs8 pem), never in the database or the logs.
+// a failure is cached too: the environment can't change while the process runs (a new key means
+// `docker compose up -d api`, a new process), and retrying would re-import a bad key on every hit to the public,
+// unlimited jwks endpoint
 export function getSigningKey(): Promise<SigningKey> {
   if(!signingKey) {
-    signingKey = loadSigningKey(process.env.OIDC_SIGNING_KEY).catch(error => {
-      // not cached: a key added to the environment later works after `docker compose up -d api` without a code change
-      signingKey = null
-      throw error
-    })
+    signingKey = loadSigningKey(process.env.OIDC_SIGNING_KEY)
   }
   return signingKey
 }
@@ -34,7 +33,7 @@ async function loadSigningKey(pem: string | undefined): Promise<SigningKey> {
   return {kid, privateKey, publicJwk: {...publicJwk, kid, alg: OIDC_SIGNING_ALG, use: 'sig'}}
 }
 
-// tests only: forget the loaded key, so a test can change OIDC_SIGNING_KEY
+// tests only: forget the loaded key (or the failure), as a restart would, so a test can change OIDC_SIGNING_KEY
 export function resetSigningKeyForTests() {
   signingKey = null
 }
